@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
+import {BatchManagementPage} from './pages/sales/BatchManagementPage';
+import {FacultyBatchesPage} from './pages/faculty/FacultyBatchesPage';
 
 
 // Placeholder screen for pending sub-pages
@@ -32,7 +34,7 @@ export default function App() {
 
             {/* Faculty Routes */}
             <Route path="faculty" element={<Placeholder title="Faculty Dashboard" />} />
-            <Route path="faculty/batches" element={<BatchManagementPage />} />
+            <Route path="faculty/batches" element={<FacultyBatchesPage />} />
             <Route path="faculty/attendance" element={<Placeholder title="Faculty Attendance" />} />
             <Route path="faculty/demos" element={<Placeholder title="Assigned Demos" />} />
 
