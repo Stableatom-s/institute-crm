@@ -1,6 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
+import { FacultyBatchesPage } from './pages/faculty/FacultyBatchesPage';
+
+
+
 
 // Placeholder screen while building
 const Placeholder = ({ title }: { title: string }) => (
@@ -32,12 +36,14 @@ export default function App() {
             <Route path="faculty" element={<Placeholder title="Faculty Dashboard" />} />
             <Route path="faculty/attendance" element={<Placeholder title="Faculty Attendance" />} />
             <Route path="faculty/demos" element={<Placeholder title="Assigned Demos" />} />
-            <Route path="faculty/batches" element={<Placeholder title="Assigned Batches" />} />
-            <Route path="faculty/students" element={<Placeholder title="Student Roster" />} />
+            <Route path="faculty/batches" element={<FacultyBatchesPage />} />
+
 
             {/* Admin Routes */}
             <Route path="admin" element={<Placeholder title="Admin Dashboard" />} />
             <Route path="admin/*" element={<Placeholder title="Admin Management Module" />} />
+
+
           </Route>
         </Routes>
       </BrowserRouter>
