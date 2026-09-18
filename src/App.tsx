@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
-import { BatchManagementPage } from './pages/sales/BatchManagementPage';
+
 
 // Placeholder screen for pending sub-pages
 const Placeholder = ({ title }: { title: string }) => (
@@ -35,12 +35,14 @@ export default function App() {
             <Route path="faculty/batches" element={<BatchManagementPage />} />
             <Route path="faculty/attendance" element={<Placeholder title="Faculty Attendance" />} />
             <Route path="faculty/demos" element={<Placeholder title="Assigned Demos" />} />
-            <Route path="faculty/students" element={<Placeholder title="Student Roster" />} />
+
 
             {/* Admin Routes */}
             <Route path="admin" element={<Placeholder title="Admin Dashboard" />} />
             <Route path="admin/batches" element={<BatchManagementPage />} />
             <Route path="admin/*" element={<Placeholder title="Admin Management Module" />} />
+
+
           </Route>
         </Routes>
       </BrowserRouter>
