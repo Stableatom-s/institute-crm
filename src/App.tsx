@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { BatchManagementPage } from './pages/sales/BatchManagementPage';
+import { DemoManagementPage } from './pages/sales/DemoManagementPage';
 import { FacultyBatchesPage } from './pages/faculty/FacultyBatchesPage';
 import { FacultyDemoPage } from './pages/faculty/FacultyDemosPage';
 
@@ -27,8 +28,8 @@ export default function App() {
             <Route path="sales/batches" element={<BatchManagementPage />} />
             <Route path="sales/leads" element={<Placeholder title="Leads Directory" />} />
             <Route path="sales/follow-up" element={<Placeholder title="Follow-up Log" />} />
-            <Route path="sales/demos" element={<Placeholder title="Sales Demo Management" />} />
-            <Route path="sales/demo-management" element={<Placeholder title="Sales Demo Management" />} />
+            <Route path="sales/demos" element={<DemoManagementPage />} />
+            <Route path="sales/demo-management" element={<DemoManagementPage />} />
             <Route path="sales/fees" element={<Placeholder title="Fees Management" />} />
             <Route path="sales/fees-management" element={<Placeholder title="Fees Management" />} />
             <Route path="sales/invoices" element={<Placeholder title="Invoices" />} />
