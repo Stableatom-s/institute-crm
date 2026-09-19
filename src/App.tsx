@@ -1,13 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
-import {BatchManagementPage} from './pages/sales/BatchManagementPage';
-import {FacultyBatchesPage} from './pages/faculty/FacultyBatchesPage';
-
+import { BatchManagementPage } from './pages/sales/BatchManagementPage';
+import { FacultyBatchesPage } from './pages/faculty/FacultyBatchesPage';
+import { FacultyDemoPage } from './pages/faculty/FacultyDemosPage';
 
 // Placeholder screen for pending sub-pages
 const Placeholder = ({ title }: { title: string }) => (
-  <div className="p-8 bg-white border border-[#050720]/10 rounded-2xl shadow-sm font-['Onest']">
+  <div className="p-8 bg-white border border-[#050720]/10 rounded-2xl shadow-xs font-['Onest']">
     <h1 className="text-xl font-bold text-[#050720] font-['Sora']">{title}</h1>
     <p className="text-xs text-[#050720]/50 mt-1">Ready for implementation.</p>
   </div>
@@ -19,32 +19,49 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<AppLayout />}>
-            {/* Redirect root directly to Batches */}
-            <Route index element={<Navigate to="/sales/batches" replace />} />
+            {/* Root default redirect */}
+            <Route index element={<Navigate to="/faculty/demo-management" replace />} />
 
-            {/* Sales Rep Routes */}
+            {/* ─── Sales Rep Routes ─── */}
             <Route path="sales" element={<Navigate to="/sales/batches" replace />} />
             <Route path="sales/batches" element={<BatchManagementPage />} />
             <Route path="sales/leads" element={<Placeholder title="Leads Directory" />} />
             <Route path="sales/follow-up" element={<Placeholder title="Follow-up Log" />} />
-            <Route path="sales/demos" element={<Placeholder title="Demo Management" />} />
+            <Route path="sales/demos" element={<Placeholder title="Sales Demo Management" />} />
+            <Route path="sales/demo-management" element={<Placeholder title="Sales Demo Management" />} />
             <Route path="sales/fees" element={<Placeholder title="Fees Management" />} />
+            <Route path="sales/fees-management" element={<Placeholder title="Fees Management" />} />
             <Route path="sales/invoices" element={<Placeholder title="Invoices" />} />
             <Route path="sales/attendance" element={<Placeholder title="My Attendance" />} />
+            <Route path="sales/my-attendance" element={<Placeholder title="My Attendance" />} />
 
-            {/* Faculty Routes */}
-            <Route path="faculty" element={<Placeholder title="Faculty Dashboard" />} />
+            {/* ─── Faculty Routes ─── */}
+            <Route path="faculty" element={<Navigate to="/faculty/demo-management" replace />} />
+            <Route path="faculty/dashboard" element={<Placeholder title="Faculty Dashboard" />} />
             <Route path="faculty/batches" element={<FacultyBatchesPage />} />
+            <Route path="faculty/batch" element={<FacultyBatchesPage />} />
             <Route path="faculty/attendance" element={<Placeholder title="Faculty Attendance" />} />
-            <Route path="faculty/demos" element={<Placeholder title="Assigned Demos" />} />
+            <Route path="faculty/my-attendance" element={<Placeholder title="Faculty Attendance" />} />
+            <Route path="faculty/demos" element={<FacultyDemoPage />} />
+            <Route path="faculty/demo-management" element={<FacultyDemoPage />} />
+            <Route path="faculty/student-management" element={<Placeholder title="Student Management" />} />
+            <Route path="faculty/students" element={<Placeholder title="Student Management" />} />
 
-
-            {/* Admin Routes */}
+            {/* ─── Admin Routes ─── */}
             <Route path="admin" element={<Placeholder title="Admin Dashboard" />} />
-            <Route path="admin/batches" element={<BatchManagementPage />} />
-            <Route path="admin/*" element={<Placeholder title="Admin Management Module" />} />
+            <Route path="admin/dashboard" element={<Placeholder title="Admin Dashboard" />} />
+            <Route path="admin/demo-management" element={<Placeholder title="Admin Demo Management" />} />
+            <Route path="admin/leads" element={<Placeholder title="Admin Leads" />} />
+            <Route path="admin/batches" element={<Placeholder title="Admin Batches" />} />
+            <Route path="admin/batch" element={<Placeholder title="Admin Batches" />} />
+            <Route path="admin/student" element={<Placeholder title="Admin Students" />} />
+            <Route path="admin/attendance" element={<Placeholder title="Institute Attendance" />} />
+            <Route path="admin/leave" element={<Placeholder title="Leave Management" />} />
+            <Route path="admin/team" element={<Placeholder title="Team Members" />} />
+            <Route path="admin/invoices" element={<Placeholder title="Admin Invoices & Collections" />} />
 
-
+            {/* Catch-all 404 fallback */}
+            <Route path="*" element={<Navigate to="/faculty/demo-management" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>
