@@ -3,10 +3,13 @@ import { AuthProvider } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { BatchManagementPage } from './pages/sales/BatchManagementPage';
 import { DemoManagementPage } from './pages/sales/DemoManagementPage';
+import { SalesLeadsPage } from './pages/sales/SalesLeadsPage';
+import { FollowUpPage } from './pages/sales/FollowUpPage';
 import { FacultyBatchesPage } from './pages/faculty/FacultyBatchesPage';
 import { FacultyDemoPage } from './pages/faculty/FacultyDemosPage';
 import { FacultyStudentsPage } from './pages/faculty/FacultyStudentsPage';
 import { FacultyAttendancePage } from './pages/faculty/FacultyAttendancePage';
+
 
 // Placeholder screen for pending sub-pages
 const Placeholder = ({ title }: { title: string }) => (
@@ -28,8 +31,8 @@ export default function App() {
             {/* ─── Sales Rep Routes ─── */}
             <Route path="sales" element={<Navigate to="/sales/batches" replace />} />
             <Route path="sales/batches" element={<BatchManagementPage />} />
-            <Route path="sales/leads" element={<Placeholder title="Leads Directory" />} />
-            <Route path="sales/follow-up" element={<Placeholder title="Follow-up Log" />} />
+            <Route path="sales/leads" element={<SalesLeadsPage />} />
+            <Route path="sales/follow-up" element={<FollowUpPage />} />
             <Route path="sales/demos" element={<DemoManagementPage />} />
             <Route path="sales/demo-management" element={<DemoManagementPage />} />
             <Route path="sales/fees" element={<Placeholder title="Fees Management" />} />
@@ -43,7 +46,7 @@ export default function App() {
             <Route path="faculty/dashboard" element={<Placeholder title="Faculty Dashboard" />} />
             <Route path="faculty/batches" element={<FacultyBatchesPage />} />
             <Route path="faculty/batch" element={<FacultyBatchesPage />} />
-            <Route path="faculty/attendance" element={<FacultyAttendancePage />} />            
+            <Route path="faculty/attendance" element={<FacultyAttendancePage />} />
             <Route path="faculty/my-attendance" element={<Placeholder title="Faculty Attendance" />} />
             <Route path="faculty/demos" element={<FacultyDemoPage />} />
             <Route path="faculty/demo-management" element={<FacultyDemoPage />} />
