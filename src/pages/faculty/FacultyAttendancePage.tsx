@@ -1,12 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  ArrowLeft, 
-  Clock, 
-  Calendar as CalendarIcon, 
-  Plus, 
-  MoreVertical, 
-  CheckCircle2, 
-  X,
+import {
+  ArrowLeft,
+  Plus,
+  MoreVertical,
   FileText
 } from 'lucide-react';
 
