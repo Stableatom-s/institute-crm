@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, Plus, Check } from 'lucide-react';
 
 type ViewMode = 'list' | 'batch-details' | 'lecture-view' | 'add-lecture' | 'student-details';
@@ -12,6 +13,9 @@ interface Student {
   attendanceRatio: string;
   remark: string;
   presentInLecture?: boolean;
+  email?: string;
+  course?: string;
+  batchCode?: string;
 }
 
 interface Lecture {
@@ -26,8 +30,33 @@ interface Lecture {
   assignmentGiven: string;
 }
 
+interface RouteState {
+  openStudentDetail?: boolean;
+  activeTab?: string;
+  from?: 'students' | 'batches';
+  batchCode?: string;
+  student?: {
+    id: string;
+    srNo?: string;
+    name: string;
+    startDate: string;
+    contact: string;
+    attendance?: string;
+    attendanceRatio?: string;
+    remark: string;
+    course?: string;
+    batchCode?: string;
+    email?: string;
+  };
+}
+
 export const FacultyBatchesPage: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const stateData = location.state as RouteState | null;
+
   const [currentView, setCurrentView] = useState<ViewMode>('list');
+  const [navOrigin, setNavOrigin] = useState<'students' | 'batches'>('batches');
   const [selectedBatchCode, setSelectedBatchCode] = useState('MWF-JAN-2026');
   const [selectedLecture, setSelectedLecture] = useState<Lecture | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -80,6 +109,39 @@ export const FacultyBatchesPage: React.FC = () => {
       assignmentGiven: 'Wireframe one onboarding screen',
     },
   ]);
+
+  // Handle incoming student view trigger from Student Management page
+  useEffect(() => {
+    if (stateData?.student) {
+      const incoming = stateData.student;
+      setSelectedStudent({
+        id: incoming.id,
+        srNo: incoming.srNo || '01',
+        name: incoming.name,
+        startDate: incoming.startDate,
+        contact: incoming.contact,
+        attendanceRatio: incoming.attendanceRatio || incoming.attendance || '02/02',
+        remark: incoming.remark,
+        email: incoming.email,
+        course: incoming.course,
+        batchCode: incoming.batchCode,
+      });
+
+      if (incoming.batchCode) {
+        setSelectedBatchCode(incoming.batchCode);
+      }
+      setNavOrigin(stateData.from || 'batches');
+      setCurrentView('student-details');
+    }
+  }, [stateData]);
+
+  const handleBackFromStudentDetails = () => {
+    if (navOrigin === 'students') {
+      navigate('/faculty/student-management');
+    } else {
+      setCurrentView('batch-details');
+    }
+  };
 
   const toggleStudentAttendance = (studentId: string) => {
     setStudents((prev) =>
@@ -176,9 +238,10 @@ export const FacultyBatchesPage: React.FC = () => {
                       <button
                         onClick={() => {
                           setSelectedBatchCode(row.batch);
+                          setNavOrigin('batches');
                           setCurrentView('batch-details');
                         }}
-                        className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5"
+                        className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 cursor-pointer"
                       >
                         View
                       </button>
@@ -199,7 +262,7 @@ export const FacultyBatchesPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentView('list')}
-              className="p-1 rounded hover:bg-slate-100 text-[#050720]"
+              className="p-1 rounded hover:bg-slate-100 text-[#050720] cursor-pointer"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -279,9 +342,10 @@ export const FacultyBatchesPage: React.FC = () => {
                       <button
                         onClick={() => {
                           setSelectedStudent(st);
+                          setNavOrigin('batches');
                           setCurrentView('student-details');
                         }}
-                        className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5"
+                        className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 cursor-pointer"
                       >
                         View
                       </button>
@@ -298,7 +362,7 @@ export const FacultyBatchesPage: React.FC = () => {
               <h3 className="text-sm font-bold text-[#050720] font-['Sora']">Lectures</h3>
               <button
                 onClick={() => setCurrentView('add-lecture')}
-                className="flex items-center gap-1 px-4 py-1.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720]"
+                className="flex items-center gap-1 px-4 py-1.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add new lecture</span>
@@ -329,7 +393,7 @@ export const FacultyBatchesPage: React.FC = () => {
                           setSelectedLecture(lec);
                           setCurrentView('lecture-view');
                         }}
-                        className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5"
+                        className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 cursor-pointer"
                       >
                         View
                       </button>
@@ -350,7 +414,7 @@ export const FacultyBatchesPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentView('batch-details')}
-              className="p-1 rounded hover:bg-slate-100 text-[#050720]"
+              className="p-1 rounded hover:bg-slate-100 text-[#050720] cursor-pointer"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -448,7 +512,7 @@ export const FacultyBatchesPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentView('batch-details')}
-              className="p-1 rounded hover:bg-slate-100 text-[#050720]"
+              className="p-1 rounded hover:bg-slate-100 text-[#050720] cursor-pointer"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -567,13 +631,13 @@ export const FacultyBatchesPage: React.FC = () => {
           <div className="flex gap-4">
             <button
               onClick={() => setCurrentView('batch-details')}
-              className="w-1/2 py-3 border border-[#050720]/30 rounded-lg text-xs font-bold text-[#050720] hover:bg-slate-50 transition-colors"
+              className="w-1/2 py-3 border border-[#050720]/30 rounded-lg text-xs font-bold text-[#050720] hover:bg-slate-50 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={handleSaveLecture}
-              className="w-1/2 py-3 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors"
+              className="w-1/2 py-3 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors cursor-pointer"
             >
               Save
             </button>
@@ -588,8 +652,8 @@ export const FacultyBatchesPage: React.FC = () => {
         <div className="space-y-6">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setCurrentView('batch-details')}
-              className="p-1 rounded hover:bg-slate-100 text-[#050720]"
+              onClick={handleBackFromStudentDetails}
+              className="p-1 rounded hover:bg-slate-100 text-[#050720] cursor-pointer"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -606,15 +670,15 @@ export const FacultyBatchesPage: React.FC = () => {
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Last Name</span>
-                <span className="font-semibold text-[#050720]">{selectedStudent.name.split(' ')[1] || 'Junnarkar'}</span>
+                <span className="font-semibold text-[#050720]">{selectedStudent.name.split(' ').slice(1).join(' ') || 'Junnarkar'}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Batch</span>
-                <span className="font-semibold text-[#050720]">{selectedBatchCode}</span>
+                <span className="font-semibold text-[#050720]">{selectedStudent.batchCode || selectedBatchCode}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Course</span>
-                <span className="font-semibold text-[#050720]">UI/UX Design</span>
+                <span className="font-semibold text-[#050720]">{selectedStudent.course || 'UI/UX Design'}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Start Date</span>

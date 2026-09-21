@@ -5,6 +5,8 @@ import { BatchManagementPage } from './pages/sales/BatchManagementPage';
 import { DemoManagementPage } from './pages/sales/DemoManagementPage';
 import { FacultyBatchesPage } from './pages/faculty/FacultyBatchesPage';
 import { FacultyDemoPage } from './pages/faculty/FacultyDemosPage';
+import { FacultyStudentsPage } from './pages/faculty/FacultyStudentsPage';
+import { FacultyAttendancePage } from './pages/faculty/FacultyAttendancePage';
 
 // Placeholder screen for pending sub-pages
 const Placeholder = ({ title }: { title: string }) => (
@@ -41,12 +43,12 @@ export default function App() {
             <Route path="faculty/dashboard" element={<Placeholder title="Faculty Dashboard" />} />
             <Route path="faculty/batches" element={<FacultyBatchesPage />} />
             <Route path="faculty/batch" element={<FacultyBatchesPage />} />
-            <Route path="faculty/attendance" element={<Placeholder title="Faculty Attendance" />} />
+            <Route path="faculty/attendance" element={<FacultyAttendancePage />} />            
             <Route path="faculty/my-attendance" element={<Placeholder title="Faculty Attendance" />} />
             <Route path="faculty/demos" element={<FacultyDemoPage />} />
             <Route path="faculty/demo-management" element={<FacultyDemoPage />} />
-            <Route path="faculty/student-management" element={<Placeholder title="Student Management" />} />
-            <Route path="faculty/students" element={<Placeholder title="Student Management" />} />
+            <Route path="faculty/student-management" element={<FacultyStudentsPage />} />
+            <Route path="faculty/students" element={<FacultyStudentsPage />} />
 
             {/* ─── Admin Routes ─── */}
             <Route path="admin" element={<Placeholder title="Admin Dashboard" />} />
