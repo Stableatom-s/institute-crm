@@ -1,10 +1,16 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
+
+
 import { BatchManagementPage } from './pages/sales/BatchManagementPage';
 import { DemoManagementPage } from './pages/sales/DemoManagementPage';
 import { SalesLeadsPage } from './pages/sales/SalesLeadsPage';
 import { FollowUpPage } from './pages/sales/FollowUpPage';
+import { SalesInvoicesPage } from './pages/sales/SalesInvoicesPage';
+import { FeesManagementPage } from './pages/sales/FeesManagementPage';
+
+
 import { FacultyBatchesPage } from './pages/faculty/FacultyBatchesPage';
 import { FacultyDemoPage } from './pages/faculty/FacultyDemosPage';
 import { FacultyStudentsPage } from './pages/faculty/FacultyStudentsPage';
@@ -35,9 +41,9 @@ export default function App() {
             <Route path="sales/follow-up" element={<FollowUpPage />} />
             <Route path="sales/demos" element={<DemoManagementPage />} />
             <Route path="sales/demo-management" element={<DemoManagementPage />} />
-            <Route path="sales/fees" element={<Placeholder title="Fees Management" />} />
+            <Route path="sales/fees" element={<FeesManagementPage />} />
             <Route path="sales/fees-management" element={<Placeholder title="Fees Management" />} />
-            <Route path="sales/invoices" element={<Placeholder title="Invoices" />} />
+            <Route path="sales/invoices" element={<SalesInvoicesPage />} />
             <Route path="sales/attendance" element={<Placeholder title="My Attendance" />} />
             <Route path="sales/my-attendance" element={<Placeholder title="My Attendance" />} />
 
