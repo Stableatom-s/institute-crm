@@ -580,6 +580,15 @@ export const FeesManagementPage: React.FC = () => {
                         <option value="January">January</option>
                         <option value="February">February</option>
                         <option value="March">March</option>
+                        <option value="April">April</option>
+                        <option value="May">May</option>
+                        <option value="June">June</option>
+                        <option value="July">July</option>
+                        <option value="August">August</option>
+                        <option value="September">September</option>
+                        <option value="October">October</option>
+                        <option value="November">November</option>
+                        <option value="December">December</option>
                       </select>
                       <ChevronDown className="w-3.5 h-3.5 text-[#050720]/50 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
