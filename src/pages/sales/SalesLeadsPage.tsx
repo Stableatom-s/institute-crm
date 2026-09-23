@@ -1,19 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Plus, 
-  ChevronDown, 
-  ChevronUp, 
-  ChevronLeft, 
-  ChevronRight, 
+import React, { useState, useEffect } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Calendar,
   Save,
-  Check
-} from 'lucide-react';
+  Check,
+} from "lucide-react";
 
 // --- TYPES ---
-export type LeadStatus = 'Interested' | 'Not Interested' | 'Demo Scheduled' | 'Enrolled' | 'Contacted';
+export type LeadStatus =
+  | "Interested"
+  | "Not Interested"
+  | "Demo Scheduled"
+  | "Enrolled"
+  | "Contacted";
 
 export interface TimelineEntry {
   id: string;
@@ -40,175 +45,241 @@ export interface DetailedLead {
   address: string;
   offeredFees?: string;
   finalFees?: string;
-  referral?: 'Yes' | 'No';
-  enquiringFor?: 'Self' | 'Other';
+  referral?: "Yes" | "No";
+  enquiringFor?: "Self" | "Other";
   timeline: TimelineEntry[];
 }
 
 // --- INITIAL SEED DATA ---
 const INITIAL_LEADS: DetailedLead[] = [
   {
-    id: 'lead-1',
-    srNo: '01',
-    firstName: 'Aanya',
-    lastName: 'Shah',
-    contactNo: '9078675645',
-    email: 'aanya@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'UI/UX Design',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Needs Time',
-    occupation: 'Working',
-    leadSource: 'Instagram',
-    address: 'Pune',
-    offeredFees: '₹35,000',
-    finalFees: '₹35,000',
-    referral: 'No',
-    enquiringFor: 'Self',
+    id: "lead-1",
+    srNo: "01",
+    firstName: "Aanya",
+    lastName: "Shah",
+    contactNo: "9078675645",
+    email: "aanya@gmail.com",
+    enquiryDate: "21-12-2025",
+    course: "UI/UX Design",
+    status: "Interested",
+    followUp: "01-01-2026",
+    remark: "Needs Time",
+    occupation: "Working",
+    leadSource: "Instagram",
+    address: "Pune",
+    offeredFees: "₹35,000",
+    finalFees: "₹35,000",
+    referral: "No",
+    enquiringFor: "Self",
     timeline: [
-      { id: 't1', timestamp: '15-11-2025, 10:05 AM', status: 'Interested', title: 'Lead Remark', description: 'Lead created via inquiry form' },
-      { id: 't2', timestamp: '16-11-2025, 10:10 AM', status: 'Interested', title: 'Lead Remark', description: 'Student requested a demo session' },
-      { id: 't3', timestamp: '17-11-2025, 10:10 AM', status: 'Demo Scheduled', title: 'Lead Remark', description: 'Demo scheduled at 12:00 PM' },
-    ]
+      {
+        id: "t1",
+        timestamp: "15-11-2025, 10:05 AM",
+        status: "Interested",
+        title: "Lead Remark",
+        description: "Lead created via inquiry form",
+      },
+      {
+        id: "t2",
+        timestamp: "16-11-2025, 10:10 AM",
+        status: "Interested",
+        title: "Lead Remark",
+        description: "Student requested a demo session",
+      },
+      {
+        id: "t3",
+        timestamp: "17-11-2025, 10:10 AM",
+        status: "Demo Scheduled",
+        title: "Lead Remark",
+        description: "Demo scheduled at 12:00 PM",
+      },
+    ],
   },
   {
-    id: 'lead-2',
-    srNo: '02',
-    firstName: 'Rohan',
-    lastName: 'Mehta',
-    contactNo: '9123456565',
-    email: 'rohan.m@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'No Code',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Needs Time',
-    occupation: 'College Student',
-    leadSource: 'Google Search',
-    address: 'Mumbai',
+    id: "lead-2",
+    srNo: "02",
+    firstName: "Rohan",
+    lastName: "Mehta",
+    contactNo: "9123456565",
+    email: "rohan.m@gmail.com",
+    enquiryDate: "21-12-2025",
+    course: "No Code",
+    status: "Interested",
+    followUp: "01-01-2026",
+    remark: "Needs Time",
+    occupation: "College Student",
+    leadSource: "Google Search",
+    address: "Mumbai",
     timeline: [
-      { id: 't4', timestamp: '21-12-2025, 11:00 AM', status: 'Interested', title: 'Lead Remark', description: 'Initial contact via website' }
-    ]
+      {
+        id: "t4",
+        timestamp: "21-12-2025, 11:00 AM",
+        status: "Interested",
+        title: "Lead Remark",
+        description: "Initial contact via website",
+      },
+    ],
   },
   {
-    id: 'lead-3',
-    srNo: '03',
-    firstName: 'Neha',
-    lastName: 'Patel',
-    contactNo: '9767564995',
-    email: 'neha.patel@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'UI/UX Design',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Joining Soon',
-    occupation: 'Working',
-    leadSource: 'LinkedIn',
-    address: 'Pune',
+    id: "lead-3",
+    srNo: "03",
+    firstName: "Neha",
+    lastName: "Patel",
+    contactNo: "9767564995",
+    email: "neha.patel@gmail.com",
+    enquiryDate: "21-12-2025",
+    course: "UI/UX Design",
+    status: "Interested",
+    followUp: "01-01-2026",
+    remark: "Joining Soon",
+    occupation: "Working",
+    leadSource: "LinkedIn",
+    address: "Pune",
     timeline: [
-      { id: 't5', timestamp: '21-12-2025, 02:30 PM', status: 'Interested', title: 'Lead Remark', description: 'Interested in weekend batch' }
-    ]
+      {
+        id: "t5",
+        timestamp: "21-12-2025, 02:30 PM",
+        status: "Interested",
+        title: "Lead Remark",
+        description: "Interested in weekend batch",
+      },
+    ],
   },
   {
-    id: 'lead-4',
-    srNo: '04',
-    firstName: 'Aman',
-    lastName: 'Verma',
-    contactNo: '9876694837',
-    email: 'aman.v@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'Portfolio',
-    status: 'Not Interested',
-    followUp: '01-01-2026',
-    remark: 'Call Back',
-    occupation: 'College Student',
-    leadSource: 'Walk-in',
-    address: 'Pune',
+    id: "lead-4",
+    srNo: "04",
+    firstName: "Aman",
+    lastName: "Verma",
+    contactNo: "9876694837",
+    email: "aman.v@gmail.com",
+    enquiryDate: "21-12-2025",
+    course: "Portfolio",
+    status: "Not Interested",
+    followUp: "01-01-2026",
+    remark: "Call Back",
+    occupation: "College Student",
+    leadSource: "Walk-in",
+    address: "Pune",
     timeline: [
-      { id: 't6', timestamp: '21-12-2025, 04:15 PM', status: 'Not Interested', title: 'Lead Remark', description: 'Requested call back next month' }
-    ]
+      {
+        id: "t6",
+        timestamp: "21-12-2025, 04:15 PM",
+        status: "Not Interested",
+        title: "Lead Remark",
+        description: "Requested call back next month",
+      },
+    ],
   },
   {
-    id: 'lead-5',
-    srNo: '05',
-    firstName: 'Siddhi',
-    lastName: 'Shah',
-    contactNo: '9456578342',
-    email: 'siddhi.s@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'Full-Stack',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Joining Soon',
-    occupation: 'Working',
-    leadSource: 'Friend Referral',
-    address: 'Pune',
+    id: "lead-5",
+    srNo: "05",
+    firstName: "Siddhi",
+    lastName: "Shah",
+    contactNo: "9456578342",
+    email: "siddhi.s@gmail.com",
+    enquiryDate: "21-12-2025",
+    course: "Full-Stack",
+    status: "Interested",
+    followUp: "01-01-2026",
+    remark: "Joining Soon",
+    occupation: "Working",
+    leadSource: "Friend Referral",
+    address: "Pune",
     timeline: [
-      { id: 't7', timestamp: '21-12-2025, 05:00 PM', status: 'Interested', title: 'Lead Remark', description: 'Wants placement assistance details' }
-    ]
+      {
+        id: "t7",
+        timestamp: "21-12-2025, 05:00 PM",
+        status: "Interested",
+        title: "Lead Remark",
+        description: "Wants placement assistance details",
+      },
+    ],
   },
 ];
 
-const COURSES = ['All', 'UI/UX Design', 'No Code', 'Portfolio', 'Full-Stack', 'React Native'];
-const STATUSES = ['All', 'Interested', 'Not Interested', 'Demo Scheduled', 'Enrolled'];
+const COURSES = [
+  "All",
+  "UI/UX Design",
+  "No Code",
+  "Portfolio",
+  "Full-Stack",
+  "React Native",
+];
+
+const STATUSES = [
+  "All",
+  "Interested",
+  "Not Interested",
+  "Demo Scheduled",
+  "Enrolled",
+];
 
 export const SalesLeadsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Navigation states: 'list' | 'details' | 'add'
-  const [view, setView] = useState<'list' | 'details' | 'add'>('list');
+  const [view, setView] = useState<"list" | "details" | "add">("list");
   const [leads, setLeads] = useState<DetailedLead[]>(INITIAL_LEADS);
-  const [selectedLead, setSelectedLead] = useState<DetailedLead>(INITIAL_LEADS[0]);
+  const [selectedLead, setSelectedLead] = useState<DetailedLead>(
+    INITIAL_LEADS[0],
+  );
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [courseFilter, setCourseFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [courseFilter, setCourseFilter] = useState("All");
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
 
   // Edit Lead Details states
-  const [currentLeadStatus, setCurrentLeadStatus] = useState<LeadStatus>('Interested');
-  const [remarkTitle, setRemarkTitle] = useState('Demo');
-  const [remarkDescription, setRemarkDescription] = useState('');
+  const [currentLeadStatus, setCurrentLeadStatus] =
+    useState<LeadStatus>("Interested");
+  const [remarkTitle, setRemarkTitle] = useState("Demo");
+  const [remarkDescription, setRemarkDescription] = useState("");
   const [isDirty, setIsDirty] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
 
   // Add Lead Form State
-  const [formFirstName, setFormFirstName] = useState('');
-  const [formLastName, setFormLastName] = useState('Shah');
-  const [formMobile, setFormMobile] = useState('9078675645');
-  const [formEmail, setFormEmail] = useState('aanya@gmail.com');
-  const [formOccupation, setFormOccupation] = useState('College Student');
-  const [formLeadSource, setFormLeadSource] = useState('Instagram');
-  const [formEnquiryDate, setFormEnquiryDate] = useState('15-11-2025');
-  const [formAddress, setFormAddress] = useState('Pune');
-  const [formCourses, setFormCourses] = useState<string[]>(['UI/UX Design']);
-  const [formReferral, setFormReferral] = useState<'Yes' | 'No'>('No');
-  const [formOfferedFees, setFormOfferedFees] = useState('₹35,000');
-  const [formFinalFees, setFormFinalFees] = useState('₹35,000');
-  const [formEnquiringFor, setFormEnquiringFor] = useState<'Self' | 'Other'>('Self');
-  const [formStudentName, setFormStudentName] = useState('Aanya Shah');
-  const [formStudentMobile, setFormStudentMobile] = useState('9078675645');
+  const [formFirstName, setFormFirstName] = useState("");
+  const [formLastName, setFormLastName] = useState("Shah");
+  const [formMobile, setFormMobile] = useState("9078675645");
+  const [formEmail, setFormEmail] = useState("aanya@gmail.com");
+  const [formOccupation, setFormOccupation] = useState("College Student");
+  const [formLeadSource, setFormLeadSource] = useState("Instagram");
+  const [formEnquiryDate, setFormEnquiryDate] = useState("15-11-2025");
+  const [formAddress, setFormAddress] = useState("Pune");
+  const [formCourses, setFormCourses] = useState<string[]>(["UI/UX Design"]);
+  const [formReferral, setFormReferral] = useState<"Yes" | "No">("No");
+  const [formOfferedFees, setFormOfferedFees] = useState("₹35,000");
+  const [formFinalFees, setFormFinalFees] = useState("₹35,000");
+  const [formEnquiringFor, setFormEnquiringFor] = useState<"Self" | "Other">(
+    "Self",
+  );
+  const [formStudentName, setFormStudentName] = useState("Aanya Shah");
+  const [formStudentMobile, setFormStudentMobile] = useState("9078675645");
   const [formError, setFormError] = useState(false);
 
   // Deep linking listener: Opens lead directly if URL has `?leadId=...`
   useEffect(() => {
-    const targetId = searchParams.get('leadId');
+    const targetId = searchParams.get("leadId");
     if (targetId) {
       const match = leads.find((l) => l.id === targetId);
       if (match) {
         setSelectedLead(match);
         setCurrentLeadStatus(match.status);
-        setView('details');
+        setView("details");
       }
     }
   }, [searchParams, leads]);
 
   // Filtered Leads
   const filteredLeads = leads.filter((l) => {
-    const matchStatus = statusFilter === 'All' || l.status.toLowerCase() === statusFilter.toLowerCase();
-    const matchCourse = courseFilter === 'All' || l.course.toLowerCase() === courseFilter.toLowerCase();
+    const matchStatus =
+      statusFilter === "All" ||
+      l.status.toLowerCase() === statusFilter.toLowerCase();
+    const matchCourse =
+      courseFilter === "All" ||
+      l.course.toLowerCase() === courseFilter.toLowerCase();
     return matchStatus && matchCourse;
   });
 
@@ -216,10 +287,10 @@ export const SalesLeadsPage: React.FC = () => {
   const handleOpenLead = (lead: DetailedLead) => {
     setSelectedLead(lead);
     setCurrentLeadStatus(lead.status);
-    setRemarkTitle('Demo');
-    setRemarkDescription('');
+    setRemarkTitle("Demo");
+    setRemarkDescription("");
     setIsDirty(false);
-    setView('details');
+    setView("details");
   };
 
   // Back from details check
@@ -228,7 +299,7 @@ export const SalesLeadsPage: React.FC = () => {
       setShowUnsavedModal(true);
     } else {
       setSearchParams({});
-      setView('list');
+      setView("list");
     }
   };
 
@@ -237,7 +308,7 @@ export const SalesLeadsPage: React.FC = () => {
     let updatedTimeline = [...selectedLead.timeline];
     if (remarkDescription.trim()) {
       const now = new Date();
-      const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      const dateStr = `${String(now.getDate()).padStart(2, "0")}-${String(now.getMonth() + 1).padStart(2, "0")}-${now.getFullYear()}, ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
       updatedTimeline.push({
         id: `t-${Date.now()}`,
         timestamp: dateStr,
@@ -255,15 +326,15 @@ export const SalesLeadsPage: React.FC = () => {
 
     setLeads(leads.map((l) => (l.id === updated.id ? updated : l)));
     setSelectedLead(updated);
-    setRemarkDescription('');
+    setRemarkDescription("");
     setIsDirty(false);
-    alert('Lead details saved successfully!');
+    alert("Lead details saved successfully!");
   };
 
   // Toggle course checkbox in Add Form
   const toggleCourseCheckbox = (c: string) => {
     setFormCourses((prev) =>
-      prev.includes(c) ? prev.filter((item) => item !== c) : [...prev, c]
+      prev.includes(c) ? prev.filter((item) => item !== c) : [...prev, c],
     );
   };
 
@@ -277,16 +348,16 @@ export const SalesLeadsPage: React.FC = () => {
 
     const newLead: DetailedLead = {
       id: `lead-${Date.now()}`,
-      srNo: String(leads.length + 1).padStart(2, '0'),
+      srNo: String(leads.length + 1).padStart(2, "0"),
       firstName: formFirstName,
       lastName: formLastName,
       contactNo: formMobile,
       email: formEmail,
       enquiryDate: formEnquiryDate,
-      course: formCourses[0] || 'UI/UX Design',
-      status: 'Interested',
-      followUp: '01-01-2026',
-      remark: 'Newly Added',
+      course: formCourses[0] || "UI/UX Design",
+      status: "Interested",
+      followUp: "01-01-2026",
+      remark: "Newly Added",
       occupation: formOccupation,
       leadSource: formLeadSource,
       address: formAddress,
@@ -298,25 +369,24 @@ export const SalesLeadsPage: React.FC = () => {
         {
           id: `t-${Date.now()}`,
           timestamp: `${formEnquiryDate}, 10:00 AM`,
-          status: 'Interested',
-          title: 'Lead Remark',
-          description: 'Lead created via CRM manual entry',
+          status: "Interested",
+          title: "Lead Remark",
+          description: "Lead created via CRM manual entry",
         },
       ],
     };
 
     setLeads([newLead, ...leads]);
     setSelectedLead(newLead);
-    setView('list');
+    setView("list");
   };
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-
       {/* ========================================================= */}
       {/* 1. LEADS DIRECTORY LISTING                                */}
       {/* ========================================================= */}
-      {view === 'list' && (
+      {view === "list" && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold font-['Sora']">Leads</h1>
 
@@ -324,30 +394,52 @@ export const SalesLeadsPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Total Leads</span>
-              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">150</span>
-              <span className="text-[11px] text-[#050720]/50 font-medium">All time</span>
+              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
+                150
+              </span>
+              <span className="text-[11px] text-[#050720]/50 font-medium">
+                All time
+              </span>
             </div>
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
-              <span className="text-xs font-bold block">Leads created today</span>
-              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">20</span>
-              <span className="text-[11px] text-[#050720]/50 font-medium">+8 Since Yesterday</span>
+              <span className="text-xs font-bold block">
+                Leads created today
+              </span>
+              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
+                20
+              </span>
+              <span className="text-[11px] text-[#050720]/50 font-medium">
+                +8 Since Yesterday
+              </span>
             </div>
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Enrolled</span>
-              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">30</span>
-              <span className="text-[11px] text-[#050720]/50 font-medium">Leads converted to students</span>
+              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
+                30
+              </span>
+              <span className="text-[11px] text-[#050720]/50 font-medium">
+                Leads converted to students
+              </span>
             </div>
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
-              <span className="text-xs font-bold block">Follow-ups Due Today</span>
-              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">05</span>
-              <span className="text-[11px] text-[#050720]/50 font-medium">Action required</span>
+              <span className="text-xs font-bold block">
+                Follow-ups Due Today
+              </span>
+              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
+                05
+              </span>
+              <span className="text-[11px] text-[#050720]/50 font-medium">
+                Action required
+              </span>
             </div>
           </div>
 
           {/* Action Header: Sort Filters + Add Lead Button */}
           <div className="flex justify-between items-center relative z-10 pt-2">
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#050720]/70 font-medium">Sort by:</span>
+              <span className="text-xs text-[#050720]/70 font-medium">
+                Sort by:
+              </span>
 
               {/* Status Filter */}
               <div className="relative">
@@ -358,8 +450,14 @@ export const SalesLeadsPage: React.FC = () => {
                   }}
                   className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[100px]"
                 >
-                  <span>{statusFilter === 'All' ? 'Status' : statusFilter}</span>
-                  {isStatusDropdownOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  <span>
+                    {statusFilter === "All" ? "Status" : statusFilter}
+                  </span>
+                  {isStatusDropdownOpen ? (
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  )}
                 </button>
                 {isStatusDropdownOpen && (
                   <div className="absolute left-0 top-9 w-36 bg-white border border-[#050720]/15 rounded-lg shadow-lg py-1 z-20">
@@ -388,8 +486,14 @@ export const SalesLeadsPage: React.FC = () => {
                   }}
                   className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[100px]"
                 >
-                  <span>{courseFilter === 'All' ? 'Course' : courseFilter}</span>
-                  {isCourseDropdownOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  <span>
+                    {courseFilter === "All" ? "Course" : courseFilter}
+                  </span>
+                  {isCourseDropdownOpen ? (
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  )}
                 </button>
                 {isCourseDropdownOpen && (
                   <div className="absolute left-0 top-9 w-40 bg-white border border-[#050720]/15 rounded-lg shadow-lg py-1 z-20">
@@ -412,9 +516,9 @@ export const SalesLeadsPage: React.FC = () => {
 
             <button
               onClick={() => {
-                setFormFirstName('');
+                setFormFirstName("");
                 setFormError(false);
-                setView('add');
+                setView("add");
               }}
               className="flex items-center gap-1.5 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
             >
@@ -441,18 +545,31 @@ export const SalesLeadsPage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
                 {filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                  <tr
+                    key={lead.id}
+                    className="hover:bg-[#FFB908]/5 transition-colors"
+                  >
                     <td className="py-3.5 text-[#050720]/70">{lead.srNo}</td>
-                    <td className="py-3.5 font-medium">{lead.firstName} {lead.lastName}</td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.contactNo}</td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.enquiryDate}</td>
+                    <td className="py-3.5 font-medium">
+                      {lead.firstName} {lead.lastName}
+                    </td>
+                    <td className="py-3.5 text-[#050720]/70">
+                      {lead.contactNo}
+                    </td>
+                    <td className="py-3.5 text-[#050720]/70">
+                      {lead.enquiryDate}
+                    </td>
                     <td className="py-3.5 text-[#050720]/70">{lead.course}</td>
                     <td className="py-3.5">
-                      <span className={`font-semibold ${lead.status === 'Interested' ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+                      <span
+                        className={`font-semibold ${lead.status === "Interested" ? "text-[#10B981]" : "text-[#EF4444]"}`}
+                      >
                         {lead.status}
                       </span>
                     </td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.followUp}</td>
+                    <td className="py-3.5 text-[#050720]/70">
+                      {lead.followUp}
+                    </td>
                     <td className="py-3.5 text-[#050720]/70">{lead.remark}</td>
                     <td className="py-3.5 text-right">
                       <button
@@ -476,9 +593,15 @@ export const SalesLeadsPage: React.FC = () => {
                 className="w-8 h-7 text-center border border-[#050720]/20 rounded text-xs text-[#050720] font-semibold"
               />
               <div className="flex items-center gap-1.5 ml-2">
-                <button className="p-1 hover:text-[#050720]"><ChevronLeft className="w-3.5 h-3.5" /></button>
-                <span className="text-[11px] font-semibold text-[#050720]">01 of 10</span>
-                <button className="p-1 hover:text-[#050720]"><ChevronRight className="w-3.5 h-3.5" /></button>
+                <button className="p-1 hover:text-[#050720]">
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-[11px] font-semibold text-[#050720]">
+                  01 of 10
+                </span>
+                <button className="p-1 hover:text-[#050720]">
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           </div>
@@ -488,7 +611,7 @@ export const SalesLeadsPage: React.FC = () => {
       {/* ========================================================= */}
       {/* 2. VIEW LEAD DETAILS PAGE                                 */}
       {/* ========================================================= */}
-      {view === 'details' && selectedLead && (
+      {view === "details" && selectedLead && (
         <div className="space-y-6">
           {/* Header Action Bar */}
           <div className="flex justify-between items-center">
@@ -500,14 +623,16 @@ export const SalesLeadsPage: React.FC = () => {
               <span>Lead Details</span>
             </button>
             <div className="flex items-center gap-3">
-              <button 
-                onClick={() => alert('Redirecting to demo scheduling...')}
+              <button
+                onClick={() =>
+                  navigate(`/sales/demos?scheduleLeadId=${selectedLead.id}`)
+                }
                 className="flex items-center gap-2 px-4 py-2 border border-[#050720] rounded-lg text-xs font-bold text-[#050720] hover:bg-[#050720]/5 transition-colors bg-white shadow-xs"
               >
                 <Calendar className="w-4 h-4" />
                 <span>Schedule Demo</span>
               </button>
-              <button 
+              <button
                 onClick={handleSaveLeadChanges}
                 className="flex items-center gap-1.5 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
               >
@@ -523,39 +648,73 @@ export const SalesLeadsPage: React.FC = () => {
             <div className="lg:col-span-2 space-y-6">
               {/* Student Overview Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
-                <h3 className="text-sm font-bold font-['Sora']">Student Overview</h3>
+                <h3 className="text-sm font-bold font-['Sora']">
+                  Student Overview
+                </h3>
                 <div className="grid grid-cols-2 gap-y-4 text-xs">
                   <div>
-                    <span className="text-[10px] text-[#050720]/50 block">First Name</span>
-                    <span className="font-semibold text-sm">{selectedLead.firstName}</span>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      First Name
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLead.firstName}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Last Name</span>
-                    <span className="font-semibold text-sm">{selectedLead.lastName}</span>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      Last Name
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLead.lastName}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Mobile</span>
-                    <span className="font-semibold text-sm">{selectedLead.contactNo}</span>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      Mobile
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLead.contactNo}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Email</span>
-                    <span className="font-semibold text-sm">{selectedLead.email}</span>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      Email
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLead.email}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Occupation</span>
-                    <span className="font-semibold text-sm">{selectedLead.occupation}</span>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      Occupation
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLead.occupation}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Lead Source</span>
-                    <span className="font-semibold text-sm">{selectedLead.leadSource}</span>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      Lead Source
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLead.leadSource}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Enquiry Date</span>
-                    <span className="font-semibold text-sm">{selectedLead.enquiryDate}</span>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      Enquiry Date
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLead.enquiryDate}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Address</span>
-                    <span className="font-semibold text-sm">{selectedLead.address}</span>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      Address
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLead.address}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -565,15 +724,26 @@ export const SalesLeadsPage: React.FC = () => {
                 <h3 className="text-sm font-bold font-['Sora']">Timeline</h3>
                 <div className="space-y-3">
                   {selectedLead.timeline.map((entry) => (
-                    <div key={entry.id} className="border border-[#050720]/10 rounded-xl p-4">
+                    <div
+                      key={entry.id}
+                      className="border border-[#050720]/10 rounded-xl p-4"
+                    >
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-bold text-[#050720]">{entry.timestamp}</span>
-                        <span className={`text-[11px] font-semibold ${entry.status === 'Interested' ? 'text-[#10B981]' : 'text-[#0066FF]'}`}>
+                        <span className="text-xs font-bold text-[#050720]">
+                          {entry.timestamp}
+                        </span>
+                        <span
+                          className={`text-[11px] font-semibold ${entry.status === "Interested" ? "text-[#10B981]" : "text-[#0066FF]"}`}
+                        >
                           {entry.status}
                         </span>
                       </div>
-                      <span className="text-[10px] text-[#050720]/50 block font-medium">{entry.title}</span>
-                      <p className="text-xs text-[#050720]/80 mt-0.5">{entry.description}</p>
+                      <span className="text-[10px] text-[#050720]/50 block font-medium">
+                        {entry.title}
+                      </span>
+                      <p className="text-xs text-[#050720]/80 mt-0.5">
+                        {entry.description}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -584,9 +754,13 @@ export const SalesLeadsPage: React.FC = () => {
             <div className="space-y-6">
               {/* Current Status Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
-                <h3 className="text-sm font-bold font-['Sora']">Current Status</h3>
+                <h3 className="text-sm font-bold font-['Sora']">
+                  Current Status
+                </h3>
                 <div>
-                  <span className="text-[10px] text-[#050720]/50 block mb-1">Status</span>
+                  <span className="text-[10px] text-[#050720]/50 block mb-1">
+                    Status
+                  </span>
                   <div className="relative">
                     <select
                       value={currentLeadStatus}
@@ -596,10 +770,18 @@ export const SalesLeadsPage: React.FC = () => {
                       }}
                       className="w-full bg-[#F8FAFC] text-xs font-semibold text-[#10B981] px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
                     >
-                      <option value="Interested" className="text-[#10B981]">Interested</option>
-                      <option value="Not Interested" className="text-[#EF4444]">Not Interested</option>
-                      <option value="Demo Scheduled" className="text-[#0066FF]">Demo Scheduled</option>
-                      <option value="Enrolled" className="text-[#10B981]">Enrolled</option>
+                      <option value="Interested" className="text-[#10B981]">
+                        Interested
+                      </option>
+                      <option value="Not Interested" className="text-[#EF4444]">
+                        Not Interested
+                      </option>
+                      <option value="Demo Scheduled" className="text-[#0066FF]">
+                        Demo Scheduled
+                      </option>
+                      <option value="Enrolled" className="text-[#10B981]">
+                        Enrolled
+                      </option>
                     </select>
                     <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
@@ -629,7 +811,9 @@ export const SalesLeadsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <span className="text-[10px] text-[#050720]/50 block mb-1">Remark Description</span>
+                  <span className="text-[10px] text-[#050720]/50 block mb-1">
+                    Remark Description
+                  </span>
                   <textarea
                     rows={6}
                     placeholder="Enter remark here.."
@@ -654,8 +838,12 @@ export const SalesLeadsPage: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
             <div>
-              <h2 className="text-lg font-bold font-['Sora'] text-[#050720]">Leave Without Saving?</h2>
-              <p className="text-xs text-[#050720]/60 mt-2">If you leave now, your changes will be lost.</p>
+              <h2 className="text-lg font-bold font-['Sora'] text-[#050720]">
+                Leave Without Saving?
+              </h2>
+              <p className="text-xs text-[#050720]/60 mt-2">
+                If you leave now, your changes will be lost.
+              </p>
             </div>
             <div className="flex gap-3 pt-2">
               <button
@@ -663,7 +851,7 @@ export const SalesLeadsPage: React.FC = () => {
                   setShowUnsavedModal(false);
                   setIsDirty(false);
                   setSearchParams({});
-                  setView('list');
+                  setView("list");
                 }}
                 className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
               >
@@ -674,7 +862,7 @@ export const SalesLeadsPage: React.FC = () => {
                   setShowUnsavedModal(false);
                   handleSaveLeadChanges();
                   setSearchParams({});
-                  setView('list');
+                  setView("list");
                 }}
                 className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
               >
@@ -688,10 +876,10 @@ export const SalesLeadsPage: React.FC = () => {
       {/* ========================================================= */}
       {/* 4. ADD NEW LEADS VIEW                                     */}
       {/* ========================================================= */}
-      {view === 'add' && (
+      {view === "add" && (
         <div className="space-y-6 max-w-4xl">
           <button
-            onClick={() => setView('list')}
+            onClick={() => setView("list")}
             className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
@@ -712,11 +900,15 @@ export const SalesLeadsPage: React.FC = () => {
                     if (e.target.value) setFormError(false);
                   }}
                   className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border ${
-                    formError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
+                    formError
+                      ? "border-rose-500 ring-1 ring-rose-500"
+                      : "border-[#050720]/15"
                   } focus:outline-none`}
                 />
                 {formError && (
-                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">This field is required*</span>
+                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">
+                    This field is required*
+                  </span>
                 )}
               </div>
               <div>
@@ -792,15 +984,28 @@ export const SalesLeadsPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
             <h3 className="text-sm font-bold font-['Sora']">Course</h3>
             <div className="flex flex-wrap items-center gap-6 text-xs">
-              {['UI/UX Design', 'No code Development', 'Full-stack Development', 'Portfolio Building', 'React Native'].map((c) => (
-                <label key={c} className="flex items-center gap-2 cursor-pointer">
+              {[
+                "UI/UX Design",
+                "No code Development",
+                "Full-stack Development",
+                "Portfolio Building",
+                "React Native",
+              ].map((c) => (
+                <label
+                  key={c}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
                   <div
                     onClick={() => toggleCourseCheckbox(c)}
                     className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                      formCourses.includes(c) ? 'bg-[#050720] border-[#050720] text-white' : 'border-[#050720]/30'
+                      formCourses.includes(c)
+                        ? "bg-[#050720] border-[#050720] text-white"
+                        : "border-[#050720]/30"
                     }`}
                   >
-                    {formCourses.includes(c) && <Check className="w-3 h-3 stroke-[3]" />}
+                    {formCourses.includes(c) && (
+                      <Check className="w-3 h-3 stroke-[3]" />
+                    )}
                   </div>
                   <span className="font-medium text-[#050720]">{c}</span>
                 </label>
@@ -816,8 +1021,8 @@ export const SalesLeadsPage: React.FC = () => {
                 <input
                   type="radio"
                   name="refOption"
-                  checked={formReferral === 'Yes'}
-                  onChange={() => setFormReferral('Yes')}
+                  checked={formReferral === "Yes"}
+                  onChange={() => setFormReferral("Yes")}
                   className="w-4 h-4 accent-[#050720]"
                 />
                 <span className="font-medium">Yes</span>
@@ -826,8 +1031,8 @@ export const SalesLeadsPage: React.FC = () => {
                 <input
                   type="radio"
                   name="refOption"
-                  checked={formReferral === 'No'}
-                  onChange={() => setFormReferral('No')}
+                  checked={formReferral === "No"}
+                  onChange={() => setFormReferral("No")}
                   className="w-4 h-4 accent-[#050720]"
                 />
                 <span className="font-medium">No</span>
@@ -865,10 +1070,14 @@ export const SalesLeadsPage: React.FC = () => {
             <h3 className="text-sm font-bold font-['Sora']">Enquiring for</h3>
             <div className="space-y-4">
               <div className="relative">
-                <span className="text-[10px] text-[#050720]/50 block mb-1">Enquiring for</span>
+                <span className="text-[10px] text-[#050720]/50 block mb-1">
+                  Enquiring for
+                </span>
                 <select
                   value={formEnquiringFor}
-                  onChange={(e) => setFormEnquiringFor(e.target.value as 'Self' | 'Other')}
+                  onChange={(e) =>
+                    setFormEnquiringFor(e.target.value as "Self" | "Other")
+                  }
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
                 >
                   <option value="Self">Self</option>
@@ -902,7 +1111,7 @@ export const SalesLeadsPage: React.FC = () => {
           {/* Form Actions */}
           <div className="flex gap-4">
             <button
-              onClick={() => setView('list')}
+              onClick={() => setView("list")}
               className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
             >
               Cancel
@@ -916,7 +1125,6 @@ export const SalesLeadsPage: React.FC = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };
