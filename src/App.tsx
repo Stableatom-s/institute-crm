@@ -9,7 +9,7 @@ import { AdminLeadsPage } from './pages/admin/AdminLeadsPage';
 import { AdminStudentPage } from './pages/admin/StudentPage';
 import { AdminBatchPage } from './pages/admin/AdminBatchesPage';
 import { AdminInvoicesPage } from './pages/admin/AdminInvoicesPage';
-import { AdminDashboardPage } from './pages/admin/AdminDashboard';
+import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminDemosPage } from './pages/admin/AdminDemosPage';
 
 
@@ -73,8 +73,8 @@ export default function App() {
             <Route path="faculty/students" element={<FacultyStudentsPage />} />
 
             {/* ─── Admin Routes ─── */}
-           <Route path="admin" element={<Placeholder title="Admin Dashboard" />} />
-            <Route path="admin" element={<AdminDashboardPage />} />
+           
+            <Route path="admin" element={<AdminDashboard />} />
             <Route path="admin/demos" element={<AdminDemosPage />} />
             <Route path="admin/demo-management" element={<AdminDemosPage />} />
             <Route path="admin/leads" element={<AdminLeadsPage />} />
