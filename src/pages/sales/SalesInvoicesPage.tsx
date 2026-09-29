@@ -1,10 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
   Download, 
   ChevronLeft, 
   ChevronRight 
 } from 'lucide-react';
+import { financeService } from '../../services/financeService';
+import { leadService } from '../../services/leadService';
+
+interface TimelineItem {
+  id: string;
+  installmentTitle: string;
+  dueDate: string;
+  paidDate: string;
+  amount: string;
+  amountLeft: string;
+  status: string;
+}
 
 interface InvoiceItem {
   id: string;
@@ -19,174 +31,97 @@ interface InvoiceItem {
   dueDate: string;
   invoiceId: string;
   paymentStatus: 'Paid' | 'Partially Paid';
-  timeline: {
-    id: string;
-    installmentTitle: string;
-    dueDate: string;
-    paidDate: string;
-    amount: string;
-    amountLeft: string;
-    status: string;
-  }[];
+  timeline: TimelineItem[];
 }
-
-const INITIAL_INVOICES: InvoiceItem[] = [
-  {
-    id: 'inv-1',
-    srNo: '01',
-    name: 'Ashish Mehta',
-    firstName: 'Ashish',
-    lastName: 'Mehta',
-    course: 'No Code',
-    paidFees: 35000,
-    totalFees: 35000,
-    followUp: '30-11-2025',
-    dueDate: '01-12-2025',
-    invoiceId: 'GST/001',
-    paymentStatus: 'Paid',
-    timeline: [
-      {
-        id: 't-1',
-        installmentTitle: 'Installment #1',
-        dueDate: '01-12-2025',
-        paidDate: '01-12-2025',
-        amount: '₹35,000',
-        amountLeft: 'Nil',
-        status: 'Paid',
-      },
-    ],
-  },
-  {
-    id: 'inv-2',
-    srNo: '02',
-    name: 'Ashu Patel',
-    firstName: 'Ashu',
-    lastName: 'Patel',
-    course: 'UI/UX Design',
-    paidFees: 35000,
-    totalFees: 35000,
-    followUp: '30-11-2025',
-    dueDate: '01-12-2025',
-    invoiceId: 'GST/002',
-    paymentStatus: 'Paid',
-    timeline: [
-      {
-        id: 't-2',
-        installmentTitle: 'Installment #1',
-        dueDate: '01-12-2025',
-        paidDate: '01-12-2025',
-        amount: '₹35,000',
-        amountLeft: 'Nil',
-        status: 'Paid',
-      },
-    ],
-  },
-  {
-    id: 'inv-3',
-    srNo: '03',
-    name: 'Neha Patel',
-    firstName: 'Neha',
-    lastName: 'Patel',
-    course: 'UI/UX Design',
-    paidFees: 7000,
-    totalFees: 35000,
-    followUp: '30-11-2025',
-    dueDate: '01-12-2025',
-    invoiceId: 'GST/003',
-    paymentStatus: 'Partially Paid',
-    timeline: [
-      {
-        id: 't-3',
-        installmentTitle: 'Installment #4',
-        dueDate: '01-12-2025',
-        paidDate: '01-12-2025',
-        amount: '₹7,000',
-        amountLeft: '₹7,000',
-        status: 'Paid',
-      },
-    ],
-  },
-  {
-    id: 'inv-4',
-    srNo: '04',
-    name: 'Neha Patel',
-    firstName: 'Neha',
-    lastName: 'Patel',
-    course: 'UI/UX Design',
-    paidFees: 7000,
-    totalFees: 35000,
-    followUp: '30-10-2025',
-    dueDate: '01-11-2025',
-    invoiceId: 'GST/004',
-    paymentStatus: 'Partially Paid',
-    timeline: [
-      {
-        id: 't-4',
-        installmentTitle: 'Installment #3',
-        dueDate: '01-11-2025',
-        paidDate: '01-11-2025',
-        amount: '₹7,000',
-        amountLeft: '₹14,000',
-        status: 'Paid',
-      },
-    ],
-  },
-  {
-    id: 'inv-5',
-    srNo: '05',
-    name: 'Neha Patel',
-    firstName: 'Neha',
-    lastName: 'Patel',
-    course: 'UI/UX Design',
-    paidFees: 7000,
-    totalFees: 35000,
-    followUp: '30-09-2025',
-    dueDate: '01-10-2025',
-    invoiceId: 'GST/005',
-    paymentStatus: 'Partially Paid',
-    timeline: [
-      {
-        id: 't-5',
-        installmentTitle: 'Installment #2',
-        dueDate: '01-10-2025',
-        paidDate: '01-10-2025',
-        amount: '₹7,000',
-        amountLeft: '₹21,000',
-        status: 'Paid',
-      },
-    ],
-  },
-  {
-    id: 'inv-6',
-    srNo: '06',
-    name: 'Neha Patel',
-    firstName: 'Neha',
-    lastName: 'Patel',
-    course: 'UI/UX Design',
-    paidFees: 7000,
-    totalFees: 35000,
-    followUp: '30-08-2025',
-    dueDate: '01-09-2025',
-    invoiceId: 'GST/001',
-    paymentStatus: 'Partially Paid',
-    timeline: [
-      {
-        id: 't-6',
-        installmentTitle: 'Installment #1',
-        dueDate: '01-09-2025',
-        paidDate: '01-09-2025',
-        amount: '₹7,000',
-        amountLeft: '₹28,000',
-        status: 'Paid',
-      },
-    ],
-  },
-];
 
 export const SalesInvoicesPage: React.FC = () => {
   const [view, setView] = useState<'list' | 'details'>('list');
-  const [invoices] = useState<InvoiceItem[]>(INITIAL_INVOICES);
-  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceItem>(INITIAL_INVOICES[0]);
+  const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceItem | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Load real invoices & enrolled students from MongoDB
+  const loadInvoices = async () => {
+    try {
+      setIsLoading(true);
+      const dbInvoices = await financeService.getAllInvoices();
+      const leads = await leadService.getAllLeads();
+
+      const existingNames = new Set(dbInvoices.map((i) => i.studentName.toLowerCase()));
+
+      // Cross-reference any converted Leads into invoice line items
+      const enrolledInvoices: InvoiceItem[] = leads
+        .filter((l) => l.status === 'Enrolled' && !existingNames.has(`${l.firstName} ${l.lastName || ''}`.trim().toLowerCase()))
+        .map((l, index) => {
+          const total = parseInt((l.finalFees || '35000').replace(/[^0-9]/g, '')) || 35000;
+          const paid = total;
+          return {
+            id: l.id,
+            srNo: String(index + 1).padStart(2, '0'),
+            name: `${l.firstName} ${l.lastName || ''}`.trim(),
+            firstName: l.firstName,
+            lastName: l.lastName || '',
+            course: l.course,
+            paidFees: paid,
+            totalFees: total,
+            followUp: l.followUp || '30-11-2025',
+            dueDate: l.enquiryDate || '01-12-2025',
+            invoiceId: `GST/${String(index + 1).padStart(3, '0')}`,
+            paymentStatus: paid >= total ? 'Paid' : 'Partially Paid',
+            timeline: [
+              {
+                id: `t-lead-${l.id}`,
+                installmentTitle: 'Installment #1',
+                dueDate: l.enquiryDate || '01-12-2025',
+                paidDate: l.enquiryDate || '01-12-2025',
+                amount: `₹${paid.toLocaleString()}`,
+                amountLeft: 'Nil',
+                status: 'Paid',
+              },
+            ],
+          };
+        });
+
+      const mappedInvoices: InvoiceItem[] = dbInvoices.map((inv, index) => ({
+        id: inv.id,
+        srNo: String(index + 1).padStart(2, '0'),
+        name: inv.studentName,
+        firstName: inv.firstName || inv.studentName.split(' ')[0] || '',
+        lastName: inv.lastName || inv.studentName.split(' ').slice(1).join(' ') || '',
+        course: inv.course,
+        paidFees: inv.paidFees || 14000,
+        totalFees: inv.totalFees || 35000,
+        followUp: inv.lastFollowUp || '30-11-2025',
+        dueDate: inv.dueDate || '01-12-2025',
+        invoiceId: inv.invoiceCode || `GST/${String(index + 1).padStart(3, '0')}`,
+        paymentStatus: inv.status === 'Paid' ? 'Paid' : 'Partially Paid',
+        timeline: (inv.timeline || []).map((t: any, tIdx: number) => ({
+          id: t.id || `t-${tIdx}`,
+          installmentTitle: t.title || `Installment #${tIdx + 1}`,
+          dueDate: t.dueDate || inv.dueDate || '01-12-2025',
+          paidDate: t.paidDate || t.dueDate || '01-12-2025',
+          amount: t.amount || `₹${(inv.paidFees || 14000).toLocaleString()}`,
+          amountLeft: t.amountLeft || 'Nil',
+          status: t.status || 'Paid',
+        })),
+      }));
+
+      const fullList = [...mappedInvoices, ...enrolledInvoices];
+      setInvoices(fullList);
+
+      if (fullList.length > 0 && !selectedInvoice) {
+        setSelectedInvoice(fullList[0]);
+      }
+    } catch (err) {
+      console.error('Failed to load invoices from server:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadInvoices();
+  }, []);
 
   const handleDownload = (invoiceId: string, name: string) => {
     alert(`Downloading PDF receipt: ${invoiceId} for ${name}`);
@@ -197,64 +132,80 @@ export const SalesInvoicesPage: React.FC = () => {
     setView('details');
   };
 
-  const percentPaid = Math.round((selectedInvoice.paidFees / selectedInvoice.totalFees) * 100);
-  const pendingAmount = Math.max(0, selectedInvoice.totalFees - selectedInvoice.paidFees);
+  const percentPaid = selectedInvoice
+    ? Math.min(100, Math.round((selectedInvoice.paidFees / (selectedInvoice.totalFees || 1)) * 100))
+    : 100;
+  const pendingAmount = selectedInvoice
+    ? Math.max(0, selectedInvoice.totalFees - selectedInvoice.paidFees)
+    : 0;
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
       
       {/* ========================================================= */}
-      {/* 1. INVOICE DIRECTORY TABLE VIEW (SCREENSHOT 1)           */}
+      {/* 1. INVOICE DIRECTORY TABLE VIEW                           */}
       {/* ========================================================= */}
       {view === 'list' && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold font-['Sora']">Invoice</h1>
 
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
-                  <th className="pb-3.5 font-semibold">Sr. No.</th>
-                  <th className="pb-3.5 font-semibold">Name</th>
-                  <th className="pb-3.5 font-semibold">Course</th>
-                  <th className="pb-3.5 font-semibold">Paid fees</th>
-                  <th className="pb-3.5 font-semibold">Follow-up</th>
-                  <th className="pb-3.5 font-semibold">Due Date</th>
-                  <th className="pb-3.5 font-semibold">Invoice ID</th>
-                  <th className="pb-3.5 text-right font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {invoices.map((inv) => (
-                  <tr key={`${inv.id}-${inv.invoiceId}`} className="hover:bg-[#FFB908]/5 transition-colors">
-                    <td className="py-3.5 text-[#050720]/70">{inv.srNo}</td>
-                    <td className="py-3.5 font-medium">{inv.name}</td>
-                    <td className="py-3.5 text-[#050720]/70">{inv.course}</td>
-                    <td className="py-3.5 text-[#050720]/70">₹{inv.paidFees.toLocaleString()}</td>
-                    <td className="py-3.5 text-[#050720]/70">{inv.followUp}</td>
-                    <td className="py-3.5 text-[#050720]/70">{inv.dueDate}</td>
-                    <td className="py-3.5 font-medium text-[#050720]">{inv.invoiceId}</td>
-                    <td className="py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleDownload(inv.invoiceId, inv.name)}
-                          title="Download Invoice"
-                          className="p-1 hover:text-[#050720] text-[#050720]/70 transition-colors"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleOpenDetails(inv)}
-                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
-                        >
-                          View
-                        </button>
-                      </div>
-                    </td>
+            {isLoading ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                Loading invoices from database...
+              </div>
+            ) : invoices.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                No invoices found.
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
+                    <th className="pb-3.5 font-semibold">Sr. No.</th>
+                    <th className="pb-3.5 font-semibold">Name</th>
+                    <th className="pb-3.5 font-semibold">Course</th>
+                    <th className="pb-3.5 font-semibold">Paid fees</th>
+                    <th className="pb-3.5 font-semibold">Follow-up</th>
+                    <th className="pb-3.5 font-semibold">Due Date</th>
+                    <th className="pb-3.5 font-semibold">Invoice ID</th>
+                    <th className="pb-3.5 text-right font-semibold">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                  {invoices.map((inv, index) => (
+                    <tr key={`${inv.id}-${inv.invoiceId}`} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5 text-[#050720]/70">
+                        {String(index + 1).padStart(2, '0')}
+                      </td>
+                      <td className="py-3.5 font-medium">{inv.name}</td>
+                      <td className="py-3.5 text-[#050720]/70">{inv.course}</td>
+                      <td className="py-3.5 text-[#050720]/70">₹{inv.paidFees.toLocaleString()}</td>
+                      <td className="py-3.5 text-[#050720]/70">{inv.followUp}</td>
+                      <td className="py-3.5 text-[#050720]/70">{inv.dueDate}</td>
+                      <td className="py-3.5 font-medium text-[#050720]">{inv.invoiceId}</td>
+                      <td className="py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleDownload(inv.invoiceId, inv.name)}
+                            title="Download Invoice"
+                            className="p-1 hover:text-[#050720] text-[#050720]/70 transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenDetails(inv)}
+                            className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                          >
+                            View
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
             {/* Pagination Controls */}
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#050720]/5 text-xs text-[#050720]/70">
@@ -275,7 +226,7 @@ export const SalesInvoicesPage: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 2. INVOICE DETAILS VIEW (SCREENSHOT 2)                    */}
+      {/* 2. INVOICE DETAILS VIEW                                   */}
       {/* ========================================================= */}
       {view === 'details' && selectedInvoice && (
         <div className="space-y-6">
@@ -335,7 +286,7 @@ export const SalesInvoicesPage: React.FC = () => {
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Last Name</span>
-                <span className="font-semibold text-sm">{selectedInvoice.lastName}</span>
+                <span className="font-semibold text-sm">{selectedInvoice.lastName || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Course</span>

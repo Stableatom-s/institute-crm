@@ -3,6 +3,8 @@ import { User, UserRole } from '../types';
 
 interface AuthContextType {
   user: User | null;
+  role: UserRole;
+  isAuthenticated: boolean;
   setRole: (role: UserRole) => void;
   logout: () => void;
 }
@@ -24,7 +26,7 @@ const defaultUsers: Record<UserRole, User> = {
   },
   ADMIN: {
     id: 'u-admin-1',
-    name: ' Tanmay Kalbhor (Admin)',
+    name: 'Tanmay Kalbhor (Admin)',
     email: 'admin@radiquolab.com',
     role: 'ADMIN',
     inTime: '09:15 AM',
@@ -34,11 +36,16 @@ const defaultUsers: Record<UserRole, User> = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentRole, setCurrentRole] = useState<UserRole>('SALES');
-  const [user, setUser] = useState<User>(defaultUsers['SALES']);
+  const [currentRole, setCurrentRole] = useState<UserRole>(() => {
+    const saved = localStorage.getItem('crm_active_role') as UserRole;
+    return saved && defaultUsers[saved] ? saved : 'ADMIN';
+  });
+
+  const [user, setUser] = useState<User>(() => defaultUsers[currentRole]);
 
   useEffect(() => {
     setUser(defaultUsers[currentRole]);
+    localStorage.setItem('crm_active_role', currentRole);
   }, [currentRole]);
 
   const setRole = (role: UserRole) => {
@@ -50,7 +57,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, setRole, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        role: currentRole,
+        isAuthenticated: !!user,
+        setRole,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

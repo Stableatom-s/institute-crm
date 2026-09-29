@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Calendar, 
@@ -10,68 +11,26 @@ import {
   Search,
   Video
 } from 'lucide-react';
-
-// --- TYPES ---
-export type DemoTab = 'Scheduled' | 'Completed' | 'Cancelled';
-
-export interface DemoItem {
-  id: string;
-  srNo: string;
-  name: string;
-  lastName?: string;
-  contactNo: string;
-  address?: string;
-  timeSlot: string;
-  demoDate: string;
-  course: string;
-  mode: 'Online' | 'Offline';
-  faculty: string;
-  status: DemoTab;
-  demoStatusText?: string;
-  remark?: string;
-  cancellationReason?: string;
-  feedback?: string;
-}
-
-// --- MOCK SEED DATA ---
-const INITIAL_SCHEDULED_DEMOS: DemoItem[] = [
-  { id: 'd-1', srNo: '01', name: 'Aanya', lastName: 'Shah', contactNo: '9078675645', address: 'Pune', timeSlot: '11:00 - 12:00', demoDate: '21-12-2025', course: 'UI/UX Design', mode: 'Online', faculty: 'Tanmay Kalbhor', status: 'Scheduled' },
-  { id: 'd-2', srNo: '02', name: 'Rohan', lastName: 'Mehta', contactNo: '9123456565', address: 'Mumbai', timeSlot: '01:00 - 02:00', demoDate: '21-12-2025', course: 'No Code', mode: 'Online', faculty: 'Poorva Pande', status: 'Scheduled' },
-  { id: 'd-3', srNo: '03', name: 'Neha', lastName: 'Patel', contactNo: '9767564995', address: 'Pune', timeSlot: '03:00 - 04:00', demoDate: '21-12-2025', course: 'UI/UX Design', mode: 'Offline', faculty: 'Tanmay Kalbhor', status: 'Scheduled' },
-  { id: 'd-4', srNo: '04', name: 'Anish', lastName: 'Verma', contactNo: '9845123478', address: 'Nashik', timeSlot: '03:00 - 04:00', demoDate: '21-12-2025', course: 'Portfolio', mode: 'Offline', faculty: 'Poorva Pande', status: 'Scheduled' },
-  { id: 'd-5', srNo: '05', name: 'Siddhi', lastName: 'Shah', contactNo: '9923847581', address: 'Pune', timeSlot: '01:00 - 02:00', demoDate: '21-12-2025', course: 'Full-Stack', mode: 'Online', faculty: 'Neeraj Joshi', status: 'Scheduled' },
-];
-
-const INITIAL_COMPLETED_DEMOS: DemoItem[] = [
-  { id: 'cd-1', srNo: '01', name: 'Rohit', lastName: 'Shah', contactNo: '9845612378', address: 'Pune', timeSlot: '11:00 - 12:00', demoDate: '21-12-2025', course: 'UI/UX Design', mode: 'Online', faculty: 'Tanmay Kalbhor', status: 'Completed', demoStatusText: 'Attended', remark: 'Joining soon', feedback: 'Student showed strong interest in the course structure and tools. Asked relevant questions about projects and placement support. Recommended for follow-up within 24 hours.' },
-  { id: 'cd-2', srNo: '02', name: 'Ashish', lastName: 'Mehta', contactNo: '9928475812', address: 'Pune', timeSlot: '11:00 - 12:00', demoDate: '21-12-2025', course: 'UI/UX Design', mode: 'Online', faculty: 'Tanmay Kalbhor', status: 'Completed', demoStatusText: 'Attended', remark: 'Joining soon', feedback: 'Good conceptual clarity. Wants portfolio guidance.' },
-  { id: 'cd-3', srNo: '03', name: 'Anush', lastName: 'Shah', contactNo: '9784561234', address: 'Nagpur', timeSlot: '11:00 - 12:00', demoDate: '21-12-2025', course: 'UI/UX Design', mode: 'Online', faculty: 'Tanmay Kalbhor', status: 'Completed', demoStatusText: 'Attended', remark: 'Joining soon', feedback: 'Deciding between weekday or weekend batch.' },
-];
-
-const INITIAL_CANCELLED_DEMOS: DemoItem[] = [
-  { id: 'can-1', srNo: '01', name: 'Aanya', lastName: 'Shah', contactNo: '9078675645', address: 'Pune', timeSlot: '11:00 - 12:00', demoDate: '21-12-2025', course: 'UI/UX Design', mode: 'Online', faculty: 'Tanmay Kalbhor', status: 'Cancelled', cancellationReason: 'No Response from Student' },
-  { id: 'can-2', srNo: '02', name: 'Rohan', lastName: 'Mehta', contactNo: '9123456565', address: 'Mumbai', timeSlot: '01:00 - 02:00', demoDate: '21-12-2025', course: 'No Code', mode: 'Online', faculty: 'Poorva Pande', status: 'Cancelled', cancellationReason: 'Student had personal emergency' },
-  { id: 'can-3', srNo: '03', name: 'Neha', lastName: 'Patel', contactNo: '9767564995', address: 'Pune', timeSlot: '03:00 - 04:00', demoDate: '21-12-2025', course: 'UI/UX Design', mode: 'Offline', faculty: 'Tanmay Kalbhor', status: 'Cancelled', cancellationReason: 'Timings conflicted with college exams' },
-  { id: 'can-4', srNo: '04', name: 'Anish', lastName: 'Verma', contactNo: '9845123478', address: 'Nashik', timeSlot: '03:00 - 04:00', demoDate: '21-12-2025', course: 'Portfolio', mode: 'Offline', faculty: 'Poorva Pande', status: 'Cancelled', cancellationReason: 'Fee discussion pending' },
-  { id: 'can-5', srNo: '05', name: 'Siddhi', lastName: 'Shah', contactNo: '9923847581', address: 'Pune', timeSlot: '01:00 - 02:00', demoDate: '21-12-2025', course: 'Full-Stack', mode: 'Online', faculty: 'Neeraj Joshi', status: 'Cancelled', cancellationReason: 'Requested reschedule for next week' },
-];
+import { demoService, DemoItem, DemoTab } from '../../services/demoService';
+import { leadService } from '../../services/leadService';
 
 const COURSES = ['All', 'UI/UX Design', 'No Code', 'Portfolio', 'Full-Stack', 'React Native'];
 const FACULTIES = ['Tanmay Kalbhor', 'Poorva Pande', 'Neeraj Joshi'];
 const TIME_SLOTS = ['11:00 - 12:00', '01:00 - 02:00', '03:00 - 04:00', '05:00 - 06:00'];
 
 export const DemoManagementPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+
   // Navigation views: 'table' | 'schedule-form' | 'reschedule-form' | 'details'
   const [view, setView] = useState<'table' | 'schedule-form' | 'reschedule-form' | 'details'>('table');
   const [activeTab, setActiveTab] = useState<DemoTab>('Scheduled');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Master lists
-  const [scheduledList, setScheduledList] = useState<DemoItem[]>(INITIAL_SCHEDULED_DEMOS);
-  const [completedList] = useState<DemoItem[]>(INITIAL_COMPLETED_DEMOS);
-  const [cancelledList, setCancelledList] = useState<DemoItem[]>(INITIAL_CANCELLED_DEMOS);
+  const [allDemos, setAllDemos] = useState<DemoItem[]>([]);
 
   // Active item in detail / reschedule view
-  const [selectedDemo, setSelectedDemo] = useState<DemoItem>(INITIAL_SCHEDULED_DEMOS[0]);
+  const [selectedDemo, setSelectedDemo] = useState<DemoItem | null>(null);
 
   // Dropdown Sort Filters
   const [filterMode, setFilterMode] = useState<string>('All');
@@ -79,9 +38,12 @@ export const DemoManagementPage: React.FC = () => {
   const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
 
-  // Form State (Schedule & Reschedule)
+  // Form State (Schedule & Reschedule) - NO HARDCODED DEFAULTS
   const [leadSearchQuery, setLeadSearchQuery] = useState('');
+  const [matchingLeads, setMatchingLeads] = useState<any[]>([]);
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const [selectedLeadData, setSelectedLeadData] = useState<{
+    id?: string;
     firstName: string;
     lastName: string;
     mobile: string;
@@ -89,11 +51,18 @@ export const DemoManagementPage: React.FC = () => {
   } | null>(null);
 
   const [formCourse, setFormCourse] = useState('');
-  const [formFaculty, setFormFaculty] = useState('Tanmay Kalbhor');
-  const [formDate, setFormDate] = useState('2026-01-12');
-  const [formTimeSlot, setFormTimeSlot] = useState('11:00 - 12:00');
-  const [formMode, setFormMode] = useState<'Online' | 'Offline'>('Online');
+  const [formFaculty, setFormFaculty] = useState('');
+  const [formDate, setFormDate] = useState('');
+  const [formTimeSlot, setFormTimeSlot] = useState('');
+  const [formMode, setFormMode] = useState<'Online' | 'Offline' | ''>('');
+
+  // Validation Error States
+  const [leadError, setLeadError] = useState(false);
   const [courseError, setCourseError] = useState(false);
+  const [facultyError, setFacultyError] = useState(false);
+  const [dateError, setDateError] = useState(false);
+  const [slotError, setSlotError] = useState(false);
+  const [modeError, setModeError] = useState(false);
 
   // Modals
   const [showScheduleSuccessModal, setShowScheduleSuccessModal] = useState(false);
@@ -101,7 +70,73 @@ export const DemoManagementPage: React.FC = () => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancellationReasonInput, setCancellationReasonInput] = useState('');
 
-  // Active Tab list
+  // Reset form states completely when opening schedule form
+  const handleOpenScheduleForm = () => {
+    setLeadSearchQuery('');
+    setMatchingLeads([]);
+    setIsSearchDropdownOpen(false);
+    setSelectedLeadData(null);
+    setFormCourse('');
+    setFormFaculty('');
+    setFormDate('');
+    setFormTimeSlot('');
+    setFormMode('');
+    setLeadError(false);
+    setCourseError(false);
+    setFacultyError(false);
+    setDateError(false);
+    setSlotError(false);
+    setModeError(false);
+    setView('schedule-form');
+  };
+
+  // 1. Fetch Demos from MongoDB on mount
+  const loadDemos = async () => {
+    try {
+      setIsLoading(true);
+      const data = await demoService.getAllDemos();
+      setAllDemos(data);
+      if (data.length > 0 && !selectedDemo) {
+        setSelectedDemo(data[0]);
+      }
+    } catch (err) {
+      console.error('Failed to load demos from server:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDemos();
+  }, []);
+
+  // 2. Deep linking: if opened from SalesLeadsPage with ?scheduleLeadId=xyz
+  useEffect(() => {
+    const leadIdParam = searchParams.get('scheduleLeadId');
+    if (leadIdParam) {
+      leadService.getAllLeads().then((leads) => {
+        const matched = leads.find((l) => l.id === leadIdParam);
+        if (matched) {
+          setSelectedLeadData({
+            id: matched.id,
+            firstName: matched.firstName,
+            lastName: matched.lastName || '',
+            mobile: matched.contactNo,
+            address: matched.address || 'Pune',
+          });
+          setLeadSearchQuery(`${matched.firstName} ${matched.lastName || ''} (${matched.contactNo})`);
+          setFormCourse(matched.course || '');
+          setView('schedule-form');
+        }
+      });
+    }
+  }, [searchParams]);
+
+  // Tab segmented lists
+  const scheduledList = allDemos.filter((d) => d.status === 'Scheduled');
+  const completedList = allDemos.filter((d) => d.status === 'Completed');
+  const cancelledList = allDemos.filter((d) => d.status === 'Cancelled');
+
   const currentList = 
     activeTab === 'Scheduled' 
       ? scheduledList 
@@ -116,28 +151,56 @@ export const DemoManagementPage: React.FC = () => {
     return matchMode && matchCourse;
   });
 
-  // Handle lead search autofill
-  const handleLeadSearchChange = (val: string) => {
+  // Handle lead search with MULTI-LEAD matching dropdown
+  const handleLeadSearchChange = async (val: string) => {
     setLeadSearchQuery(val);
-    if (val.toLowerCase().includes('aanya') || val.includes('9078675645')) {
-      setSelectedLeadData({
-        firstName: 'Aanya',
-        lastName: 'Shah',
-        mobile: '9078675645',
-        address: 'Pune',
-      });
-    } else {
-      setSelectedLeadData(null);
+    setSelectedLeadData(null);
+    if (!val.trim()) {
+      setMatchingLeads([]);
+      setIsSearchDropdownOpen(false);
+      return;
     }
+
+    try {
+      const leads = await leadService.getAllLeads();
+      const query = val.toLowerCase().trim();
+      const matches = leads.filter((l) => {
+        const fullName = `${l.firstName} ${l.lastName || ''}`.toLowerCase();
+        return fullName.includes(query) || (l.contactNo && l.contactNo.includes(query));
+      });
+
+      setMatchingLeads(matches);
+      setIsSearchDropdownOpen(matches.length > 0);
+    } catch (err) {
+      console.error('Lead search error:', err);
+    }
+  };
+
+  // Selecting a lead from search results
+  const handleSelectLead = (lead: any) => {
+    setSelectedLeadData({
+      id: lead.id,
+      firstName: lead.firstName,
+      lastName: lead.lastName || '',
+      mobile: lead.contactNo,
+      address: lead.address || 'Pune',
+    });
+    setLeadSearchQuery(`${lead.firstName} ${lead.lastName || ''} (${lead.contactNo})`);
+    if (lead.course) {
+      setFormCourse(lead.course);
+      setCourseError(false);
+    }
+    setLeadError(false);
+    setIsSearchDropdownOpen(false);
   };
 
   // Prepopulate and launch Reschedule screen
   const handleStartReschedule = (demo: DemoItem) => {
     setSelectedDemo(demo);
-    setLeadSearchQuery(`${demo.contactNo} - ${demo.name} ${demo.lastName || 'Shah'}`);
+    setLeadSearchQuery(`${demo.name} ${demo.lastName || ''} (${demo.contactNo})`);
     setSelectedLeadData({
       firstName: demo.name,
-      lastName: demo.lastName || 'Shah',
+      lastName: demo.lastName || '',
       mobile: demo.contactNo,
       address: demo.address || 'Pune',
     });
@@ -150,78 +213,150 @@ export const DemoManagementPage: React.FC = () => {
     setView('reschedule-form');
   };
 
-  // Submit Schedule Form
-  const handleSubmitSchedule = () => {
+  // Submit Schedule Form with strict validation
+  const handleSubmitSchedule = async () => {
+    let hasError = false;
+
+    if (!selectedLeadData) {
+      setLeadError(true);
+      hasError = true;
+    } else {
+      setLeadError(false);
+    }
+
     if (!formCourse) {
       setCourseError(true);
-      return;
+      hasError = true;
+    } else {
+      setCourseError(false);
     }
-    setCourseError(false);
 
-    const newDemo: DemoItem = {
-      id: `demo-${Date.now()}`,
-      srNo: String(scheduledList.length + 1).padStart(2, '0'),
-      name: selectedLeadData ? selectedLeadData.firstName : 'Aanya',
-      lastName: selectedLeadData ? selectedLeadData.lastName : 'Shah',
-      contactNo: selectedLeadData ? selectedLeadData.mobile : '9078675645',
-      address: selectedLeadData ? selectedLeadData.address : 'Pune',
+    if (!formFaculty) {
+      setFacultyError(true);
+      hasError = true;
+    } else {
+      setFacultyError(false);
+    }
+
+    if (!formDate) {
+      setDateError(true);
+      hasError = true;
+    } else {
+      setDateError(false);
+    }
+
+    if (!formTimeSlot) {
+      setSlotError(true);
+      hasError = true;
+    } else {
+      setSlotError(false);
+    }
+
+    if (!formMode) {
+      setModeError(true);
+      hasError = true;
+    } else {
+      setModeError(false);
+    }
+
+    if (hasError || !selectedLeadData) return;
+
+    const payload: Partial<DemoItem> = {
+      name: selectedLeadData.firstName,
+      lastName: selectedLeadData.lastName,
+      contactNo: selectedLeadData.mobile,
+      address: selectedLeadData.address,
       timeSlot: formTimeSlot,
       demoDate: formDate,
       course: formCourse,
-      mode: formMode,
+      mode: formMode as 'Online' | 'Offline',
       faculty: formFaculty,
       status: 'Scheduled',
     };
 
-    setScheduledList([newDemo, ...scheduledList]);
-    setSelectedDemo(newDemo);
-    setShowScheduleSuccessModal(true);
+    try {
+      const saved = await demoService.scheduleDemo(payload);
+
+      if (selectedLeadData.id) {
+        await leadService.updateStatus(
+          selectedLeadData.id,
+          'Demo Scheduled',
+          `Demo booked with ${formFaculty} on ${formDate} (${formTimeSlot})`,
+          {
+            timestamp: `${formDate}, ${formTimeSlot}`,
+            status: 'Demo Scheduled',
+            title: `Demo Scheduled (${formMode})`,
+            description: `Assigned faculty: ${formFaculty}. Course: ${formCourse}.`,
+          }
+        );
+      }
+
+      setAllDemos([saved, ...allDemos]);
+      setSelectedDemo(saved);
+      setShowScheduleSuccessModal(true);
+    } catch (err) {
+      console.error('Failed to schedule demo:', err);
+      alert('Error saving demo to server.');
+    }
   };
 
-  // Submit Reschedule Form
-  const handleSubmitReschedule = () => {
-    if (!formCourse) {
-      setCourseError(true);
+  // Submit Reschedule Form to MongoDB
+  const handleSubmitReschedule = async () => {
+    if (!selectedDemo) return;
+
+    if (!formCourse || !formFaculty || !formDate || !formTimeSlot || !formMode) {
+      alert('Please fill out all fields before rescheduling.');
       return;
     }
-    setCourseError(false);
 
-    const updatedDemo: DemoItem = {
-      ...selectedDemo,
-      course: formCourse,
-      faculty: formFaculty,
-      demoDate: formDate || '21-12-2025',
-      timeSlot: formTimeSlot || '11:00 - 12:00',
-      mode: formMode,
-      status: 'Scheduled',
-    };
+    try {
+      const updated = await demoService.updateDemoStatus(selectedDemo.id, 'Scheduled', {
+        course: formCourse,
+        faculty: formFaculty,
+        demoDate: formDate,
+        timeSlot: formTimeSlot,
+        mode: formMode as 'Online' | 'Offline',
+      });
 
-    // If it was cancelled, move back to scheduled
-    if (selectedDemo.status === 'Cancelled') {
-      setCancelledList(cancelledList.filter((d) => d.id !== selectedDemo.id));
-      setScheduledList([updatedDemo, ...scheduledList]);
-    } else {
-      setScheduledList(scheduledList.map((d) => (d.id === selectedDemo.id ? updatedDemo : d)));
+      const patchedDemo: DemoItem = {
+        ...updated,
+        course: formCourse,
+        faculty: formFaculty,
+        demoDate: formDate,
+        timeSlot: formTimeSlot,
+        mode: formMode as 'Online' | 'Offline',
+        status: 'Scheduled',
+      };
+
+      setAllDemos(allDemos.map((d) => (d.id === selectedDemo.id ? patchedDemo : d)));
+      setSelectedDemo(patchedDemo);
+      setShowRescheduleSuccessModal(true);
+    } catch (err) {
+      console.error('Error rescheduling demo:', err);
+      alert('Failed to reschedule demo on database.');
     }
-
-    setSelectedDemo(updatedDemo);
-    setShowRescheduleSuccessModal(true);
   };
 
-  // Confirm Cancellation
-  const handleConfirmCancel = () => {
+  // Confirm Cancellation in MongoDB
+  const handleConfirmCancel = async () => {
     if (!selectedDemo) return;
-    const updatedDemo: DemoItem = {
-      ...selectedDemo,
-      status: 'Cancelled',
-      cancellationReason: cancellationReasonInput || 'No Response from Student',
-    };
 
-    setScheduledList(scheduledList.filter((d) => d.id !== selectedDemo.id));
-    setCancelledList([updatedDemo, ...cancelledList]);
-    setSelectedDemo(updatedDemo);
-    setShowCancelModal(false);
-    setCancellationReasonInput('');
+    try {
+      await demoService.updateDemoStatus(selectedDemo.id, 'Cancelled');
+      const cancelledDemo: DemoItem = {
+        ...selectedDemo,
+        status: 'Cancelled',
+        cancellationReason: cancellationReasonInput || 'No Response from Student',
+      };
+
+      setAllDemos(allDemos.map((d) => (d.id === selectedDemo.id ? cancelledDemo : d)));
+      setSelectedDemo(cancelledDemo);
+      setShowCancelModal(false);
+      setCancellationReasonInput('');
+    } catch (err) {
+      console.error('Error cancelling demo:', err);
+      alert('Failed to cancel demo on server.');
+    }
   };
 
   return (
@@ -235,13 +370,7 @@ export const DemoManagementPage: React.FC = () => {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold font-['Sora']">Demo Management</h1>
             <button
-              onClick={() => {
-                setLeadSearchQuery('');
-                setSelectedLeadData(null);
-                setFormCourse('');
-                setCourseError(false);
-                setView('schedule-form');
-              }}
+              onClick={handleOpenScheduleForm}
               className="flex items-center gap-2 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
             >
               <Calendar className="w-4 h-4" />
@@ -340,56 +469,68 @@ export const DemoManagementPage: React.FC = () => {
             </div>
 
             {/* Table */}
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
-                  <th className="pb-3.5 font-semibold">Sr. No.</th>
-                  <th className="pb-3.5 font-semibold">Name</th>
-                  <th className="pb-3.5 font-semibold">Time Slot</th>
-                  <th className="pb-3.5 font-semibold">Demo Date</th>
-                  <th className="pb-3.5 font-semibold">Course</th>
-                  <th className="pb-3.5 font-semibold">Mode</th>
-                  <th className="pb-3.5 font-semibold">Faculty</th>
-                  {activeTab === 'Completed' && (
-                    <>
-                      <th className="pb-3.5 font-semibold">Demo Status</th>
-                      <th className="pb-3.5 font-semibold">Remark</th>
-                    </>
-                  )}
-                  <th className="pb-3.5 text-right font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {filteredList.map((demo) => (
-                  <tr key={demo.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                    <td className="py-3.5 text-[#050720]/70">{demo.srNo}</td>
-                    <td className="py-3.5 font-medium">{demo.name} {demo.lastName}</td>
-                    <td className="py-3.5 text-[#050720]/70">{demo.timeSlot}</td>
-                    <td className="py-3.5 text-[#050720]/70">{demo.demoDate}</td>
-                    <td className="py-3.5 text-[#050720]/70">{demo.course}</td>
-                    <td className="py-3.5 text-[#050720]/70">{demo.mode}</td>
-                    <td className="py-3.5 text-[#050720]/70">{demo.faculty}</td>
+            {isLoading ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                Loading demo sessions from database...
+              </div>
+            ) : filteredList.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                No {activeTab.toLowerCase()} demos found.
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
+                    <th className="pb-3.5 font-semibold">Sr. No.</th>
+                    <th className="pb-3.5 font-semibold">Name</th>
+                    <th className="pb-3.5 font-semibold">Time Slot</th>
+                    <th className="pb-3.5 font-semibold">Demo Date</th>
+                    <th className="pb-3.5 font-semibold">Course</th>
+                    <th className="pb-3.5 font-semibold">Mode</th>
+                    <th className="pb-3.5 font-semibold">Faculty</th>
                     {activeTab === 'Completed' && (
                       <>
-                        <td className="py-3.5 font-semibold text-[#050720]">{demo.demoStatusText || 'Attended'}</td>
-                        <td className="py-3.5 text-[#050720]/70">{demo.remark || 'Joining soon'}</td>
+                        <th className="pb-3.5 font-semibold">Demo Status</th>
+                        <th className="pb-3.5 font-semibold">Remark</th>
                       </>
                     )}
-                    <td className="py-3.5 text-right">
-                      <button
-                        onClick={() => {
-                          setSelectedDemo(demo);
-                          setView('details');
-                        }}
-                        className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
-                      >
-                        View
-                      </button>
-                    </td>
+                    <th className="pb-3.5 text-right font-semibold">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                  {filteredList.map((demo, index) => (
+                    <tr key={demo.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5 text-[#050720]/70">
+                        {String(index + 1).padStart(2, '0')}
+                      </td>
+                      <td className="py-3.5 font-medium">{demo.name} {demo.lastName}</td>
+                      <td className="py-3.5 text-[#050720]/70">{demo.timeSlot}</td>
+                      <td className="py-3.5 text-[#050720]/70">{demo.demoDate}</td>
+                      <td className="py-3.5 text-[#050720]/70">{demo.course}</td>
+                      <td className="py-3.5 text-[#050720]/70">{demo.mode}</td>
+                      <td className="py-3.5 text-[#050720]/70">{demo.faculty}</td>
+                      {activeTab === 'Completed' && (
+                        <>
+                          <td className="py-3.5 font-semibold text-[#050720]">{demo.demoStatusText || 'Attended'}</td>
+                          <td className="py-3.5 text-[#050720]/70">{demo.remark || 'Joining soon'}</td>
+                        </>
+                      )}
+                      <td className="py-3.5 text-right">
+                        <button
+                          onClick={() => {
+                            setSelectedDemo(demo);
+                            setView('details');
+                          }}
+                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
             {/* Pagination */}
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#050720]/5 text-xs text-[#050720]/70">
@@ -422,7 +563,7 @@ export const DemoManagementPage: React.FC = () => {
             <span>Schedule Demo</span>
           </button>
 
-          {/* Select Lead */}
+          {/* Select Lead with Multi-Match Dropdown */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Select Lead</h3>
             
@@ -430,12 +571,39 @@ export const DemoManagementPage: React.FC = () => {
               <input
                 type="text"
                 value={leadSearchQuery}
-                placeholder="Search leads by name/contact (type 'Aanya' or '9078675645')"
+                placeholder="Search leads by name or contact..."
                 onChange={(e) => handleLeadSearchChange(e.target.value)}
-                className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 pr-10 rounded-lg border border-[#050720]/15 focus:outline-none focus:border-[#050720]"
+                className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 pr-10 rounded-lg border ${
+                  leadError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
+                } focus:outline-none focus:border-[#050720]`}
               />
               <Search className="w-4 h-4 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+
+              {/* Multi-result dropdown menu */}
+              {isSearchDropdownOpen && matchingLeads.length > 0 && (
+                <div className="absolute left-0 right-0 top-11 bg-white border border-[#050720]/15 rounded-lg shadow-xl py-1 z-30 max-h-52 overflow-y-auto">
+                  {matchingLeads.map((lead) => (
+                    <button
+                      key={lead.id}
+                      type="button"
+                      onClick={() => handleSelectLead(lead)}
+                      className="w-full text-left px-4 py-2 text-xs hover:bg-[#FFB908]/15 text-[#050720] flex justify-between items-center border-b border-[#050720]/5 last:border-b-0"
+                    >
+                      <div>
+                        <span className="font-bold">{lead.firstName} {lead.lastName || ''}</span>
+                        <span className="text-[11px] text-[#050720]/60 block">{lead.course} • {lead.contactNo}</span>
+                      </div>
+                      <span className="text-[10px] text-[#050720]/40">{lead.address || 'Pune'}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+            {leadError && (
+              <span className="text-[10px] font-semibold text-rose-500 block">
+                Please search and select a lead before scheduling*
+              </span>
+            )}
 
             {selectedLeadData && (
               <div className="pt-3 border-t border-[#050720]/10 space-y-3">
@@ -447,7 +615,7 @@ export const DemoManagementPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Last Name</span>
-                    <span className="font-semibold text-sm">{selectedLeadData.lastName}</span>
+                    <span className="font-semibold text-sm">{selectedLeadData.lastName || '—'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Mobile</span>
@@ -455,7 +623,7 @@ export const DemoManagementPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Address</span>
-                    <span className="font-semibold text-sm">{selectedLeadData.address}</span>
+                    <span className="font-semibold text-sm">{selectedLeadData.address || '—'}</span>
                   </div>
                 </div>
               </div>
@@ -479,7 +647,7 @@ export const DemoManagementPage: React.FC = () => {
                       courseError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
                     } focus:outline-none`}
                   >
-                    <option value="">Course*</option>
+                    <option value="">Select Course*</option>
                     {COURSES.filter(c => c !== 'All').map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
@@ -487,43 +655,75 @@ export const DemoManagementPage: React.FC = () => {
                   <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
                 {courseError && (
-                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">This field is required*</span>
+                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">Course is required*</span>
                 )}
               </div>
 
-              <div className="relative">
-                <select
-                  value={formFaculty}
-                  onChange={(e) => setFormFaculty(e.target.value)}
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
-                >
-                  {FACULTIES.map((f) => (
-                    <option key={f} value={f}>{f}</option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div>
+                <div className="relative">
+                  <select
+                    value={formFaculty}
+                    onChange={(e) => {
+                      setFormFaculty(e.target.value);
+                      if (e.target.value) setFacultyError(false);
+                    }}
+                    className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border appearance-none ${
+                      facultyError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
+                    } focus:outline-none`}
+                  >
+                    <option value="">Select Faculty*</option>
+                    {FACULTIES.map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                {facultyError && (
+                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">Faculty assignment is required*</span>
+                )}
               </div>
 
-              <div className="relative">
-                <input
-                  type="date"
-                  value={formDate}
-                  onChange={(e) => setFormDate(e.target.value)}
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2 rounded-lg border border-[#050720]/15 focus:outline-none"
-                />
+              <div>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={formDate}
+                    onChange={(e) => {
+                      setFormDate(e.target.value);
+                      if (e.target.value) setDateError(false);
+                    }}
+                    className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2 rounded-lg border ${
+                      dateError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
+                    } focus:outline-none`}
+                  />
+                </div>
+                {dateError && (
+                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">Demo date is required*</span>
+                )}
               </div>
 
-              <div className="relative">
-                <select
-                  value={formTimeSlot}
-                  onChange={(e) => setFormTimeSlot(e.target.value)}
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
-                >
-                  {TIME_SLOTS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-                <Clock className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div>
+                <div className="relative">
+                  <select
+                    value={formTimeSlot}
+                    onChange={(e) => {
+                      setFormTimeSlot(e.target.value);
+                      if (e.target.value) setSlotError(false);
+                    }}
+                    className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border appearance-none ${
+                      slotError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
+                    } focus:outline-none`}
+                  >
+                    <option value="">Select Time Slot*</option>
+                    {TIME_SLOTS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <Clock className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                {slotError && (
+                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">Time slot is required*</span>
+                )}
               </div>
             </div>
           </div>
@@ -537,7 +737,10 @@ export const DemoManagementPage: React.FC = () => {
                   type="radio"
                   name="demoMode"
                   checked={formMode === 'Online'}
-                  onChange={() => setFormMode('Online')}
+                  onChange={() => {
+                    setFormMode('Online');
+                    setModeError(false);
+                  }}
                   className="w-4 h-4 accent-[#FFB908]"
                 />
                 <span className="font-medium">Online</span>
@@ -547,12 +750,18 @@ export const DemoManagementPage: React.FC = () => {
                   type="radio"
                   name="demoMode"
                   checked={formMode === 'Offline'}
-                  onChange={() => setFormMode('Offline')}
+                  onChange={() => {
+                    setFormMode('Offline');
+                    setModeError(false);
+                  }}
                   className="w-4 h-4 accent-[#FFB908]"
                 />
                 <span className="font-medium">Offline</span>
               </label>
             </div>
+            {modeError && (
+              <span className="text-[10px] font-semibold text-rose-500 block">Please select Online or Offline*</span>
+            )}
           </div>
 
           <div className="flex gap-4">
@@ -574,9 +783,9 @@ export const DemoManagementPage: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 3. RESCHEDULE DEMO VIEW (EXACT FIGMA LAYOUT)              */}
+      {/* 3. RESCHEDULE DEMO VIEW                                   */}
       {/* ========================================================= */}
-      {view === 'reschedule-form' && (
+      {view === 'reschedule-form' && selectedDemo && (
         <div className="space-y-6 max-w-4xl">
           <button
             onClick={() => setView('details')}
@@ -593,11 +802,10 @@ export const DemoManagementPage: React.FC = () => {
             <div className="relative">
               <input
                 type="text"
-                value={leadSearchQuery}
-                onChange={(e) => handleLeadSearchChange(e.target.value)}
-                className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 pr-10 rounded-lg border border-[#050720]/15 focus:outline-none focus:border-[#050720]"
+                disabled
+                value={`${selectedDemo.name} ${selectedDemo.lastName || ''} (${selectedDemo.contactNo})`}
+                className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 pr-10 rounded-lg border border-[#050720]/15 opacity-70 cursor-not-allowed"
               />
-              <Search className="w-4 h-4 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
             <div className="pt-3 border-t border-[#050720]/10 space-y-3">
@@ -605,19 +813,19 @@ export const DemoManagementPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-y-3 text-xs">
                 <div>
                   <span className="text-[10px] text-[#050720]/50 block">First Name</span>
-                  <span className="font-semibold text-sm">{selectedLeadData?.firstName || selectedDemo.name}</span>
+                  <span className="font-semibold text-sm">{selectedDemo.name}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-[#050720]/50 block">Last Name</span>
-                  <span className="font-semibold text-sm">{selectedLeadData?.lastName || selectedDemo.lastName || 'Shah'}</span>
+                  <span className="font-semibold text-sm">{selectedDemo.lastName || '—'}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-[#050720]/50 block">Mobile</span>
-                  <span className="font-semibold text-sm">{selectedLeadData?.mobile || selectedDemo.contactNo}</span>
+                  <span className="font-semibold text-sm">{selectedDemo.contactNo}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-[#050720]/50 block">Address</span>
-                  <span className="font-semibold text-sm">{selectedLeadData?.address || selectedDemo.address || 'Pune'}</span>
+                  <span className="font-semibold text-sm">{selectedDemo.address || '—'}</span>
                 </div>
               </div>
             </div>
@@ -632,13 +840,8 @@ export const DemoManagementPage: React.FC = () => {
                 <div className="relative">
                   <select
                     value={formCourse}
-                    onChange={(e) => {
-                      setFormCourse(e.target.value);
-                      if (e.target.value) setCourseError(false);
-                    }}
-                    className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border appearance-none ${
-                      courseError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
-                    } focus:outline-none`}
+                    onChange={(e) => setFormCourse(e.target.value)}
+                    className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
                   >
                     <option value="">Course*</option>
                     {COURSES.filter(c => c !== 'All').map((c) => (
@@ -647,9 +850,6 @@ export const DemoManagementPage: React.FC = () => {
                   </select>
                   <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
-                {courseError && (
-                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">This field is required*</span>
-                )}
               </div>
 
               <div className="relative">
@@ -658,6 +858,7 @@ export const DemoManagementPage: React.FC = () => {
                   onChange={(e) => setFormFaculty(e.target.value)}
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
                 >
+                  <option value="">Faculty*</option>
                   {FACULTIES.map((f) => (
                     <option key={f} value={f}>{f}</option>
                   ))}
@@ -680,6 +881,7 @@ export const DemoManagementPage: React.FC = () => {
                   onChange={(e) => setFormTimeSlot(e.target.value)}
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
                 >
+                  <option value="">Time Slot*</option>
                   {TIME_SLOTS.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
@@ -735,9 +937,9 @@ export const DemoManagementPage: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 4. RESCHEDULE CONFIRMATION MODAL (FIGMA SCREENSHOT 3)     */}
+      {/* 4. RESCHEDULE CONFIRMATION MODAL                          */}
       {/* ========================================================= */}
-      {showRescheduleSuccessModal && (
+      {showRescheduleSuccessModal && selectedDemo && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-lg w-full text-center space-y-5 shadow-2xl">
             <div>
@@ -745,13 +947,12 @@ export const DemoManagementPage: React.FC = () => {
               <p className="text-xs text-[#050720]/60 mt-1">Please review the information.</p>
             </div>
 
-            {/* Demo Overview Card */}
             <div className="bg-white border border-[#050720]/15 rounded-xl p-5 text-left space-y-4">
               <h4 className="text-xs font-bold font-['Sora']">Demo Overview</h4>
               <div className="grid grid-cols-2 gap-y-3 text-xs">
                 <div>
                   <span className="text-[10px] text-[#050720]/50 block">Lead Name</span>
-                  <span className="font-semibold text-sm">{selectedDemo.name}</span>
+                  <span className="font-semibold text-sm">{selectedDemo.name} {selectedDemo.lastName || ''}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-[#050720]/50 block">Faculty Name</span>
@@ -792,7 +993,7 @@ export const DemoManagementPage: React.FC = () => {
       {/* ========================================================= */}
       {/* 5. SCHEDULE SUCCESS MODAL (NEW DEMO)                      */}
       {/* ========================================================= */}
-      {showScheduleSuccessModal && (
+      {showScheduleSuccessModal && selectedDemo && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
             <div>
@@ -872,7 +1073,7 @@ export const DemoManagementPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-y-4 text-xs">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Lead Name</span>
-                <span className="font-semibold text-sm">{selectedDemo.name}</span>
+                <span className="font-semibold text-sm">{selectedDemo.name} {selectedDemo.lastName || ''}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Faculty Name</span>
