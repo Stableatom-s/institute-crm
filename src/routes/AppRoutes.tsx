@@ -3,11 +3,15 @@ import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { useAuth } from '../hooks/useAuth';
 
+// ─── Auth & Utility Pages ───
+import { LoginPage } from '../pages/auth/LoginPage';
+import { NotificationsPage } from '../components/common/NotificationsPage';
+
 // ─── Admin Pages ───
 import { AdminDashboard } from '../pages/admin/AdminDashboard';
 import { AdminLeadsPage } from '../pages/admin/AdminLeadsPage';
 import { AdminDemosPage } from '../pages/admin/AdminDemosPage';
-import {AdminBatchPage  } from '../pages/admin/AdminBatchesPage';
+import { AdminBatchPage } from '../pages/admin/AdminBatchesPage';
 import { AdminStudentPage } from '../pages/admin/StudentPage';
 import { AdminAttendancePage } from '../pages/admin/AttendancePage';
 import { AdminLeavePage } from '../pages/admin/LeavePage';
@@ -33,7 +37,7 @@ import { FacultyAttendancePage } from '../pages/faculty/FacultyAttendancePage';
 
 const RootRedirect = () => {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/admin" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'SALES') return <Navigate to="/sales" replace />;
   if (user.role === 'FACULTY') return <Navigate to="/faculty/dashboard" replace />;
   return <Navigate to="/admin" replace />;
@@ -42,9 +46,16 @@ const RootRedirect = () => {
 export const AppRoutes = () => {
   return (
     <Routes>
+      {/* ─── PUBLIC AUTHENTICATION ROUTE (Without AppLayout Shell) ─── */}
+      <Route path="/login" element={<LoginPage />} />
+
+      {/* ─── PROTECTED APPLICATION ROUTES (Inside AppLayout Shell) ─── */}
       <Route path="/" element={<AppLayout />}>
         {/* Dynamic Root */}
         <Route index element={<RootRedirect />} />
+
+        {/* Global Notifications Page (Accessible across roles) */}
+        <Route path="notifications" element={<NotificationsPage />} />
 
         {/* ─── ADMIN ROUTES ─── */}
         <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>

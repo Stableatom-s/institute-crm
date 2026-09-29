@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 interface LogoutModalProps {
   isOpen: boolean;
@@ -8,10 +9,14 @@ interface LogoutModalProps {
 
 export const LogoutModal: React.FC<LogoutModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   if (!isOpen) return null;
 
   const handleConfirmLogout = () => {
+    localStorage.removeItem('radiquolab_punch_in');
+    localStorage.removeItem('crm_token');
+    logout();
     onClose();
     navigate('/login');
   };

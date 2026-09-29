@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Bell, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { LogoutModal } from '../modals/LogoutModal';
 
 export const TopNav: React.FC = () => {
-  const { logout } = useAuth();
   const navigate = useNavigate();
   const [inTime, setInTime] = useState<string>('09:30 AM');
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
@@ -25,13 +24,6 @@ export const TopNav: React.FC = () => {
       setInTime(formatted);
     }
   }, []);
-
-  const handleConfirmLogout = () => {
-    setShowLogoutModal(false);
-    localStorage.removeItem('radiquolab_punch_in');
-    logout();
-    navigate('/login');
-  };
 
   return (
     <>
@@ -78,36 +70,11 @@ export const TopNav: React.FC = () => {
         </div>
       </header>
 
-      {/* Logout Confirmation Modal */}
-      {showLogoutModal && (
-        <div className="fixed inset-0 z-50 bg-[#050720]/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-[420px] w-full shadow-2xl text-center space-y-3 font-['Onest']">
-            <h3 className="text-base font-bold font-['Sora'] text-[#050720]">
-              Log out of your account?
-            </h3>
-            <p className="text-xs text-[#050720]/60">
-              You'll need to sign in again to access your dashboard.
-            </p>
-
-            <div className="flex items-center gap-3 pt-4">
-              <button
-                type="button"
-                onClick={() => setShowLogoutModal(false)}
-                className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmLogout}
-                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Reusable Logout Modal */}
+      <LogoutModal 
+        isOpen={showLogoutModal} 
+        onClose={() => setShowLogoutModal(false)} 
+      />
     </>
   );
 };

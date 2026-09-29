@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const auth = useAuth() as any; // Prevents the type collision on 'login' vs 'signIn'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showVerificationModal, setShowVerificationModal] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Verification workflow check (e.g. pending approval accounts)
@@ -16,10 +18,17 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
+    // Call context login/signIn if implemented
+    if (typeof auth.login === 'function') {
+      await auth.login(email, password);
+    } else if (typeof auth.signIn === 'function') {
+      await auth.signIn(email, password);
+    }
+
     // Role-based redirect routing
-    if (email.startsWith('admin')) {
+    if (email.startsWith('admin') || email.includes('admin')) {
       navigate('/admin');
-    } else if (email.startsWith('sales') || email.startsWith('sejal')) {
+    } else if (email.startsWith('sales') || email.startsWith('sejal') || email.includes('sales')) {
       navigate('/sales');
     } else {
       navigate('/faculty');
