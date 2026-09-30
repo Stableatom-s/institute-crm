@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, Plus, Check } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { batchService, BatchItem } from '../../services/batchService';
 
 type ViewMode = 'list' | 'batch-details' | 'lecture-view' | 'add-lecture' | 'student-details';
 
@@ -55,62 +57,64 @@ export const FacultyBatchesPage: React.FC = () => {
   const navigate = useNavigate();
   const stateData = location.state as RouteState | null;
 
+  const auth = useAuth() as any;
+  const currentUserName = auth?.user?.name || 'Poorva Pande';
+
   const [currentView, setCurrentView] = useState<ViewMode>('list');
   const [navOrigin, setNavOrigin] = useState<'students' | 'batches'>('batches');
-  const [selectedBatchCode, setSelectedBatchCode] = useState('MWF-JAN-2026');
+  const [batches, setBatches] = useState<BatchItem[]>([]);
+  const [selectedBatch, setSelectedBatch] = useState<BatchItem | null>(null);
   const [selectedLecture, setSelectedLecture] = useState<Lecture | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Filters
+  const [courseFilter, setCourseFilter] = useState('All');
 
   // New Lecture Form State
   const [newLectureForm, setNewLectureForm] = useState({
     title: '',
-    course: 'UI/UX Design',
-    date: '06-01-2026',
-    timeSlot: '11:00-12:00',
+    course: '',
+    date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
+    timeSlot: '11:00 - 12:00',
     topicsCovered: '',
     assignmentGiven: '',
   });
 
-  // Sample Students
-  const [students, setStudents] = useState<Student[]>([
-    { id: '1', srNo: '01', name: 'Ashish Mehta', startDate: '21-12-2025', contact: '9158745870', attendanceRatio: '02/02', remark: 'Assignment done', presentInLecture: true },
-    { id: '2', srNo: '02', name: 'Tanaya Junnarkar', startDate: '21-12-2025', contact: '9876543152', attendanceRatio: '02/02', remark: 'Assignment done', presentInLecture: true },
-    { id: '3', srNo: '03', name: 'Aashi Shah', startDate: '21-12-2025', contact: '9876543152', attendanceRatio: '01/02', remark: 'Assignment done', presentInLecture: true },
-    { id: '4', srNo: '04', name: 'Vishwajeet Pawale', startDate: '21-12-2025', contact: '8987456512', attendanceRatio: '01/02', remark: 'Assignment done', presentInLecture: true },
-    { id: '5', srNo: '05', name: 'Siddhi Shah', startDate: '21-12-2025', contact: '9876543152', attendanceRatio: '01/02', remark: 'Assignment done', presentInLecture: true },
-  ]);
+  // Roll call checkbox list for adding new lectures
+  const [rollCallStudents, setRollCallStudents] = useState<Student[]>([]);
 
-  // Sample Lectures
-  const [lectures, setLectures] = useState<Lecture[]>([
-    {
-      id: 'lec-1',
-      srNo: '01',
-      topic: 'Introduction to UI/UX Design',
-      date: '02-01-2026',
-      hoursSpent: '01',
-      attendance: '05/05',
-      timeSlot: '11:00-12:00',
-      topicsCovered: [
-        'Overview of User Interface (UI) and User Experience (UX) and how they differ',
-        'Importance of user-centered design in digital products',
-        'Real-world examples of good vs poor user experience',
-      ],
-      assignmentGiven: 'Study your favourite application',
-    },
-    {
-      id: 'lec-2',
-      srNo: '02',
-      topic: 'Understanding of UI/UX',
-      date: '21-12-2025',
-      hoursSpent: '02',
-      attendance: '04/05',
-      timeSlot: '11:00-12:00',
-      topicsCovered: ['Design heuristics and usability principles'],
-      assignmentGiven: 'Wireframe one onboarding screen',
-    },
-  ]);
+  // 1. Fetch live batches from MongoDB
+  const loadBatches = async () => {
+    try {
+      setIsLoading(true);
+      const allBatches = await batchService.getAllBatches();
 
-  // Handle incoming student view trigger from Student Management page
+      // Filter batches belonging to the instructor
+      const facultyBatches = allBatches.filter(
+        (b) =>
+          b.faculty.toLowerCase().includes(currentUserName.toLowerCase()) ||
+          currentUserName.toLowerCase().includes(b.faculty.toLowerCase())
+      );
+
+      const targetBatches = facultyBatches.length > 0 ? facultyBatches : allBatches;
+      setBatches(targetBatches);
+
+      if (targetBatches.length > 0 && !selectedBatch) {
+        setSelectedBatch(targetBatches[0]);
+      }
+    } catch (err) {
+      console.error('Failed to load faculty batches:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBatches();
+  }, [currentUserName]);
+
+  // 2. Handle deep-linking navigation from FacultyStudentsPage
   useEffect(() => {
     if (stateData?.student) {
       const incoming = stateData.student;
@@ -120,20 +124,45 @@ export const FacultyBatchesPage: React.FC = () => {
         name: incoming.name,
         startDate: incoming.startDate,
         contact: incoming.contact,
-        attendanceRatio: incoming.attendanceRatio || incoming.attendance || '02/02',
-        remark: incoming.remark,
+        attendanceRatio: incoming.attendanceRatio || incoming.attendance || '100%',
+        remark: incoming.remark || 'Active',
         email: incoming.email,
         course: incoming.course,
         batchCode: incoming.batchCode,
       });
 
-      if (incoming.batchCode) {
-        setSelectedBatchCode(incoming.batchCode);
+      if (incoming.batchCode && batches.length > 0) {
+        const found = batches.find((b) => b.batchCode === incoming.batchCode);
+        if (found) setSelectedBatch(found);
       }
       setNavOrigin(stateData.from || 'batches');
       setCurrentView('student-details');
     }
-  }, [stateData]);
+  }, [stateData, batches]);
+
+  // 3. Keep roll call and new lecture defaults synchronized when selected batch changes
+  useEffect(() => {
+    if (selectedBatch) {
+      const list: Student[] = (selectedBatch.students || []).map((st: any, idx: number) => ({
+        id: st.id || st._id || `st-${idx}`,
+        srNo: String(idx + 1).padStart(2, '0'),
+        name: st.name || `${st.firstName || ''} ${st.lastName || ''}`.trim() || 'Student',
+        startDate: st.startDate || selectedBatch.startDate,
+        contact: st.contact || '—',
+        attendanceRatio: st.attendance || st.attendanceRatio || '100%',
+        remark: st.remark || 'Active',
+        presentInLecture: true,
+        email: st.email,
+        course: selectedBatch.course,
+        batchCode: selectedBatch.batchCode,
+      }));
+      setRollCallStudents(list);
+      setNewLectureForm((prev) => ({
+        ...prev,
+        course: selectedBatch.course,
+      }));
+    }
+  }, [selectedBatch]);
 
   const handleBackFromStudentDetails = () => {
     if (navOrigin === 'students') {
@@ -144,28 +173,66 @@ export const FacultyBatchesPage: React.FC = () => {
   };
 
   const toggleStudentAttendance = (studentId: string) => {
-    setStudents((prev) =>
+    setRollCallStudents((prev) =>
       prev.map((s) => (s.id === studentId ? { ...s, presentInLecture: !s.presentInLecture } : s))
     );
   };
 
-  const handleSaveLecture = () => {
-    if (!newLectureForm.title) return;
-    const presentCount = students.filter((s) => s.presentInLecture).length;
-    const createdLecture: Lecture = {
-      id: `lec-${Date.now()}`,
-      srNo: `0${lectures.length + 1}`,
-      topic: newLectureForm.title,
+  // 4. Save new lecture to MongoDB
+  const handleSaveLecture = async () => {
+    if (!selectedBatch) return;
+    if (!newLectureForm.title.trim()) {
+      alert('Please enter a lecture title/topic.');
+      return;
+    }
+
+    const presentCount = rollCallStudents.filter((s) => s.presentInLecture).length;
+    const totalCount = rollCallStudents.length;
+
+    const payload = {
+      title: newLectureForm.title.trim(),
       date: newLectureForm.date,
-      hoursSpent: '01',
-      attendance: `0${presentCount}/0${students.length}`,
       timeSlot: newLectureForm.timeSlot,
+      course: newLectureForm.course || selectedBatch.course,
       topicsCovered: newLectureForm.topicsCovered ? [newLectureForm.topicsCovered] : ['Lecture session'],
       assignmentGiven: newLectureForm.assignmentGiven || 'None',
+      totalStudents: totalCount,
+      presentStudents: presentCount,
+      studentsList: rollCallStudents.map((s) => ({
+        name: s.name,
+        present: s.presentInLecture,
+      })),
     };
-    setLectures([createdLecture, ...lectures]);
-    setCurrentView('batch-details');
+
+    try {
+      const updated = await batchService.addLectureToBatch(selectedBatch.id, payload);
+      setBatches((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+      setSelectedBatch(updated);
+      setNewLectureForm({
+        title: '',
+        course: selectedBatch.course,
+        date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
+        timeSlot: '11:00 - 12:00',
+        topicsCovered: '',
+        assignmentGiven: '',
+      });
+      alert('Lecture recorded successfully!');
+      setCurrentView('batch-details');
+    } catch (err) {
+      console.error('Failed to save lecture:', err);
+      alert('Failed to save lecture to server.');
+    }
   };
+
+  // Dynamic counts for cards
+  const totalBatchesCount = batches.length;
+  const ongoingBatches = batches.filter((b) => (b.students?.length || 0) > 0);
+  const upcomingBatches = batches.filter((b) => (b.students?.length || 0) === 0);
+  const totalLecturesDelivered = batches.reduce((acc, b) => acc + (b.lectures?.length || 0), 0);
+
+  const filteredBatches = courseFilter === 'All'
+    ? batches
+    : batches.filter((b) => b.course.toLowerCase() === courseFilter.toLowerCase());
 
   return (
     <div className="font-['Onest'] space-y-6 pb-12">
@@ -177,26 +244,34 @@ export const FacultyBatchesPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-[#050720] font-['Sora']">Batch Management</h1>
 
           {/* KPI Stat Cards */}
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
               <span className="text-xs font-semibold text-[#050720]/80">Total Batches</span>
-              <div className="text-2xl font-extrabold text-[#050720] font-['Sora'] mt-1">05</div>
+              <div className="text-2xl font-extrabold text-[#050720] font-['Sora'] mt-1">
+                {String(totalBatchesCount).padStart(2, '0')}
+              </div>
               <span className="text-[11px] text-[#050720]/40">All time</span>
             </div>
             <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
               <span className="text-xs font-semibold text-[#050720]/80">Ongoing</span>
-              <div className="text-2xl font-extrabold text-[#050720] font-['Sora'] mt-1">02</div>
-              <span className="text-[11px] text-[#050720]/40">Wire framing Phase</span>
+              <div className="text-2xl font-extrabold text-[#050720] font-['Sora'] mt-1">
+                {String(ongoingBatches.length).padStart(2, '0')}
+              </div>
+              <span className="text-[11px] text-[#050720]/40">Active sessions</span>
             </div>
             <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
               <span className="text-xs font-semibold text-[#050720]/80">Upcoming</span>
-              <div className="text-2xl font-extrabold text-[#050720] font-['Sora'] mt-1">02</div>
+              <div className="text-2xl font-extrabold text-[#050720] font-['Sora'] mt-1">
+                {String(upcomingBatches.length).padStart(2, '0')}
+              </div>
               <span className="text-[11px] text-[#050720]/40">Newly enrolled</span>
             </div>
             <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
               <span className="text-xs font-semibold text-[#050720]/80">Completed</span>
-              <div className="text-2xl font-extrabold text-[#050720] font-['Sora'] mt-1">01</div>
-              <span className="text-[11px] text-[#050720]/40">Portfolio completed</span>
+              <div className="text-2xl font-extrabold text-[#050720] font-['Sora'] mt-1">
+                {String(totalLecturesDelivered).padStart(2, '0')}
+              </div>
+              <span className="text-[11px] text-[#050720]/40">Lectures delivered</span>
             </div>
           </div>
 
@@ -204,52 +279,68 @@ export const FacultyBatchesPage: React.FC = () => {
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
             <div className="flex items-center gap-2 mb-6">
               <span className="text-xs text-[#050720]/60 font-medium">Sort by:</span>
-              <select className="border border-[#050720]/15 rounded-md px-3 py-1 text-xs text-[#050720] bg-white focus:outline-none">
-                <option>Course</option>
-                <option>UI/UX Design</option>
-                <option>No Code</option>
+              <select
+                value={courseFilter}
+                onChange={(e) => setCourseFilter(e.target.value)}
+                className="border border-[#050720]/15 rounded-md px-3 py-1 text-xs text-[#050720] bg-white focus:outline-none"
+              >
+                <option value="All">All Courses</option>
+                <option value="UI/UX Design">UI/UX Design</option>
+                <option value="No Code">No Code</option>
+                <option value="Full-Stack">Full-Stack</option>
+                <option value="Portfolio">Portfolio</option>
               </select>
             </div>
 
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720]/70 pb-3 font-semibold">
-                  <th className="pb-3">Sr. No.</th>
-                  <th className="pb-3">Batch</th>
-                  <th className="pb-3">Start Date</th>
-                  <th className="pb-3">Course</th>
-                  <th className="pb-3">Student count</th>
-                  <th className="pb-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {[
-                  { srNo: '01', batch: 'MWF-JAN-2026', start: '21-12-2025', course: 'UI/UX Design', count: '05' },
-                  { srNo: '02', batch: 'TTS-JAN-2026', start: '21-12-2025', course: 'No Code', count: '06' },
-                  { srNo: '03', batch: 'WEEKEND-JAN-2026', start: '21-12-2025', course: 'UI/UX Design', count: '04' },
-                ].map((row) => (
-                  <tr key={row.srNo} className="hover:bg-[#FFB908]/5">
-                    <td className="py-3.5 text-[#050720]/70">{row.srNo}</td>
-                    <td className="py-3.5 font-medium">{row.batch}</td>
-                    <td className="py-3.5 text-[#050720]/70">{row.start}</td>
-                    <td className="py-3.5 text-[#050720]/70">{row.course}</td>
-                    <td className="py-3.5 text-[#050720]/70">{row.count}</td>
-                    <td className="py-3.5 text-right">
-                      <button
-                        onClick={() => {
-                          setSelectedBatchCode(row.batch);
-                          setNavOrigin('batches');
-                          setCurrentView('batch-details');
-                        }}
-                        className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 cursor-pointer"
-                      >
-                        View
-                      </button>
-                    </td>
+            {isLoading ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                Loading batches from database...
+              </div>
+            ) : filteredBatches.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                No active batches found.
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 text-[#050720]/70 pb-3 font-semibold">
+                    <th className="pb-3">Sr. No.</th>
+                    <th className="pb-3">Batch</th>
+                    <th className="pb-3">Start Date</th>
+                    <th className="pb-3">Course</th>
+                    <th className="pb-3">Student count</th>
+                    <th className="pb-3 text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                  {filteredBatches.map((row, index) => (
+                    <tr key={row.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5 text-[#050720]/70">
+                        {String(index + 1).padStart(2, '0')}
+                      </td>
+                      <td className="py-3.5 font-medium">{row.batchCode}</td>
+                      <td className="py-3.5 text-[#050720]/70">{row.startDate}</td>
+                      <td className="py-3.5 text-[#050720]/70">{row.course}</td>
+                      <td className="py-3.5 text-[#050720]/70">
+                        {String(row.students?.length || 0).padStart(2, '0')}
+                      </td>
+                      <td className="py-3.5 text-right">
+                        <button
+                          onClick={() => {
+                            setSelectedBatch(row);
+                            setNavOrigin('batches');
+                            setCurrentView('batch-details');
+                          }}
+                          className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 cursor-pointer"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
@@ -257,7 +348,7 @@ export const FacultyBatchesPage: React.FC = () => {
       {/* ─────────────────────────────────────────────────────────────────
           VIEW 2: BATCH DETAILS (STUDENTS & PAST LECTURES)
       ───────────────────────────────────────────────────────────────── */}
-      {currentView === 'batch-details' && (
+      {currentView === 'batch-details' && selectedBatch && (
         <div className="space-y-6">
           <div className="flex items-center gap-2">
             <button
@@ -273,12 +364,16 @@ export const FacultyBatchesPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
               <span className="text-xs font-semibold text-[#050720]/80">Completed Lectures</span>
-              <div className="text-2xl font-extrabold text-[#050720] font-['Sora'] mt-1">02</div>
-              <span className="text-[11px] text-[#050720]/40">This Week</span>
+              <div className="text-2xl font-extrabold text-[#050720] font-['Sora'] mt-1">
+                {String(selectedBatch.lectures?.length || 0).padStart(2, '0')}
+              </div>
+              <span className="text-[11px] text-[#050720]/40">Lectures logged</span>
             </div>
             <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
               <span className="text-xs font-semibold text-[#050720]/80">Hours spent</span>
-              <div className="text-2xl font-extrabold text-[#050720] font-['Sora'] mt-1">02</div>
+              <div className="text-2xl font-extrabold text-[#050720] font-['Sora'] mt-1">
+                {String((selectedBatch.lectures?.length || 0) * 1).padStart(2, '0')}
+              </div>
               <span className="text-[11px] text-[#050720]/40">Total lecture hours</span>
             </div>
           </div>
@@ -286,30 +381,32 @@ export const FacultyBatchesPage: React.FC = () => {
           {/* Batch Overview Meta */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
             <h3 className="text-sm font-bold text-[#050720] font-['Sora'] mb-4">Batch Overview</h3>
-            <div className="grid grid-cols-3 gap-y-4 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 text-xs">
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Batch</span>
-                <span className="font-semibold text-[#050720]">{selectedBatchCode}</span>
+                <span className="font-semibold text-[#050720]">{selectedBatch.batchCode}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Faculty</span>
-                <span className="font-semibold text-[#050720]">Poorva Pande</span>
+                <span className="font-semibold text-[#050720]">{selectedBatch.faculty}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Course</span>
-                <span className="font-semibold text-[#050720]">UI/UX Design</span>
+                <span className="font-semibold text-[#050720]">{selectedBatch.course}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Student Count</span>
-                <span className="font-semibold text-[#050720]">05</span>
+                <span className="font-semibold text-[#050720]">
+                  {String(selectedBatch.students?.length || 0).padStart(2, '0')}
+                </span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Start Date</span>
-                <span className="font-semibold text-[#050720]">21-12-2025</span>
+                <span className="font-semibold text-[#050720]">{selectedBatch.startDate}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">End Date</span>
-                <span className="font-semibold text-[#050720]">21-05-2026</span>
+                <span className="font-semibold text-[#050720]">{selectedBatch.endDate || '—'}</span>
               </div>
             </div>
           </div>
@@ -317,43 +414,64 @@ export const FacultyBatchesPage: React.FC = () => {
           {/* Table: Student Details */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
             <h3 className="text-sm font-bold text-[#050720] font-['Sora'] mb-4">Student Details</h3>
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720]/70 pb-3 font-semibold">
-                  <th className="pb-3">Sr. No.</th>
-                  <th className="pb-3">Student Name</th>
-                  <th className="pb-3">Start Date</th>
-                  <th className="pb-3">Contact</th>
-                  <th className="pb-3">Attendance</th>
-                  <th className="pb-3">Remark</th>
-                  <th className="pb-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5">
-                {students.map((st) => (
-                  <tr key={st.id} className="hover:bg-[#FFB908]/5">
-                    <td className="py-3 text-[#050720]/70">{st.srNo}</td>
-                    <td className="py-3 font-medium text-[#050720]">{st.name}</td>
-                    <td className="py-3 text-[#050720]/70">{st.startDate}</td>
-                    <td className="py-3 text-[#050720]/70">{st.contact}</td>
-                    <td className="py-3 font-semibold text-[#10B981]">{st.attendanceRatio}</td>
-                    <td className="py-3 text-[#050720]/70">{st.remark}</td>
-                    <td className="py-3 text-right">
-                      <button
-                        onClick={() => {
-                          setSelectedStudent(st);
-                          setNavOrigin('batches');
-                          setCurrentView('student-details');
-                        }}
-                        className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 cursor-pointer"
-                      >
-                        View
-                      </button>
-                    </td>
+            {(!selectedBatch.students || selectedBatch.students.length === 0) ? (
+              <p className="text-xs text-[#050720]/40 italic py-4">No students enrolled in this batch yet.</p>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 text-[#050720]/70 pb-3 font-semibold">
+                    <th className="pb-3">Sr. No.</th>
+                    <th className="pb-3">Student Name</th>
+                    <th className="pb-3">Start Date</th>
+                    <th className="pb-3">Contact</th>
+                    <th className="pb-3">Attendance</th>
+                    <th className="pb-3">Remark</th>
+                    <th className="pb-3 text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5">
+                  {selectedBatch.students.map((st: any, idx: number) => {
+                    const displayName =
+                      st.name || `${st.firstName || ''} ${st.lastName || ''}`.trim() || 'Student';
+
+                    return (
+                      <tr key={idx} className="hover:bg-[#FFB908]/5">
+                        <td className="py-3 text-[#050720]/70">{String(idx + 1).padStart(2, '0')}</td>
+                        <td className="py-3 font-medium text-[#050720]">{displayName}</td>
+                        <td className="py-3 text-[#050720]/70">{st.startDate}</td>
+                        <td className="py-3 text-[#050720]/70">{st.contact}</td>
+                        <td className="py-3 font-semibold text-[#10B981]">
+                          {st.attendance || st.attendanceRatio || '100%'}
+                        </td>
+                        <td className="py-3 text-[#050720]/70">{st.remark || 'Active'}</td>
+                        <td className="py-3 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedStudent({
+                                id: st.id || st._id || `st-${idx}`,
+                                srNo: String(idx + 1).padStart(2, '0'),
+                                name: displayName,
+                                startDate: st.startDate,
+                                contact: st.contact,
+                                attendanceRatio: st.attendance || st.attendanceRatio || '100%',
+                                remark: st.remark || 'Active',
+                                course: selectedBatch.course,
+                                batchCode: selectedBatch.batchCode,
+                              });
+                              setNavOrigin('batches');
+                              setCurrentView('student-details');
+                            }}
+                            className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 cursor-pointer"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* Table: Lectures List */}
@@ -368,40 +486,64 @@ export const FacultyBatchesPage: React.FC = () => {
                 <span>Add new lecture</span>
               </button>
             </div>
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720]/70 pb-3 font-semibold">
-                  <th className="pb-3">Sr. No.</th>
-                  <th className="pb-3">Lecture Topic</th>
-                  <th className="pb-3">Date</th>
-                  <th className="pb-3">Hours Spent</th>
-                  <th className="pb-3">Attendance</th>
-                  <th className="pb-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5">
-                {lectures.map((lec) => (
-                  <tr key={lec.id} className="hover:bg-[#FFB908]/5">
-                    <td className="py-3 text-[#050720]/70">{lec.srNo}</td>
-                    <td className="py-3 font-medium text-[#050720]">{lec.topic}</td>
-                    <td className="py-3 text-[#050720]/70">{lec.date}</td>
-                    <td className="py-3 text-[#050720]/70">{lec.hoursSpent}</td>
-                    <td className="py-3 font-medium text-[#050720]">{lec.attendance}</td>
-                    <td className="py-3 text-right">
-                      <button
-                        onClick={() => {
-                          setSelectedLecture(lec);
-                          setCurrentView('lecture-view');
-                        }}
-                        className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 cursor-pointer"
-                      >
-                        View
-                      </button>
-                    </td>
+
+            {(!selectedBatch.lectures || selectedBatch.lectures.length === 0) ? (
+              <p className="text-xs text-[#050720]/40 italic py-4">No lectures logged for this batch yet.</p>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 text-[#050720]/70 pb-3 font-semibold">
+                    <th className="pb-3">Sr. No.</th>
+                    <th className="pb-3">Lecture Topic</th>
+                    <th className="pb-3">Date</th>
+                    <th className="pb-3">Hours Spent</th>
+                    <th className="pb-3">Attendance</th>
+                    <th className="pb-3 text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5">
+                  {selectedBatch.lectures.map((lec: any, idx: number) => {
+                    const title = lec.title || lec.topic || 'Lecture Session';
+                    const attText =
+                      lec.attendance ||
+                      `${String(lec.presentStudents || 0).padStart(2, '0')}/${String(
+                        lec.totalStudents || selectedBatch.students?.length || 0
+                      ).padStart(2, '0')}`;
+
+                    return (
+                      <tr key={lec.id || idx} className="hover:bg-[#FFB908]/5">
+                        <td className="py-3 text-[#050720]/70">{String(idx + 1).padStart(2, '0')}</td>
+                        <td className="py-3 font-medium text-[#050720]">{title}</td>
+                        <td className="py-3 text-[#050720]/70">{lec.date}</td>
+                        <td className="py-3 text-[#050720]/70">{lec.hoursSpent || '01'}</td>
+                        <td className="py-3 font-medium text-[#050720]">{attText}</td>
+                        <td className="py-3 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedLecture({
+                                id: lec.id || `lec-${idx}`,
+                                srNo: String(idx + 1).padStart(2, '0'),
+                                topic: title,
+                                date: lec.date,
+                                hoursSpent: lec.hoursSpent || '01',
+                                attendance: attText,
+                                timeSlot: lec.timeSlot || '11:00 - 12:00',
+                                topicsCovered: lec.topics || lec.topicsCovered || ['Lecture overview'],
+                                assignmentGiven: lec.assignment || lec.assignmentGiven || 'None',
+                              });
+                              setCurrentView('lecture-view');
+                            }}
+                            className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 cursor-pointer"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
@@ -420,7 +562,7 @@ export const FacultyBatchesPage: React.FC = () => {
             </button>
             <div>
               <h1 className="text-2xl font-bold text-[#050720] font-['Sora'] leading-none">Lectures</h1>
-              <span className="text-xs text-[#050720]/60">Poorva Pande</span>
+              <span className="text-xs text-[#050720]/60">{selectedBatch?.faculty}</span>
             </div>
           </div>
 
@@ -433,7 +575,7 @@ export const FacultyBatchesPage: React.FC = () => {
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Course</span>
-                <span className="font-semibold text-[#050720]">UI/UX Design</span>
+                <span className="font-semibold text-[#050720]">{selectedBatch?.course}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Date</span>
@@ -464,11 +606,15 @@ export const FacultyBatchesPage: React.FC = () => {
             <div className="flex gap-12 text-xs">
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Total Students</span>
-                <span className="font-bold text-sm text-[#050720]">05</span>
+                <span className="font-bold text-sm text-[#050720]">
+                  {String(selectedBatch?.students?.length || 0).padStart(2, '0')}
+                </span>
               </div>
               <div>
-                <span className="text-[#050720]/50 block text-[11px]">Present Students</span>
-                <span className="font-bold text-sm text-[#050720]">05</span>
+                <span className="text-[#050720]/50 block text-[11px]">Attendance Ratio</span>
+                <span className="font-bold text-sm text-[#050720]">
+                  {selectedLecture.attendance}
+                </span>
               </div>
             </div>
 
@@ -484,20 +630,25 @@ export const FacultyBatchesPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#050720]/5">
-                {students.map((st) => (
-                  <tr key={st.id}>
-                    <td className="py-3">
-                      <div className="w-4 h-4 rounded border border-[#050720]/30 flex items-center justify-center bg-[#050720] text-white">
-                        <Check className="w-3 h-3" />
-                      </div>
-                    </td>
-                    <td className="py-3 text-[#050720]/70">{st.srNo}</td>
-                    <td className="py-3 font-medium text-[#050720]">{st.name}</td>
-                    <td className="py-3 text-[#050720]/70">{st.startDate}</td>
-                    <td className="py-3 text-[#050720]/70">{st.contact}</td>
-                    <td className="py-3 text-[#050720]/70">{st.remark}</td>
-                  </tr>
-                ))}
+                {(selectedBatch?.students || []).map((st: any, idx: number) => {
+                  const displayName =
+                    st.name || `${st.firstName || ''} ${st.lastName || ''}`.trim() || 'Student';
+
+                  return (
+                    <tr key={idx}>
+                      <td className="py-3">
+                        <div className="w-4 h-4 rounded border border-[#050720]/30 flex items-center justify-center bg-[#050720] text-white">
+                          <Check className="w-3 h-3" />
+                        </div>
+                      </td>
+                      <td className="py-3 text-[#050720]/70">{String(idx + 1).padStart(2, '0')}</td>
+                      <td className="py-3 font-medium text-[#050720]">{displayName}</td>
+                      <td className="py-3 text-[#050720]/70">{st.startDate}</td>
+                      <td className="py-3 text-[#050720]/70">{st.contact}</td>
+                      <td className="py-3 text-[#050720]/70">{st.remark || 'Active'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -518,16 +669,16 @@ export const FacultyBatchesPage: React.FC = () => {
             </button>
             <div>
               <h1 className="text-2xl font-bold text-[#050720] font-['Sora'] leading-none">Lectures</h1>
-              <span className="text-xs text-[#050720]/60">Poorva Pande</span>
+              <span className="text-xs text-[#050720]/60">{selectedBatch?.faculty}</span>
             </div>
           </div>
 
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-[#050720] font-['Sora']">Lecture Details</h3>
-            <div className="grid grid-cols-2 gap-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <input
                 type="text"
-                placeholder="Lecture Topic / Title"
+                placeholder="Lecture Topic / Title*"
                 value={newLectureForm.title}
                 onChange={(e) => setNewLectureForm({ ...newLectureForm, title: e.target.value })}
                 className="border border-[#050720]/15 rounded-lg p-3 focus:outline-none focus:border-[#FFB908]"
@@ -579,52 +730,62 @@ export const FacultyBatchesPage: React.FC = () => {
             <div className="flex gap-12 text-xs">
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Total Students</span>
-                <span className="font-bold text-sm text-[#050720]">05</span>
+                <span className="font-bold text-sm text-[#050720]">
+                  {String(rollCallStudents.length).padStart(2, '0')}
+                </span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Present Students</span>
                 <span className="font-bold text-sm text-[#050720]">
-                  {students.filter((s) => s.presentInLecture).length < 10
-                    ? `0${students.filter((s) => s.presentInLecture).length}`
-                    : students.filter((s) => s.presentInLecture).length}
+                  {String(rollCallStudents.filter((s) => s.presentInLecture).length).padStart(2, '0')}
                 </span>
               </div>
             </div>
 
-            <table className="w-full text-left text-xs pt-2">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720]/70 pb-3 font-semibold">
-                  <th className="pb-3 w-8"></th>
-                  <th className="pb-3">Sr. No.</th>
-                  <th className="pb-3">Student Name</th>
-                  <th className="pb-3">Start Date</th>
-                  <th className="pb-3">Contact</th>
-                  <th className="pb-3">Remark</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5">
-                {students.map((st) => (
-                  <tr key={st.id} onClick={() => toggleStudentAttendance(st.id)} className="cursor-pointer">
-                    <td className="py-3">
-                      <div
-                        className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                          st.presentInLecture
-                            ? 'bg-[#050720] border-[#050720] text-white'
-                            : 'border-[#050720]/30 bg-white'
-                        }`}
-                      >
-                        {st.presentInLecture && <Check className="w-3 h-3" />}
-                      </div>
-                    </td>
-                    <td className="py-3 text-[#050720]/70">{st.srNo}</td>
-                    <td className="py-3 font-medium text-[#050720]">{st.name}</td>
-                    <td className="py-3 text-[#050720]/70">{st.startDate}</td>
-                    <td className="py-3 text-[#050720]/70">{st.contact}</td>
-                    <td className="py-3 text-[#050720]/70">{st.remark}</td>
+            {rollCallStudents.length === 0 ? (
+              <p className="text-xs text-[#050720]/40 italic py-4">
+                No students enrolled in this batch to record attendance.
+              </p>
+            ) : (
+              <table className="w-full text-left text-xs pt-2">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 text-[#050720]/70 pb-3 font-semibold">
+                    <th className="pb-3 w-8"></th>
+                    <th className="pb-3">Sr. No.</th>
+                    <th className="pb-3">Student Name</th>
+                    <th className="pb-3">Start Date</th>
+                    <th className="pb-3">Contact</th>
+                    <th className="pb-3">Remark</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5">
+                  {rollCallStudents.map((st) => (
+                    <tr
+                      key={st.id}
+                      onClick={() => toggleStudentAttendance(st.id)}
+                      className="cursor-pointer hover:bg-[#FFB908]/5"
+                    >
+                      <td className="py-3">
+                        <div
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                            st.presentInLecture
+                              ? 'bg-[#050720] border-[#050720] text-white'
+                              : 'border-[#050720]/30 bg-white'
+                          }`}
+                        >
+                          {st.presentInLecture && <Check className="w-3 h-3" />}
+                        </div>
+                      </td>
+                      <td className="py-3 text-[#050720]/70">{st.srNo}</td>
+                      <td className="py-3 font-medium text-[#050720]">{st.name}</td>
+                      <td className="py-3 text-[#050720]/70">{st.startDate}</td>
+                      <td className="py-3 text-[#050720]/70">{st.contact}</td>
+                      <td className="py-3 text-[#050720]/70">{st.remark}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* Submit Action Buttons */}
@@ -670,15 +831,21 @@ export const FacultyBatchesPage: React.FC = () => {
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Last Name</span>
-                <span className="font-semibold text-[#050720]">{selectedStudent.name.split(' ').slice(1).join(' ') || 'Junnarkar'}</span>
+                <span className="font-semibold text-[#050720]">
+                  {selectedStudent.name.split(' ').slice(1).join(' ') || '—'}
+                </span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Batch</span>
-                <span className="font-semibold text-[#050720]">{selectedStudent.batchCode || selectedBatchCode}</span>
+                <span className="font-semibold text-[#050720]">
+                  {selectedStudent.batchCode || selectedBatch?.batchCode}
+                </span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Course</span>
-                <span className="font-semibold text-[#050720]">{selectedStudent.course || 'UI/UX Design'}</span>
+                <span className="font-semibold text-[#050720]">
+                  {selectedStudent.course || selectedBatch?.course}
+                </span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Start Date</span>
@@ -710,15 +877,17 @@ export const FacultyBatchesPage: React.FC = () => {
             <h3 className="text-sm font-bold text-[#050720] font-['Sora']">Attendance</h3>
             <div className="grid grid-cols-3 gap-4 text-center">
               {[
-                { label: 'This Month', percent: 50 },
-                { label: 'Last Month', percent: 50 },
-                { label: 'Average', percent: 50 },
+                { label: 'This Month', percent: 100 },
+                { label: 'Last Month', percent: 100 },
+                { label: 'Average', percent: 100 },
               ].map((stat, i) => (
                 <div key={i} className="border border-[#050720]/10 rounded-xl p-4 shadow-2xs">
                   <div className="text-xl font-bold text-[#050720] font-['Sora']">{stat.percent}%</div>
-                  {/* Visual Bar */}
                   <div className="w-full bg-[#050720]/10 h-1.5 rounded-full my-2 overflow-hidden">
-                    <div className="bg-[#10B981] h-full rounded-full" style={{ width: `${stat.percent}%` }}></div>
+                    <div
+                      className="bg-[#10B981] h-full rounded-full"
+                      style={{ width: `${stat.percent}%` }}
+                    />
                   </div>
                   <span className="text-[11px] text-[#050720]/50">{stat.label}</span>
                 </div>
@@ -727,20 +896,24 @@ export const FacultyBatchesPage: React.FC = () => {
 
             {/* Attendance Session Logs */}
             <div className="space-y-3 pt-4">
-              <div className="border border-[#050720]/10 rounded-xl p-3.5 flex justify-between items-center text-xs">
-                <span className="font-medium text-[#050720]">Introduction to UI/UX</span>
-                <div className="text-right">
-                  <span className="text-[#10B981] font-semibold block text-[11px]">Present</span>
-                  <span className="text-[#050720]/40 text-[10px]">02-01-2026</span>
-                </div>
-              </div>
-              <div className="border border-[#050720]/10 rounded-xl p-3.5 flex justify-between items-center text-xs">
-                <span className="font-medium text-[#050720]">Understanding of UI/UX</span>
-                <div className="text-right">
-                  <span className="text-[#EF4444] font-semibold block text-[11px]">Absent</span>
-                  <span className="text-[#050720]/40 text-[10px]">04-01-2026</span>
-                </div>
-              </div>
+              {(selectedBatch?.lectures || []).length === 0 ? (
+                <p className="text-xs text-[#050720]/40 italic">No lecture attendance logs yet.</p>
+              ) : (
+                selectedBatch?.lectures.map((lec: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="border border-[#050720]/10 rounded-xl p-3.5 flex justify-between items-center text-xs"
+                  >
+                    <span className="font-medium text-[#050720]">
+                      {lec.title || lec.topic || 'Lecture Session'}
+                    </span>
+                    <div className="text-right">
+                      <span className="text-[#10B981] font-semibold block text-[11px]">Present</span>
+                      <span className="text-[#050720]/40 text-[10px]">{lec.date}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

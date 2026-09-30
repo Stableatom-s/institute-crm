@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { demoService, DemoItem as ServiceDemoItem, DemoTab } from '../../services/demoService';
 
-type DemoTab = 'Scheduled' | 'Completed' | 'Cancelled';
 type PageView = 'list' | 'details';
 
 interface DemoItem {
@@ -14,7 +15,7 @@ interface DemoItem {
   course: string;
   mode: 'Online' | 'Offline';
   status: DemoTab;
-  demoStatus?: string; // e.g. "Attended"
+  demoStatus?: string;
   remark?: string;
   feedback?: string;
   cancellationReason?: string;
@@ -22,145 +23,67 @@ interface DemoItem {
 }
 
 export const FacultyDemoPage: React.FC = () => {
+  const auth = useAuth() as any;
+  const currentUserName = auth?.user?.name || 'Poorva Pande';
+
   const [activeTab, setActiveTab] = useState<DemoTab>('Scheduled');
   const [currentView, setCurrentView] = useState<PageView>('list');
   const [selectedDemo, setSelectedDemo] = useState<DemoItem | null>(null);
+  const [demos, setDemos] = useState<DemoItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Filters
   const [modeFilter, setModeFilter] = useState('All');
   const [courseFilter, setCourseFilter] = useState('All');
 
-  // Completed form state
-  const [feedbackText, setFeedbackText] = useState(
-    ' '
-  );
+  // Form State
+  const [feedbackText, setFeedbackText] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('name.jpeg/png/jpg');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const [demos, setDemos] = useState<DemoItem[]>([
-    {
-      id: '1',
-      srNo: '01',
-      leadName: 'Aanya Shah',
-      facultyName: 'Poorva Pande',
-      timeSlot: '11:00 - 12:00',
-      demoDate: '21-12-2025',
-      course: 'UI/UX Design',
-      mode: 'Online',
-      status: 'Scheduled',
-    },
-    {
-      id: '2',
-      srNo: '02',
-      leadName: 'Rohan Mehta',
-      facultyName: 'Poorva Pande',
-      timeSlot: '01:00 - 02:00',
-      demoDate: '21-12-2025',
-      course: 'No Code',
-      mode: 'Online',
-      status: 'Scheduled',
-    },
-    {
-      id: '3',
-      srNo: '03',
-      leadName: 'Neha Patel',
-      facultyName: 'Poorva Pande',
-      timeSlot: '03:00 - 04:00',
-      demoDate: '21-12-2025',
-      course: 'UI/UX Design',
-      mode: 'Offline',
-      status: 'Scheduled',
-    },
-    {
-      id: '4',
-      srNo: '04',
-      leadName: 'Anish Verma',
-      facultyName: 'Poorva Pande',
-      timeSlot: '03:00 - 04:00',
-      demoDate: '21-12-2025',
-      course: 'Portfolio',
-      mode: 'Offline',
-      status: 'Scheduled',
-    },
-    {
-      id: '5',
-      srNo: '05',
-      leadName: 'Siddhi Shah',
-      facultyName: 'Poorva Pande',
-      timeSlot: '01:00 - 02:00',
-      demoDate: '21-12-2025',
-      course: 'Full-Stack',
-      mode: 'Online',
-      status: 'Scheduled',
-    },
-    // Completed
-    {
-      id: '6',
-      srNo: '01',
-      leadName: 'Rohit Shah',
-      facultyName: 'Poorva Pande',
-      timeSlot: '11:00 - 12:00',
-      demoDate: '21-12-2025',
-      course: 'UI/UX Design',
-      mode: 'Online',
-      status: 'Completed',
-      demoStatus: 'Attended',
-      remark: 'Joining soon',
-      feedback:
-        ' ',
-    },
-    {
-      id: '7',
-      srNo: '02',
-      leadName: 'Ashish Mehta',
-      facultyName: 'Poorva Pande',
-      timeSlot: '11:00 - 12:00',
-      demoDate: '21-12-2025',
-      course: 'UI/UX Design',
-      mode: 'Online',
-      status: 'Completed',
-      demoStatus: 'Attended',
-      remark: 'Joining soon',
-    },
-    {
-      id: '8',
-      srNo: '03',
-      leadName: 'Anush Shah',
-      facultyName: 'Poorva Pande',
-      timeSlot: '11:00 - 12:00',
-      demoDate: '21-12-2025',
-      course: 'UI/UX Design',
-      mode: 'Online',
-      status: 'Completed',
-      demoStatus: 'Attended',
-      remark: 'Joining soon',
-    },
-    // Cancelled
-    {
-      id: '9',
-      srNo: '01',
-      leadName: 'Aanya Shah',
-      facultyName: 'Poorva Pande',
-      timeSlot: '11:00 - 12:00',
-      demoDate: '21-12-2025',
-      course: 'UI/UX Design',
-      mode: 'Online',
-      status: 'Cancelled',
-      cancellationReason: 'Unavailable for demo',
-    },
-    {
-      id: '10',
-      srNo: '02',
-      leadName: 'Rohan Mehta',
-      facultyName: 'Poorva Pande',
-      timeSlot: '01:00 - 02:00',
-      demoDate: '21-12-2025',
-      course: 'No Code',
-      mode: 'Online',
-      status: 'Cancelled',
-      cancellationReason: 'Timing clash with college lectures',
-    },
-  ]);
+  // Fetch demos directly from MongoDB backend
+  const loadFacultyDemos = async () => {
+    try {
+      setIsLoading(true);
+      const data = await demoService.getAllDemos();
+
+      // Filter demos assigned to this instructor (or show all if generic)
+      const facultyDemos = data.filter(
+        (d) =>
+          d.faculty.toLowerCase().includes(currentUserName.toLowerCase()) ||
+          currentUserName.toLowerCase().includes(d.faculty.toLowerCase())
+      );
+
+      const targetList = facultyDemos.length > 0 ? facultyDemos : data;
+
+      const mapped: DemoItem[] = targetList.map((d: ServiceDemoItem) => ({
+        id: d.id,
+        srNo: '',
+        leadName: `${d.name} ${d.lastName || ''}`.trim(),
+        facultyName: d.faculty,
+        timeSlot: d.timeSlot,
+        demoDate: d.demoDate,
+        course: d.course,
+        mode: d.mode,
+        status: d.status,
+        demoStatus: d.demoStatusText || (d.status === 'Completed' ? 'Attended' : undefined),
+        remark: d.remark || (d.status === 'Completed' ? 'Joining soon' : undefined),
+        feedback: d.feedback,
+        cancellationReason: d.cancellationReason,
+       screenshotUrl: (d as any).screenshotUrl,
+      }));
+
+      setDemos(mapped);
+    } catch (err) {
+      console.error('Failed to load faculty demos from server:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadFacultyDemos();
+  }, [currentUserName]);
 
   const filteredDemos = demos.filter((item) => {
     if (item.status !== activeTab) return false;
@@ -171,7 +94,10 @@ export const FacultyDemoPage: React.FC = () => {
 
   const handleOpenDetails = (demo: DemoItem) => {
     setSelectedDemo(demo);
-    setFeedbackText(demo.feedback || 'Student showed strong interest in the course structure and tools. Asked relevant questions about projects and placement support. Recommended for follow-up within 24 hours.');
+    setFeedbackText(
+      demo.feedback ||
+        'Student showed strong interest in the course structure and tools. Asked relevant questions about projects and placement support. Recommended for follow-up within 24 hours.'
+    );
     setUploadedFileName('name.jpeg/png/jpg');
     setPreviewImage(demo.screenshotUrl || null);
     setCurrentView('details');
@@ -185,16 +111,28 @@ export const FacultyDemoPage: React.FC = () => {
     }
   };
 
-  const handleSaveCompleted = () => {
+  const handleSaveCompleted = async () => {
     if (!selectedDemo) return;
-    setDemos((prev) =>
-      prev.map((d) =>
-        d.id === selectedDemo.id
-          ? { ...d, feedback: feedbackText, screenshotUrl: previewImage || undefined }
-          : d
-      )
-    );
-    setCurrentView('list');
+
+    try {
+      await demoService.updateDemoStatus(selectedDemo.id, 'Completed', {
+        feedback: feedbackText,
+        screenshotUrl: previewImage || undefined,
+      } as any);
+
+      setDemos((prev) =>
+        prev.map((d) =>
+          d.id === selectedDemo.id
+            ? { ...d, feedback: feedbackText, screenshotUrl: previewImage || undefined }
+            : d
+        )
+      );
+      alert('Demo feedback saved successfully!');
+      setCurrentView('list');
+    } catch (err) {
+      console.error('Failed to update demo on database:', err);
+      alert('Error saving feedback to server.');
+    }
   };
 
   return (
@@ -253,54 +191,66 @@ export const FacultyDemoPage: React.FC = () => {
               </select>
             </div>
 
-            {/* Demo Table */}
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720]/70 pb-3 font-semibold">
-                  <th className="pb-3">Sr. No.</th>
-                  <th className="pb-3">Name</th>
-                  <th className="pb-3">Time Slot</th>
-                  <th className="pb-3">Demo Date</th>
-                  <th className="pb-3">Course</th>
-                  <th className="pb-3">Mode</th>
-                  {activeTab === 'Completed' && (
-                    <>
-                      <th className="pb-3">Demo Status</th>
-                      <th className="pb-3">Remark</th>
-                    </>
-                  )}
-                  <th className="pb-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {filteredDemos.map((row) => (
-                  <tr key={row.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                    <td className="py-3.5 text-[#050720]/70">{row.srNo}</td>
-                    <td className="py-3.5 font-medium">{row.leadName}</td>
-                    <td className="py-3.5 text-[#050720]/70">{row.timeSlot}</td>
-                    <td className="py-3.5 text-[#050720]/70">{row.demoDate}</td>
-                    <td className="py-3.5 text-[#050720]/70">{row.course}</td>
-                    <td className="py-3.5 text-[#050720]/70">{row.mode}</td>
+            {/* Live Demo Table */}
+            {isLoading ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                Loading demo sessions from database...
+              </div>
+            ) : filteredDemos.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                No {activeTab.toLowerCase()} demos found.
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 text-[#050720]/70 pb-3 font-semibold">
+                    <th className="pb-3">Sr. No.</th>
+                    <th className="pb-3">Name</th>
+                    <th className="pb-3">Time Slot</th>
+                    <th className="pb-3">Demo Date</th>
+                    <th className="pb-3">Course</th>
+                    <th className="pb-3">Mode</th>
                     {activeTab === 'Completed' && (
                       <>
-                        <td className="py-3.5 text-[#050720]/70">{row.demoStatus || 'Attended'}</td>
-                        <td className="py-3.5 text-[#050720]/70">{row.remark || 'Joining soon'}</td>
+                        <th className="pb-3">Demo Status</th>
+                        <th className="pb-3">Remark</th>
                       </>
                     )}
-                    <td className="py-3.5 text-right">
-                      <button
-                        onClick={() => handleOpenDetails(row)}
-                        className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
-                      >
-                        View
-                      </button>
-                    </td>
+                    <th className="pb-3 text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                  {filteredDemos.map((row, index) => (
+                    <tr key={row.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5 text-[#050720]/70">
+                        {String(index + 1).padStart(2, '0')}
+                      </td>
+                      <td className="py-3.5 font-medium">{row.leadName}</td>
+                      <td className="py-3.5 text-[#050720]/70">{row.timeSlot}</td>
+                      <td className="py-3.5 text-[#050720]/70">{row.demoDate}</td>
+                      <td className="py-3.5 text-[#050720]/70">{row.course}</td>
+                      <td className="py-3.5 text-[#050720]/70">{row.mode}</td>
+                      {activeTab === 'Completed' && (
+                        <>
+                          <td className="py-3.5 text-[#050720]/70">{row.demoStatus || 'Attended'}</td>
+                          <td className="py-3.5 text-[#050720]/70">{row.remark || 'Joining soon'}</td>
+                        </>
+                      )}
+                      <td className="py-3.5 text-right">
+                        <button
+                          onClick={() => handleOpenDetails(row)}
+                          className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
-            {/* Pagination */}
+            {/* Pagination Controls */}
             <div className="flex justify-end items-center gap-3 mt-6 text-xs text-[#050720]/60">
               <span>Jump to</span>
               <span className="border border-[#050720]/20 rounded px-2 py-0.5 text-[#050720] font-medium">01</span>
@@ -318,7 +268,7 @@ export const FacultyDemoPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentView('list')}
-              className="p-1 rounded hover:bg-slate-100 text-[#050720]"
+              className="p-1 rounded hover:bg-slate-100 text-[#050720] cursor-pointer"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -370,7 +320,7 @@ export const FacultyDemoPage: React.FC = () => {
               )}
             </div>
 
-            {/* Completed-only specific section: Feedback & Attendance Screenshot */}
+            {/* Completed Section: Feedback & Attendance Screenshot */}
             {selectedDemo.status === 'Completed' && (
               <div className="space-y-4 pt-2 border-t border-[#050720]/5">
                 <div>
@@ -383,7 +333,6 @@ export const FacultyDemoPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Upload or View Screenshot */}
                 <div>
                   <label className="text-[11px] text-[#050720]/60 block mb-2">Attendance screenshot</label>
                   <div className="flex items-center gap-4">
@@ -401,7 +350,6 @@ export const FacultyDemoPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Rendered Zoom-style Screenshot Mock / Uploaded Image */}
                 {previewImage ? (
                   <div className="mt-4 rounded-xl overflow-hidden border border-[#050720]/10 max-w-xl">
                     <img src={previewImage} alt="Attendance verification" className="w-full h-auto object-cover" />
@@ -411,7 +359,7 @@ export const FacultyDemoPage: React.FC = () => {
                     <div className="text-[11px] text-gray-400 font-mono">Zoom Meeting Preview</div>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="h-32 bg-stone-700 rounded-lg flex items-center justify-center text-[11px] text-gray-300">
-                        Faculty (Poorva)
+                        Faculty ({selectedDemo.facultyName})
                       </div>
                       <div className="h-32 bg-stone-800 rounded-lg flex items-center justify-center text-[11px] text-gray-300">
                         Student ({selectedDemo.leadName})
@@ -420,11 +368,10 @@ export const FacultyDemoPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Save CTA */}
                 <div className="pt-2">
                   <button
                     onClick={handleSaveCompleted}
-                    className="w-full py-3 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors"
+                    className="w-full py-3 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors cursor-pointer"
                   >
                     Save
                   </button>

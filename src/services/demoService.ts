@@ -19,6 +19,7 @@ export interface DemoItem {
   remark?: string;
   cancellationReason?: string;
   feedback?: string;
+  screenshotUrl?: string;
 }
 
 export const demoService = {

@@ -13,7 +13,18 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-// POST create new batch
+// GET single batch by ID
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const batch = await Batch.findById(req.params.id);
+    if (!batch) return res.status(404).json({ message: 'Batch not found' });
+    res.json(batch);
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving batch', error });
+  }
+});
+
+// POST create batch
 router.post('/', async (req: Request, res: Response) => {
   try {
     const count = await Batch.countDocuments();
@@ -37,13 +48,42 @@ router.post('/:id/students', async (req: Request, res: Response) => {
     if (!batch) return res.status(404).json({ message: 'Batch not found' });
 
     const incomingStudents = req.body.students || [];
-    batch.students.push(...incomingStudents);
-    batch.studentCount = batch.students.length;
+    if (!batch.students) batch.students = [] as any;
 
+    batch.students.push(...incomingStudents);
     const saved = await batch.save();
-    res.json(saved);
+    res.status(200).json(saved);
   } catch (error) {
     res.status(500).json({ message: 'Failed to add students to batch', error });
+  }
+});
+
+// POST add lecture to batch
+router.post('/:id/lectures', async (req: Request, res: Response) => {
+  try {
+    const batch = await Batch.findById(req.params.id);
+    if (!batch) return res.status(404).json({ message: 'Batch not found' });
+
+    const newLecture = {
+      srNo: String((batch.lectures?.length || 0) + 1).padStart(2, '0'),
+      title: req.body.title,
+      date: req.body.date,
+      timeSlot: req.body.timeSlot,
+      course: req.body.course || batch.course,
+      topics: req.body.topicsCovered || [],
+      assignment: req.body.assignmentGiven || 'None',
+      totalStudents: req.body.totalStudents || batch.students?.length || 0,
+      presentStudents: req.body.presentStudents || 0,
+      studentsList: req.body.studentsList || [],
+    };
+
+    if (!batch.lectures) batch.lectures = [] as any;
+    batch.lectures.unshift(newLecture as any);
+
+    const saved = await batch.save();
+    res.status(201).json(saved);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to record lecture', error });
   }
 });
 

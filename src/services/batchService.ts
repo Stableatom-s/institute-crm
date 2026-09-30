@@ -2,29 +2,44 @@ import { apiRequest } from '../lib/api';
 
 export interface BatchStudent {
   id?: string;
-  srNo: string;
+  _id?: string;
+  srNo?: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   startDate: string;
   contact: string;
-  attendance: string;
+  attendance?: string;
+  attendanceRatio?: string;
   remark: string;
-  fees: string;
+  fees?: string;
+  email?: string;
+  presentInLecture?: boolean;
 }
 
 export interface BatchLecture {
-  id: string;
-  title: string;
+  id?: string;
+  _id?: string;
+  srNo: string;
+  title?: string;
+  topic?: string;
   date: string;
   timeSlot: string;
   course: string;
-  topics: string[];
-  assignment: string;
+  topics?: string[];
+  topicsCovered?: string[];
+  assignment?: string;
+  assignmentGiven?: string;
+  hoursSpent?: string;
   totalStudents: number;
   presentStudents: number;
+  attendance?: string;
+  studentsList?: any[];
 }
 
 export interface BatchItem {
   id: string;
+  _id?: string;
   srNo: string;
   batchCode: string;
   startDate: string;
@@ -33,7 +48,6 @@ export interface BatchItem {
   faculty: string;
   studentCount: number;
   timeSlot?: string;
-  phase?: string;
   students: BatchStudent[];
   lectures: BatchLecture[];
 }
@@ -67,6 +81,19 @@ export const batchService = {
     const data = await apiRequest<any>(`/batches/${batchId}/students`, {
       method: 'POST',
       body: JSON.stringify({ students }),
+    });
+    return {
+      ...data,
+      id: data._id || data.id,
+      students: data.students || [],
+      lectures: data.lectures || [],
+    };
+  },
+
+  addLectureToBatch: async (batchId: string, lectureData: any): Promise<BatchItem> => {
+    const data = await apiRequest<any>(`/batches/${batchId}/lectures`, {
+      method: 'POST',
+      body: JSON.stringify(lectureData),
     });
     return {
       ...data,
