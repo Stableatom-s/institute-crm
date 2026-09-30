@@ -6,6 +6,8 @@ import { leadRoutes } from './routes/leads';
 import { demoRoutes } from './routes/demo';
 import { batchRoutes } from './routes/batches';
 import { invoiceRoutes } from './routes/invoices';
+import { attendanceRoutes } from './routes/attendance';
+import { leaveRoutes } from './routes/leaves';
 
 dotenv.config();
 
@@ -32,6 +34,8 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/demos', demoRoutes);
 app.use('/api/batches', batchRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/leaves', leaveRoutes);
 
 app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);

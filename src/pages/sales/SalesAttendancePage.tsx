@@ -1,123 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ArrowLeft,
   ChevronDown,
   Plus,
   CalendarCheck,
 } from "lucide-react";
-
-// --- TYPES ---
-interface ActivityItem {
-  id: string;
-  activity: string;
-  timeSpent: string;
-  details?: string;
-}
-
-interface AttendanceRecord {
-  id: string;
-  date: string;
-  inTime: string;
-  outTime: string;
-  workingHours: string;
-}
-
-interface LeaveRecord {
-  id: string;
-  leaveType: "Sick" | "Casual" | "Vacation";
-  leaveDate: string;
-  reason: string;
-  applicationDate: string;
-  status: "Approved" | "Pending" | "Rejected";
-}
-
-const INITIAL_TODAYS_ACTIVITIES: ActivityItem[] = [
-  { id: "act-1", activity: "Lead Follow-ups Done", timeSpent: "01:00 Hrs" },
-  { id: "act-2", activity: "Demo feedback updated", timeSpent: "03:00 Hrs" },
-  { id: "act-3", activity: "Demo feedback updated", timeSpent: "02:00 Hrs" },
-  { id: "act-4", activity: "Demo feedback updated", timeSpent: "03:00 Hrs" },
-];
-
-const INITIAL_ATTENDANCE_HISTORY: AttendanceRecord[] = [
-  {
-    id: "att-1",
-    date: "01-12-2025",
-    inTime: "09:30 AM",
-    outTime: "07:30 PM",
-    workingHours: "09:00",
-  },
-  {
-    id: "att-2",
-    date: "02-12-2025",
-    inTime: "09:30 AM",
-    outTime: "07:30 PM",
-    workingHours: "09:00",
-  },
-  {
-    id: "att-3",
-    date: "03-12-2025",
-    inTime: "09:49 AM",
-    outTime: "07:49 PM",
-    workingHours: "09:00",
-  },
-  {
-    id: "att-4",
-    date: "04-12-2025",
-    inTime: "09:40 AM",
-    outTime: "07:40 PM",
-    workingHours: "09:00",
-  },
-  {
-    id: "att-5",
-    date: "05-12-2025",
-    inTime: "09:39 AM",
-    outTime: "07:39 PM",
-    workingHours: "09:00",
-  },
-];
-
-const INITIAL_LEAVES: LeaveRecord[] = [
-  {
-    id: "l-1",
-    leaveType: "Sick",
-    leaveDate: "21-12-2025",
-    reason: "Flu Recovery",
-    applicationDate: "20-12-2025",
-    status: "Approved",
-  },
-  {
-    id: "l-2",
-    leaveType: "Sick",
-    leaveDate: "21-12-2025",
-    reason: "Flu Recovery",
-    applicationDate: "20-12-2025",
-    status: "Pending",
-  },
-  {
-    id: "l-3",
-    leaveType: "Casual",
-    leaveDate: "05-11-2025",
-    reason: "Personal",
-    applicationDate: "01-11-2025",
-    status: "Rejected",
-  },
-  {
-    id: "l-4",
-    leaveType: "Sick",
-    leaveDate: "21-09-2025",
-    reason: "Flu Recovery",
-    applicationDate: "20-09-2025",
-    status: "Approved",
-  },
-  {
-    id: "l-5",
-    leaveType: "Vacation",
-    leaveDate: "25-02-2025",
-    reason: "Personal",
-    applicationDate: "20-02-2025",
-    status: "Approved",
-  },
-];
+import { useAuth } from "../../context/AuthContext";
+import {
+  attendanceService,
+  ActivityItem,
+  AttendanceRecord,
+  LeaveRecord,
+} from "../../services/attendanceService";
 
 const ACTIVITY_OPTIONS = [
   "Select Activity",
@@ -129,48 +23,133 @@ const ACTIVITY_OPTIONS = [
 ];
 
 export const SalesAttendancePage: React.FC = () => {
+  const auth = useAuth() as any;
+  const currentUserName = auth?.user?.name || "User";
+  const currentUserRole = auth?.user?.role || "Sales";
+
   // Navigation states: 'main' | 'checkout' | 'leave-records' | 'apply-leave' | 'view-work-details'
   const [view, setView] = useState<
     "main" | "checkout" | "leave-records" | "apply-leave" | "view-work-details"
   >("main");
 
   // Attendance state
-  const [isClockedIn, setIsClockedIn] = useState(true);
-  const [inTimeText] = useState("09:30 AM");
-  const [outTimeText, setOutTimeText] = useState("Yet to checkout");
-  const [selectedMonth, setSelectedMonth] = useState("Month");
+  const [isClockedIn, setIsClockedIn] = useState<boolean>(true);
+  const [inTimeText, setInTimeText] = useState<string>("");
+  const [outTimeText, setOutTimeText] = useState<string>("Yet to checkout");
+  const [selectedMonth, setSelectedMonth] = useState<string>("Month");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Activities & Attendance Log
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
+  const [selectedRecordActivities, setSelectedRecordActivities] = useState<ActivityItem[]>([]);
+  const [selectedRecordDate, setSelectedRecordDate] = useState<string>("");
 
   // Time Spent Logger inputs
-  const [selectedActivity, setSelectedActivity] = useState("Select Activity");
-  const [hoursSpent, setHoursSpent] = useState("Hours");
-  const [minutesSpent, setMinutesSpent] = useState("Minutes");
-  const [activityDetails, setActivityDetails] = useState("");
-  const [activities, setActivities] = useState<ActivityItem[]>(
-    INITIAL_TODAYS_ACTIVITIES,
-  );
+  const [selectedActivity, setSelectedActivity] = useState<string>("Select Activity");
+  const [hoursSpent, setHoursSpent] = useState<string>("Hours");
+  const [minutesSpent, setMinutesSpent] = useState<string>("Minutes");
+  const [activityDetails, setActivityDetails] = useState<string>("");
 
-  // Leave Records Tab
+  // Leave Records Tab & Lists
   const [leaveTab, setLeaveTab] = useState<"Applied" | "Cancelled">("Applied");
+  const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
 
-  // Apply Leave form state
-  const [leaveFromDate, setLeaveFromDate] = useState("");
-  const [leaveToDate, setLeaveToDate] = useState("2026-02-14");
-  const [leaveType, setLeaveType] = useState("Casual");
-  const [leaveDays, setLeaveDays] = useState("02");
-  const [leaveReason, setLeaveReason] = useState("Will be out of town.");
-  const [leaveDateError, setLeaveDateError] = useState(false);
+  // Apply Leave form state (Cleared of hardcoded defaults)
+  const [leaveFromDate, setLeaveFromDate] = useState<string>("");
+  const [leaveToDate, setLeaveToDate] = useState<string>("");
+  const [leaveType, setLeaveType] = useState<"Casual" | "Sick" | "Vacation">("Casual");
+  const [leaveDays, setLeaveDays] = useState<string>("");
+  const [leaveReason, setLeaveReason] = useState<string>("");
+  const [leaveDateError, setLeaveDateError] = useState<boolean>(false);
+
+  // Fetch live attendance history & leave records
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [attLogs, leaveLogs] = await Promise.all([
+          attendanceService.getMyAttendance(),
+          attendanceService.getMyLeaves(),
+        ]);
+        setAttendanceHistory(attLogs);
+        setLeaves(leaveLogs);
+      } catch (err) {
+        console.error("Failed to load attendance logs:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+
+    // Check today's clock in/out status from localStorage
+    const todayStr = new Date()
+      .toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+      .replace(/\//g, "-");
+
+    const savedInTime = localStorage.getItem("radiquolab_punch_in");
+    if (savedInTime) {
+      setInTimeText(savedInTime);
+    } else {
+      const now = new Date();
+      const formatted = now.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+      localStorage.setItem("radiquolab_punch_in", formatted);
+      setInTimeText(formatted);
+      attendanceService.clockIn(formatted, todayStr).catch(() => {});
+    }
+
+    const savedOutTime = localStorage.getItem(`radiquolab_clock_out_${todayStr}`);
+    if (savedOutTime) {
+      setIsClockedIn(false);
+      setOutTimeText(savedOutTime);
+    }
+
+    // Load active activities for the day
+    const savedActivities = localStorage.getItem(`radiquolab_activities_${todayStr}`);
+    if (savedActivities) {
+      try {
+        setActivities(JSON.parse(savedActivities));
+      } catch {
+        setActivities([]);
+      }
+    }
+  }, []);
 
   // Add new activity
   const handleAddActivity = () => {
     if (selectedActivity === "Select Activity") return;
-    const duration = `${hoursSpent !== "Hours" ? hoursSpent : "00"}:${minutesSpent !== "Minutes" ? minutesSpent : "00"} Hrs`;
+    const duration = `${hoursSpent !== "Hours" ? hoursSpent : "00"}:${
+      minutesSpent !== "Minutes" ? minutesSpent : "00"
+    } Hrs`;
+
     const newAct: ActivityItem = {
       id: `act-${Date.now()}`,
       activity: selectedActivity,
       timeSpent: duration,
       details: activityDetails,
     };
-    setActivities([newAct, ...activities]);
+
+    const updated = [newAct, ...activities];
+    setActivities(updated);
+
+    const todayStr = new Date()
+      .toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+      .replace(/\//g, "-");
+    localStorage.setItem(`radiquolab_activities_${todayStr}`, JSON.stringify(updated));
+
     setSelectedActivity("Select Activity");
     setHoursSpent("Hours");
     setMinutesSpent("Minutes");
@@ -178,27 +157,104 @@ export const SalesAttendancePage: React.FC = () => {
   };
 
   // Confirm Clock Out
-  const handleFinalClockOut = () => {
+  const handleFinalClockOut = async () => {
+    const now = new Date();
+    const formattedOut = now.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+    const todayStr = now
+      .toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+      .replace(/\//g, "-");
+
     setIsClockedIn(false);
-    setOutTimeText("07:30 PM");
+    setOutTimeText(formattedOut);
+    localStorage.setItem(`radiquolab_clock_out_${todayStr}`, formattedOut);
+
+    const newRecord: AttendanceRecord = {
+      id: `att-${Date.now()}`,
+      date: todayStr,
+      inTime: inTimeText,
+      outTime: formattedOut,
+      workingHours: "09:00",
+      activities: activities,
+    };
+
+    try {
+      await attendanceService.clockOut(formattedOut, activities);
+    } catch {
+      // Offline fallback
+    }
+
+    setAttendanceHistory([newRecord, ...attendanceHistory]);
     setView("main");
   };
 
   // Submit Leave Request
-  const handleSubmitLeave = () => {
+  const handleSubmitLeave = async () => {
     if (!leaveFromDate) {
       setLeaveDateError(true);
       return;
     }
     setLeaveDateError(false);
+
+    const todayStr = new Date()
+      .toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+      .replace(/\//g, "-");
+
+    const payload: Partial<LeaveRecord> = {
+      leaveType,
+      leaveDate: leaveFromDate,
+      reason: leaveReason || "Personal Leave",
+      applicationDate: todayStr,
+      status: "Pending",
+    };
+
+    try {
+      const saved = await attendanceService.applyLeave(payload);
+      setLeaves([saved, ...leaves]);
+    } catch {
+      const fallbackLeave: LeaveRecord = {
+        id: `leave-${Date.now()}`,
+        leaveType,
+        leaveDate: leaveFromDate,
+        reason: leaveReason || "Personal Leave",
+        applicationDate: todayStr,
+        status: "Pending",
+      };
+      setLeaves([fallbackLeave, ...leaves]);
+    }
+
+    setLeaveFromDate("");
+    setLeaveToDate("");
+    setLeaveDays("");
+    setLeaveReason("");
     alert("Leave request submitted successfully!");
     setView("leave-records");
   };
 
+  const handleOpenWorkDetails = (record: AttendanceRecord) => {
+    setSelectedRecordDate(record.date);
+    setSelectedRecordActivities(record.activities || activities);
+    setView("view-work-details");
+  };
+
+  const sickLeavesUsed = leaves.filter((l) => l.leaveType === "Sick" && l.status === "Approved").length;
+  const casualLeavesUsed = leaves.filter((l) => l.leaveType === "Casual" && l.status === "Approved").length;
+
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
       {/* ========================================================= */}
-      {/* 1. MY ATTENDANCE MAIN PAGE (SCREENSHOT 1)                  */}
+      {/* 1. MY ATTENDANCE MAIN PAGE                                */}
       {/* ========================================================= */}
       {view === "main" && (
         <div className="space-y-6">
@@ -219,17 +275,13 @@ export const SalesAttendancePage: React.FC = () => {
             <div className="flex justify-between items-center">
               <div className="flex gap-16 text-xs">
                 <div>
-                  <span className="text-[10px] text-[#050720]/50 block">
-                    In time
-                  </span>
+                  <span className="text-[10px] text-[#050720]/50 block">In time</span>
                   <span className="font-bold text-sm font-['Sora'] mt-0.5 block">
-                    {inTimeText}
+                    {inTimeText || "—"}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-[#050720]/50 block">
-                    Out time
-                  </span>
+                  <span className="text-[10px] text-[#050720]/50 block">Out time</span>
                   <span className="font-semibold text-sm mt-0.5 block text-[#050720]/70">
                     {outTimeText}
                   </span>
@@ -278,13 +330,13 @@ export const SalesAttendancePage: React.FC = () => {
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
                 >
                   <option value="Hours">Hours</option>
-                  {Array.from({ length: 9 }, (_, i) =>
-                    String(i + 1).padStart(2, "0"),
-                  ).map((h) => (
-                    <option key={h} value={h}>
-                      {h} Hrs
-                    </option>
-                  ))}
+                  {Array.from({ length: 9 }, (_, i) => String(i + 1).padStart(2, "0")).map(
+                    (h) => (
+                      <option key={h} value={h}>
+                        {h} Hrs
+                      </option>
+                    )
+                  )}
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -325,34 +377,25 @@ export const SalesAttendancePage: React.FC = () => {
 
           {/* Today's Activities List */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
-            <h3 className="text-xs font-bold font-['Sora']">
-              Today's Activities
-            </h3>
-            <div className="space-y-3">
-              {activities.slice(0, 2).map((item) => (
-                <div
-                  key={item.id}
-                  className="flex justify-between items-center py-1"
-                >
-                  <div>
-                    <span className="text-[10px] text-[#050720]/50 block">
-                      Activity
-                    </span>
-                    <span className="text-xs font-semibold text-[#050720]">
-                      {item.activity}
-                    </span>
+            <h3 className="text-xs font-bold font-['Sora']">Today's Activities</h3>
+            {activities.length === 0 ? (
+              <p className="text-xs text-[#050720]/40 italic">No activities logged yet today.</p>
+            ) : (
+              <div className="space-y-3">
+                {activities.map((item) => (
+                  <div key={item.id} className="flex justify-between items-center py-1">
+                    <div>
+                      <span className="text-[10px] text-[#050720]/50 block">Activity</span>
+                      <span className="text-xs font-semibold text-[#050720]">{item.activity}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-[#050720]/50 block">Time spent</span>
+                      <span className="text-xs font-semibold text-[#050720]">{item.timeSpent}</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-[#050720]/50 block">
-                      Time spent
-                    </span>
-                    <span className="text-xs font-semibold text-[#050720]">
-                      {item.timeSpent}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Attendance Log Table */}
@@ -364,7 +407,6 @@ export const SalesAttendancePage: React.FC = () => {
                 className="w-full bg-[#F8FAFC] text-xs px-3 py-1.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
               >
                 <option value="Month">Month</option>
-
                 <option value="January">January</option>
                 <option value="February">February</option>
                 <option value="March">March</option>
@@ -381,46 +423,51 @@ export const SalesAttendancePage: React.FC = () => {
               <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
-                  <th className="pb-3.5 font-semibold">Date</th>
-                  <th className="pb-3.5 font-semibold">In time</th>
-                  <th className="pb-3.5 font-semibold">Out time</th>
-                  <th className="pb-3.5 font-semibold">Working Hours</th>
-                  <th className="pb-3.5 text-right font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {INITIAL_ATTENDANCE_HISTORY.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="hover:bg-[#FFB908]/5 transition-colors"
-                  >
-                    <td className="py-3.5 text-[#050720]/80">{row.date}</td>
-                    <td className="py-3.5 font-medium">{row.inTime}</td>
-                    <td className="py-3.5 text-[#050720]/80">{row.outTime}</td>
-                    <td className="py-3.5 text-[#050720]/80">
-                      {row.workingHours}
-                    </td>
-                    <td className="py-3.5 text-right">
-                      <button
-                        onClick={() => setView("view-work-details")}
-                        className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
-                      >
-                        View
-                      </button>
-                    </td>
+            {isLoading ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                Loading attendance history from database...
+              </div>
+            ) : attendanceHistory.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                No attendance history recorded yet.
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
+                    <th className="pb-3.5 font-semibold">Date</th>
+                    <th className="pb-3.5 font-semibold">In time</th>
+                    <th className="pb-3.5 font-semibold">Out time</th>
+                    <th className="pb-3.5 font-semibold">Working Hours</th>
+                    <th className="pb-3.5 text-right font-semibold">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                  {attendanceHistory.map((row) => (
+                    <tr key={row.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5 text-[#050720]/80">{row.date}</td>
+                      <td className="py-3.5 font-medium">{row.inTime}</td>
+                      <td className="py-3.5 text-[#050720]/80">{row.outTime}</td>
+                      <td className="py-3.5 text-[#050720]/80">{row.workingHours}</td>
+                      <td className="py-3.5 text-right">
+                        <button
+                          onClick={() => handleOpenWorkDetails(row)}
+                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
 
       {/* ========================================================= */}
-      {/* 2. CLOCK OUT / CHECKOUT SUMMARY (SCREENSHOT 2)            */}
+      {/* 2. CLOCK OUT / CHECKOUT SUMMARY                           */}
       {/* ========================================================= */}
       {view === "checkout" && (
         <div className="space-y-6 max-w-4xl">
@@ -434,46 +481,38 @@ export const SalesAttendancePage: React.FC = () => {
 
           {/* Personal Details */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold font-['Sora']">
-              Personal Details
-            </h3>
+            <h3 className="text-sm font-bold font-['Sora']">Personal Details</h3>
             <div className="grid grid-cols-2 gap-y-4 text-xs">
               <div>
-                <span className="text-[10px] text-[#050720]/50 block">
-                  Name
-                </span>
-                <span className="font-semibold text-sm">Sejal</span>
+                <span className="text-[10px] text-[#050720]/50 block">Name</span>
+                <span className="font-semibold text-sm">{currentUserName}</span>
               </div>
               <div>
-                <span className="text-[10px] text-[#050720]/50 block">
-                  Role
-                </span>
-                <span className="font-semibold text-sm">Sales Manager</span>
+                <span className="text-[10px] text-[#050720]/50 block">Role</span>
+                <span className="font-semibold text-sm">{currentUserRole}</span>
               </div>
               <div>
-                <span className="text-[10px] text-[#050720]/50 block">
-                  In time
-                </span>
-                <span className="font-semibold text-sm">09:30 AM</span>
+                <span className="text-[10px] text-[#050720]/50 block">In time</span>
+                <span className="font-semibold text-sm">{inTimeText}</span>
               </div>
               <div>
-                <span className="text-[10px] text-[#050720]/50 block">
-                  Out time
+                <span className="text-[10px] text-[#050720]/50 block">Out time</span>
+                <span className="font-semibold text-sm">
+                  {new Date().toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                  })}
                 </span>
-                <span className="font-semibold text-sm">07:30 PM</span>
               </div>
               <div>
-                <span className="text-[10px] text-[#050720]/50 block">
-                  Working Hours
-                </span>
+                <span className="text-[10px] text-[#050720]/50 block">Working Hours</span>
                 <span className="font-semibold text-sm">09:00 Hrs</span>
               </div>
               <div>
-                <span className="text-[10px] text-[#050720]/50 block">
-                  Location
-                </span>
+                <span className="text-[10px] text-[#050720]/50 block">Location</span>
                 <span className="font-semibold text-xs text-[#050720]/80">
-                  Radiquolab Design Institute - 18.5075, 73.8216
+                  Radiquolab Design Institute - Pune
                 </span>
               </div>
             </div>
@@ -481,34 +520,25 @@ export const SalesAttendancePage: React.FC = () => {
 
           {/* Today's Activities */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold font-['Sora']">
-              Today's Activities
-            </h3>
-            <div className="space-y-3">
-              {activities.map((act) => (
-                <div
-                  key={act.id}
-                  className="flex justify-between items-center py-1"
-                >
-                  <div>
-                    <span className="text-[10px] text-[#050720]/50 block">
-                      Activity
-                    </span>
-                    <span className="text-xs font-semibold text-[#050720]">
-                      {act.activity}
-                    </span>
+            <h3 className="text-sm font-bold font-['Sora']">Today's Activities</h3>
+            {activities.length === 0 ? (
+              <p className="text-xs text-[#050720]/40 italic">No activities added for today.</p>
+            ) : (
+              <div className="space-y-3">
+                {activities.map((act) => (
+                  <div key={act.id} className="flex justify-between items-center py-1">
+                    <div>
+                      <span className="text-[10px] text-[#050720]/50 block">Activity</span>
+                      <span className="text-xs font-semibold text-[#050720]">{act.activity}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-[#050720]/50 block">Time spent</span>
+                      <span className="text-xs font-semibold text-[#050720]">{act.timeSpent}</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-[#050720]/50 block">
-                      Time spent
-                    </span>
-                    <span className="text-xs font-semibold text-[#050720]">
-                      {act.timeSpent}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Buttons */}
@@ -530,7 +560,7 @@ export const SalesAttendancePage: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 3. LEAVE RECORDS HUB (SCREENSHOT 3)                       */}
+      {/* 3. LEAVE RECORDS HUB                                      */}
       {/* ========================================================= */}
       {view === "leave-records" && (
         <div className="space-y-6">
@@ -545,6 +575,9 @@ export const SalesAttendancePage: React.FC = () => {
             <button
               onClick={() => {
                 setLeaveFromDate("");
+                setLeaveToDate("");
+                setLeaveDays("");
+                setLeaveReason("");
                 setLeaveDateError(false);
                 setView("apply-leave");
               }}
@@ -559,13 +592,13 @@ export const SalesAttendancePage: React.FC = () => {
             <div className="bg-white p-6 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Sick Leaves</span>
               <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
-                5/10
+                {sickLeavesUsed}/10
               </span>
             </div>
             <div className="bg-white p-6 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Casual Leaves</span>
               <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
-                6/14
+                {casualLeavesUsed}/14
               </span>
             </div>
           </div>
@@ -602,39 +635,38 @@ export const SalesAttendancePage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {INITIAL_LEAVES.slice(0, 2).map((l) => (
-                  <tr
-                    key={l.id}
-                    className="hover:bg-[#FFB908]/5 transition-colors"
-                  >
-                    <td className="py-3.5 font-medium">{l.leaveType}</td>
-                    <td className="py-3.5 text-[#050720]/80">{l.leaveDate}</td>
-                    <td className="py-3.5 text-[#050720]/80">{l.reason}</td>
-                    <td className="py-3.5 text-[#050720]/80">
-                      {l.applicationDate}
-                    </td>
-                    <td className="py-3.5 text-right">
-                      <span
-                        className={`font-semibold ${
-                          l.status === "Approved"
-                            ? "text-[#10B981]"
-                            : "text-[#FFB908]"
-                        }`}
-                      >
-                        {l.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {leaves
+                  .filter((l) =>
+                    leaveTab === "Applied" ? l.status !== "Rejected" : l.status === "Rejected"
+                  )
+                  .map((l) => (
+                    <tr key={l.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5 font-medium">{l.leaveType}</td>
+                      <td className="py-3.5 text-[#050720]/80">{l.leaveDate}</td>
+                      <td className="py-3.5 text-[#050720]/80">{l.reason}</td>
+                      <td className="py-3.5 text-[#050720]/80">{l.applicationDate}</td>
+                      <td className="py-3.5 text-right">
+                        <span
+                          className={`font-semibold ${
+                            l.status === "Approved"
+                              ? "text-[#10B981]"
+                              : l.status === "Rejected"
+                              ? "text-[#EF4444]"
+                              : "text-[#FFB908]"
+                          }`}
+                        >
+                          {l.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
 
           {/* Historical Leave Log */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold font-['Sora']">
-              Leave Record History
-            </h3>
+            <h3 className="text-sm font-bold font-['Sora']">Leave Record History</h3>
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
@@ -646,25 +678,20 @@ export const SalesAttendancePage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {INITIAL_LEAVES.map((l) => (
-                  <tr
-                    key={`hist-${l.id}`}
-                    className="hover:bg-[#FFB908]/5 transition-colors"
-                  >
+                {leaves.map((l) => (
+                  <tr key={`hist-${l.id}`} className="hover:bg-[#FFB908]/5 transition-colors">
                     <td className="py-3.5 font-medium">{l.leaveType}</td>
                     <td className="py-3.5 text-[#050720]/80">{l.leaveDate}</td>
                     <td className="py-3.5 text-[#050720]/80">{l.reason}</td>
-                    <td className="py-3.5 text-[#050720]/80">
-                      {l.applicationDate}
-                    </td>
+                    <td className="py-3.5 text-[#050720]/80">{l.applicationDate}</td>
                     <td className="py-3.5 text-right">
                       <span
                         className={`font-semibold ${
                           l.status === "Approved"
                             ? "text-[#10B981]"
                             : l.status === "Rejected"
-                              ? "text-[#EF4444]"
-                              : "text-[#FFB908]"
+                            ? "text-[#EF4444]"
+                            : "text-[#FFB908]"
                         }`}
                       >
                         {l.status}
@@ -679,7 +706,7 @@ export const SalesAttendancePage: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 4. APPLY FOR LEAVE (SCREENSHOT 4 & ERROR 6)               */}
+      {/* 4. APPLY FOR LEAVE                                        */}
       {/* ========================================================= */}
       {view === "apply-leave" && (
         <div className="space-y-6 max-w-4xl">
@@ -730,7 +757,9 @@ export const SalesAttendancePage: React.FC = () => {
               <div className="relative">
                 <select
                   value={leaveType}
-                  onChange={(e) => setLeaveType(e.target.value)}
+                  onChange={(e) =>
+                    setLeaveType(e.target.value as "Casual" | "Sick" | "Vacation")
+                  }
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
                 >
                   <option value="Casual">Casual</option>
@@ -783,7 +812,7 @@ export const SalesAttendancePage: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 5. VIEW WORK DETAILS / MY ACTIVITIES (SCREENSHOT 5)       */}
+      {/* 5. VIEW WORK DETAILS / MY ACTIVITIES                      */}
       {/* ========================================================= */}
       {view === "view-work-details" && (
         <div className="space-y-6 max-w-4xl">
@@ -797,36 +826,32 @@ export const SalesAttendancePage: React.FC = () => {
 
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <div>
-              <h3 className="text-sm font-bold font-['Sora']">
-                Activity Details
-              </h3>
-              <span className="text-[11px] text-[#050720]/50">01-12-2025</span>
+              <h3 className="text-sm font-bold font-['Sora']">Activity Details</h3>
+              <span className="text-[11px] text-[#050720]/50">{selectedRecordDate || "Today"}</span>
             </div>
 
             <div className="space-y-3 pt-2">
-              {activities.map((act) => (
-                <div
-                  key={`work-${act.id}`}
-                  className="flex justify-between items-center py-2 border-b border-[#050720]/5 last:border-none"
-                >
-                  <div>
-                    <span className="text-[10px] text-[#050720]/50 block">
-                      Activity
-                    </span>
-                    <span className="text-xs font-semibold text-[#050720]">
-                      {act.activity}
-                    </span>
+              {selectedRecordActivities.length === 0 ? (
+                <p className="text-xs text-[#050720]/40 italic">
+                  No detailed activities logged for this day.
+                </p>
+              ) : (
+                selectedRecordActivities.map((act) => (
+                  <div
+                    key={`work-${act.id}`}
+                    className="flex justify-between items-center py-2 border-b border-[#050720]/5 last:border-none"
+                  >
+                    <div>
+                      <span className="text-[10px] text-[#050720]/50 block">Activity</span>
+                      <span className="text-xs font-semibold text-[#050720]">{act.activity}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-[#050720]/50 block">Time spent</span>
+                      <span className="text-xs font-semibold text-[#050720]">{act.timeSpent}</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-[#050720]/50 block">
-                      Time spent
-                    </span>
-                    <span className="text-xs font-semibold text-[#050720]">
-                      {act.timeSpent}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
