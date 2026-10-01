@@ -18,20 +18,24 @@ export interface AttendanceRecord {
 
 export interface LeaveRecord {
   id: string;
-  leaveType: 'Sick' | 'Casual' | 'Vacation';
+  leaveType: string;
   leaveDate: string;
   reason: string;
   applicationDate: string;
-  status: 'Approved' | 'Pending' | 'Rejected';
+  status: 'Approved' | 'Rejected' | 'Pending';
 }
 
 export const attendanceService = {
   getMyAttendance: async (): Promise<AttendanceRecord[]> => {
     try {
-      const data = await apiRequest<any[]>('/attendance/my');
-      return data.map((item) => ({
-        ...item,
-        id: item._id || item.id,
+      const data = await apiRequest<any[]>('/attendance/my-records');
+      return data.map((d) => ({
+        id: d._id || d.id,
+        date: d.date,
+        inTime: d.inTime,
+        outTime: d.outTime,
+        workingHours: d.workingHours || '00:00',
+        activities: d.activities || [],
       }));
     } catch {
       return [];
@@ -39,25 +43,29 @@ export const attendanceService = {
   },
 
   clockIn: async (inTime: string, date: string): Promise<any> => {
-    return apiRequest('/attendance/clock-in', {
+    return await apiRequest('/attendance/clock-in', {
       method: 'POST',
       body: JSON.stringify({ inTime, date }),
     });
   },
 
-  clockOut: async (outTime: string, activities: ActivityItem[]): Promise<any> => {
-    return apiRequest('/attendance/clock-out', {
+  clockOut: async (outTime: string, activities: ActivityItem[], workingHours?: string): Promise<any> => {
+    return await apiRequest('/attendance/clock-out', {
       method: 'POST',
-      body: JSON.stringify({ outTime, activities }),
+      body: JSON.stringify({ outTime, activities, workingHours }),
     });
   },
 
   getMyLeaves: async (): Promise<LeaveRecord[]> => {
     try {
-      const data = await apiRequest<any[]>('/leaves/my');
-      return data.map((item) => ({
-        ...item,
-        id: item._id || item.id,
+      const data = await apiRequest<any[]>('/attendance/my-leaves');
+      return data.map((l) => ({
+        id: l._id || l.id,
+        leaveType: l.leaveType,
+        leaveDate: l.leaveDate,
+        reason: l.reason,
+        applicationDate: l.applicationDate,
+        status: l.status,
       }));
     } catch {
       return [];
@@ -65,13 +73,17 @@ export const attendanceService = {
   },
 
   applyLeave: async (leaveData: Partial<LeaveRecord>): Promise<LeaveRecord> => {
-    const data = await apiRequest<any>('/leaves', {
+    const data = await apiRequest<any>('/attendance/apply-leave', {
       method: 'POST',
       body: JSON.stringify(leaveData),
     });
     return {
-      ...data,
       id: data._id || data.id,
+      leaveType: data.leaveType,
+      leaveDate: data.leaveDate,
+      reason: data.reason,
+      applicationDate: data.applicationDate,
+      status: data.status || 'Pending',
     };
   },
-};
+};  
