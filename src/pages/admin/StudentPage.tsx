@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { batchService, BatchItem } from '../../services/batchService';
 
 interface AttendanceLecture {
   id: string;
@@ -19,7 +20,7 @@ interface StudentRecord {
   batch: string;
   address: string;
   attendanceRatio: string;
-  remark: 'Regular Attendance' | 'Irregular Attendance' | 'Irregular attendance';
+  remark: string;
   metrics: {
     thisMonth: number;
     lastMonth: number;
@@ -28,91 +29,88 @@ interface StudentRecord {
   lectures: AttendanceLecture[];
 }
 
-const INITIAL_STUDENTS: StudentRecord[] = [
-  {
-    id: 'std-1',
-    srNo: '01',
-    firstName: 'Tanaya',
-    lastName: 'Junnarkar',
-    startDate: '21-12-2025',
-    contact: '9158745870',
-    course: 'UI/UX Design',
-    batch: 'MWF-JAN-2026',
-    address: 'Pune',
-    attendanceRatio: '02/02',
-    remark: 'Regular Attendance',
-    metrics: {
-      thisMonth: 50,
-      lastMonth: 50,
-      average: 50,
-    },
-    lectures: [
-      { id: 'lec-1', topic: 'Introduction to UI/UX', date: '02-01-2026', status: 'Present' },
-      { id: 'lec-2', topic: 'Understanding of UI/UX', date: '04-01-2026', status: 'Absent' },
-    ],
-  },
-  {
-    id: 'std-2',
-    srNo: '02',
-    firstName: 'Aashi',
-    lastName: 'Shah',
-    startDate: '21-12-2025',
-    contact: '9876543152',
-    course: 'UI/UX Design',
-    batch: 'TTS-JAN-2026',
-    address: 'Mumbai',
-    attendanceRatio: '01/02',
-    remark: 'Irregular Attendance',
-    metrics: {
-      thisMonth: 50,
-      lastMonth: 50,
-      average: 50,
-    },
-    lectures: [
-      { id: 'lec-3', topic: 'Introduction to UI/UX', date: '02-01-2026', status: 'Absent' },
-      { id: 'lec-4', topic: 'Understanding of UI/UX', date: '04-01-2026', status: 'Present' },
-    ],
-  },
-  {
-    id: 'std-3',
-    srNo: '03',
-    firstName: 'Vishwajeet',
-    lastName: 'Pawale',
-    startDate: '21-12-2025',
-    contact: '8987456512',
-    course: 'UI/UX Design',
-    batch: 'WEEKEND-JAN-2026',
-    address: 'Pune',
-    attendanceRatio: '01/02',
-    remark: 'Irregular attendance',
-    metrics: {
-      thisMonth: 50,
-      lastMonth: 50,
-      average: 50,
-    },
-    lectures: [
-      { id: 'lec-5', topic: 'Introduction to UI/UX', date: '02-01-2026', status: 'Present' },
-      { id: 'lec-6', topic: 'Understanding of UI/UX', date: '04-01-2026', status: 'Absent' },
-    ],
-  },
-];
-
 const COURSES = ['UI/UX Design', 'No Code', 'Full-Stack', 'Portfolio'];
 
 export const AdminStudentPage: React.FC = () => {
   const [view, setView] = useState<'list' | 'details'>('list');
-  const [selectedStudent, setSelectedStudent] = useState<StudentRecord>(INITIAL_STUDENTS[0]);
+  const [students, setStudents] = useState<StudentRecord[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null);
   const [courseFilter, setCourseFilter] = useState('UI/UX Design');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const filteredStudents = INITIAL_STUDENTS.filter(
+  // Fetch batches & aggregate enrolled students from MongoDB
+  const fetchStudents = async () => {
+    try {
+      setIsLoading(true);
+      const batches: BatchItem[] = await batchService.getAllBatches();
+      const studentMap: StudentRecord[] = [];
+
+      batches.forEach((batch) => {
+        (batch.students || []).forEach((st: any, idx: number) => {
+          const rawName = st.name || `${st.firstName || ''} ${st.lastName || ''}`.trim() || 'Student';
+          const nameParts = rawName.split(' ');
+          const fName = st.firstName || nameParts[0] || 'Student';
+          const lName = st.lastName || nameParts.slice(1).join(' ') || '—';
+
+          // Map student lectures based on batch lectures roll-call
+          const studentLectures: AttendanceLecture[] = (batch.lectures || []).map((lec: any, lIdx: number) => {
+            const hasRecord = lec.studentsList?.find(
+              (s: any) => s.name?.toLowerCase() === rawName.toLowerCase()
+            );
+            return {
+              id: lec.id || `lec-${lIdx}`,
+              topic: lec.title || lec.topic || 'Lecture Session',
+              date: lec.date || batch.startDate,
+              status: hasRecord ? (hasRecord.present || hasRecord.isPresent ? 'Present' : 'Absent') : 'Present',
+            };
+          });
+
+          studentMap.push({
+            id: st.id || st._id || `${batch.id}-st-${idx}`,
+            srNo: '',
+            firstName: fName,
+            lastName: lName,
+            startDate: st.startDate || batch.startDate,
+            contact: st.contact || '—',
+            course: batch.course || 'UI/UX Design',
+            batch: batch.batchCode || '—',
+            address: st.address || 'Pune',
+            attendanceRatio: st.attendance || st.attendanceRatio || '02/02',
+            remark: st.remark || 'Regular Attendance',
+            metrics: {
+              thisMonth: 50,
+              lastMonth: 50,
+              average: 50,
+            },
+            lectures: studentLectures,
+          });
+        });
+      });
+
+      setStudents(studentMap);
+      if (studentMap.length > 0 && !selectedStudent) {
+        setSelectedStudent(studentMap[0]);
+      }
+    } catch (err) {
+      console.error('Failed to load students from server:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  const filteredStudents = students.filter(
     (student) => student.course.toLowerCase() === courseFilter.toLowerCase()
   );
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
       {/* ========================================================= */}
-      {/* 1. STUDENT MANAGEMENT DIRECTORY (SCREENSHOT 1)            */}
+      {/* 1. STUDENT MANAGEMENT DIRECTORY (LIST VIEW)               */}
       {/* ========================================================= */}
       {view === 'list' && (
         <div className="space-y-6">
@@ -127,7 +125,7 @@ export const AdminStudentPage: React.FC = () => {
               <div className="relative">
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[130px]"
+                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[130px] cursor-pointer"
                 >
                   <span>{courseFilter}</span>
                   {isDropdownOpen ? (
@@ -146,7 +144,7 @@ export const AdminStudentPage: React.FC = () => {
                           setCourseFilter(course);
                           setIsDropdownOpen(false);
                         }}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720]"
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720] cursor-pointer"
                       >
                         {course}
                       </button>
@@ -157,52 +155,66 @@ export const AdminStudentPage: React.FC = () => {
             </div>
 
             {/* Students Table */}
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
-                  <th className="pb-3.5 font-semibold">Sr. No.</th>
-                  <th className="pb-3.5 font-semibold">Student Name</th>
-                  <th className="pb-3.5 font-semibold">Start Date</th>
-                  <th className="pb-3.5 font-semibold">Contact</th>
-                  <th className="pb-3.5 font-semibold">Attendance</th>
-                  <th className="pb-3.5 font-semibold">Remark</th>
-                  <th className="pb-3.5 text-right font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {filteredStudents.map((std) => (
-                  <tr key={std.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                    <td className="py-3.5 text-[#050720]/70">{std.srNo}</td>
-                    <td className="py-3.5 font-medium">
-                      {std.firstName} {std.lastName}
-                    </td>
-                    <td className="py-3.5 text-[#050720]/70">{std.startDate}</td>
-                    <td className="py-3.5 text-[#050720]/70">{std.contact}</td>
-                    <td className="py-3.5">
-                      <span
-                        className={`font-semibold ${
-                          std.attendanceRatio === '02/02' ? 'text-[#10B981]' : 'text-[#EF4444]'
-                        }`}
-                      >
-                        {std.attendanceRatio}
-                      </span>
-                    </td>
-                    <td className="py-3.5 text-[#050720]/70">{std.remark}</td>
-                    <td className="py-3.5 text-right">
-                      <button
-                        onClick={() => {
-                          setSelectedStudent(std);
-                          setView('details');
-                        }}
-                        className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
-                      >
-                        View
-                      </button>
-                    </td>
+            {isLoading ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                Loading students from database...
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                No students enrolled in {courseFilter}.
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
+                    <th className="pb-3.5 font-semibold">Sr. No.</th>
+                    <th className="pb-3.5 font-semibold">Student Name</th>
+                    <th className="pb-3.5 font-semibold">Start Date</th>
+                    <th className="pb-3.5 font-semibold">Contact</th>
+                    <th className="pb-3.5 font-semibold">Attendance</th>
+                    <th className="pb-3.5 font-semibold">Remark</th>
+                    <th className="pb-3.5 text-right font-semibold">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                  {filteredStudents.map((std, index) => (
+                    <tr key={std.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5 text-[#050720]/70">
+                        {String(index + 1).padStart(2, '0')}
+                      </td>
+                      <td className="py-3.5 font-medium">
+                        {std.firstName} {std.lastName}
+                      </td>
+                      <td className="py-3.5 text-[#050720]/70">{std.startDate}</td>
+                      <td className="py-3.5 text-[#050720]/70">{std.contact}</td>
+                      <td className="py-3.5">
+                        <span
+                          className={`font-semibold ${
+                            std.attendanceRatio === '02/02' || std.attendanceRatio.includes('100')
+                              ? 'text-[#10B981]'
+                              : 'text-[#EF4444]'
+                          }`}
+                        >
+                          {std.attendanceRatio}
+                        </span>
+                      </td>
+                      <td className="py-3.5 text-[#050720]/70">{std.remark}</td>
+                      <td className="py-3.5 text-right">
+                        <button
+                          onClick={() => {
+                            setSelectedStudent(std);
+                            setView('details');
+                          }}
+                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
             {/* Pagination */}
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#050720]/5 text-xs text-[#050720]/70">
@@ -213,11 +225,11 @@ export const AdminStudentPage: React.FC = () => {
                 className="w-8 h-7 text-center border border-[#050720]/20 rounded text-xs text-[#050720] font-semibold"
               />
               <div className="flex items-center gap-1.5 ml-2">
-                <button className="p-1 hover:text-[#050720]">
+                <button className="p-1 hover:text-[#050720] cursor-pointer">
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
                 <span className="text-[11px] font-semibold text-[#050720]">01 of 10</span>
-                <button className="p-1 hover:text-[#050720]">
+                <button className="p-1 hover:text-[#050720] cursor-pointer">
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -227,13 +239,13 @@ export const AdminStudentPage: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 2. DETAILED STUDENT ATTENDANCE PROFILE (SCREENSHOT 2)      */}
+      {/* 2. DETAILED STUDENT ATTENDANCE PROFILE (DETAILS VIEW)      */}
       {/* ========================================================= */}
       {view === 'details' && selectedStudent && (
         <div className="space-y-6">
           <button
             onClick={() => setView('list')}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Student Details</span>
@@ -330,24 +342,28 @@ export const AdminStudentPage: React.FC = () => {
 
             {/* Lecture Log Cards */}
             <div className="space-y-3 pt-2">
-              {selectedStudent.lectures.map((lec) => (
-                <div
-                  key={lec.id}
-                  className="border border-[#050720]/10 rounded-xl px-5 py-4 flex items-center justify-between"
-                >
-                  <span className="text-xs font-bold text-[#050720]">{lec.topic}</span>
-                  <div className="text-right">
-                    <span
-                      className={`text-xs font-semibold block ${
-                        lec.status === 'Present' ? 'text-[#10B981]' : 'text-[#EF4444]'
-                      }`}
-                    >
-                      {lec.status}
-                    </span>
-                    <span className="text-[10px] text-[#050720]/50 block mt-0.5">{lec.date}</span>
+              {selectedStudent.lectures.length === 0 ? (
+                <p className="text-xs text-[#050720]/40 italic py-2">No lecture records found for this student.</p>
+              ) : (
+                selectedStudent.lectures.map((lec) => (
+                  <div
+                    key={lec.id}
+                    className="border border-[#050720]/10 rounded-xl px-5 py-4 flex items-center justify-between"
+                  >
+                    <span className="text-xs font-bold text-[#050720]">{lec.topic}</span>
+                    <div className="text-right">
+                      <span
+                        className={`text-xs font-semibold block ${
+                          lec.status === 'Present' ? 'text-[#10B981]' : 'text-[#EF4444]'
+                        }`}
+                      >
+                        {lec.status}
+                      </span>
+                      <span className="text-[10px] text-[#050720]/50 block mt-0.5">{lec.date}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

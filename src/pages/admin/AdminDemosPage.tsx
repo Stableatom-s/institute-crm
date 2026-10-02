@@ -1,199 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
-
-type DemoTab = 'Scheduled' | 'Completed' | 'Cancelled';
-
-interface DemoSessionRecord {
-  id: string;
-  srNo: string;
-  name: string;
-  timeSlot: string;
-  demoDate: string;
-  course: string;
-  mode: 'Online' | 'Offline';
-  faculty: string;
-  status: DemoTab;
-  demoStatusLabel?: string; // e.g., "Attended"
-  remark?: string;
-  feedback?: string;
-  cancellationReason?: string;
-  screenshotUrl?: string;
-}
-
-const INITIAL_DEMOS: DemoSessionRecord[] = [
-  // Scheduled Demos
-  {
-    id: 'demo-s1',
-    srNo: '01',
-    name: 'Aanya Shah',
-    timeSlot: '11:00 - 12:00',
-    demoDate: '21-12-2025',
-    course: 'UI/UX Design',
-    mode: 'Online',
-    faculty: 'Tanmay Kalbhor',
-    status: 'Scheduled',
-  },
-  {
-    id: 'demo-s2',
-    srNo: '02',
-    name: 'Rohan Mehta',
-    timeSlot: '01:00 - 02:00',
-    demoDate: '21-12-2025',
-    course: 'No Code',
-    mode: 'Online',
-    faculty: 'Poorva Pande',
-    status: 'Scheduled',
-  },
-  {
-    id: 'demo-s3',
-    srNo: '03',
-    name: 'Neha Patel',
-    timeSlot: '03:00 - 04:00',
-    demoDate: '21-12-2025',
-    course: 'UI/UX Design',
-    mode: 'Offline',
-    faculty: 'Tanmay Kalbhor',
-    status: 'Scheduled',
-  },
-  {
-    id: 'demo-s4',
-    srNo: '04',
-    name: 'Anish Verma',
-    timeSlot: '03:00 - 04:00',
-    demoDate: '21-12-2025',
-    course: 'Portfolio',
-    mode: 'Offline',
-    faculty: 'Poorva Pande',
-    status: 'Scheduled',
-  },
-  {
-    id: 'demo-s5',
-    srNo: '05',
-    name: 'Siddhi Shah',
-    timeSlot: '01:00 - 02:00',
-    demoDate: '21-12-2025',
-    course: 'Full-Stack',
-    mode: 'Online',
-    faculty: 'Neeraj Joshi',
-    status: 'Scheduled',
-  },
-
-  // Completed Demos
-  {
-    id: 'demo-c1',
-    srNo: '01',
-    name: 'Rohit Shah',
-    timeSlot: '11:00 - 12:00',
-    demoDate: '21-12-2025',
-    course: 'UI/UX Design',
-    mode: 'Online',
-    faculty: 'Poorva Pande',
-    status: 'Completed',
-    demoStatusLabel: 'Attended',
-    remark: 'Joining soon',
-    feedback: 'Student showed strong interest in the course structure and tools. Asked relevant questions about projects and placement support. Recommended for follow-up within 24 hours.',
-    screenshotUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=1000&q=80',
-  },
-  {
-    id: 'demo-c2',
-    srNo: '02',
-    name: 'Ashish Mehta',
-    timeSlot: '11:00 - 12:00',
-    demoDate: '21-12-2025',
-    course: 'UI/UX Design',
-    mode: 'Online',
-    faculty: 'Poorva Pande',
-    status: 'Completed',
-    demoStatusLabel: 'Attended',
-    remark: 'Joining soon',
-    feedback: 'Clear grasp of fundamentals. Eager to begin portfolio track.',
-    screenshotUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=1000&q=80',
-  },
-  {
-    id: 'demo-c3',
-    srNo: '03',
-    name: 'Anush Shah',
-    timeSlot: '11:00 - 12:00',
-    demoDate: '21-12-2025',
-    course: 'UI/UX Design',
-    mode: 'Online',
-    faculty: 'Poorva Pande',
-    status: 'Completed',
-    demoStatusLabel: 'Attended',
-    remark: 'Joining soon',
-    feedback: 'Good participation during the Figma demo.',
-    screenshotUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=1000&q=80',
-  },
-
-  // Cancelled Demos
-  {
-    id: 'demo-x1',
-    srNo: '01',
-    name: 'Aanya',
-    timeSlot: '11:00-12:00',
-    demoDate: '21-12-2025',
-    course: 'UI/UX Design',
-    mode: 'Online',
-    faculty: 'Poorva Pande',
-    status: 'Cancelled',
-    cancellationReason: 'Unavailable for demo',
-  },
-  {
-    id: 'demo-x2',
-    srNo: '02',
-    name: 'Rohan Mehta',
-    timeSlot: '01:00 - 02:00',
-    demoDate: '21-12-2025',
-    course: 'No Code',
-    mode: 'Online',
-    faculty: 'Poorva Pande',
-    status: 'Cancelled',
-    cancellationReason: 'Timing conflict with college lectures',
-  },
-  {
-    id: 'demo-x3',
-    srNo: '03',
-    name: 'Neha Patel',
-    timeSlot: '03:00 - 04:00',
-    demoDate: '21-12-2025',
-    course: 'UI/UX Design',
-    mode: 'Offline',
-    faculty: 'Tanmay Kalbhor',
-    status: 'Cancelled',
-    cancellationReason: 'Rescheduled to next week',
-  },
-  {
-    id: 'demo-x4',
-    srNo: '04',
-    name: 'Anish Verma',
-    timeSlot: '03:00 - 04:00',
-    demoDate: '21-12-2025',
-    course: 'Portfolio',
-    mode: 'Offline',
-    faculty: 'Poorva Pande',
-    status: 'Cancelled',
-    cancellationReason: 'Personal emergency',
-  },
-  {
-    id: 'demo-x5',
-    srNo: '05',
-    name: 'Siddhi Shah',
-    timeSlot: '01:00 - 02:00',
-    demoDate: '21-12-2025',
-    course: 'Full-Stack',
-    mode: 'Online',
-    faculty: 'Neeraj Joshi',
-    status: 'Cancelled',
-    cancellationReason: 'Internet connectivity failure',
-  },
-];
+import { demoService, DemoItem, DemoTab } from '../../services/demoService';
 
 const MODES = ['Mode', 'Online', 'Offline'];
 const COURSES = ['Course', 'UI/UX Design', 'No Code', 'Portfolio', 'Full-Stack'];
 
 export const AdminDemosPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DemoTab>('Scheduled');
-  const [selectedDemo, setSelectedDemo] = useState<DemoSessionRecord | null>(null);
+  const [selectedDemo, setSelectedDemo] = useState<DemoItem | null>(null);
+  const [demos, setDemos] = useState<DemoItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Filters
   const [modeFilter, setModeFilter] = useState('Mode');
@@ -201,7 +17,24 @@ export const AdminDemosPage: React.FC = () => {
   const [isModeOpen, setIsModeOpen] = useState(false);
   const [isCourseOpen, setIsCourseOpen] = useState(false);
 
-  const filteredDemos = INITIAL_DEMOS.filter((demo) => {
+  // Fetch live demos from MongoDB
+  const fetchDemos = async () => {
+    try {
+      setIsLoading(true);
+      const data = await demoService.getAllDemos();
+      setDemos(data);
+    } catch (err) {
+      console.error('Failed to load admin demos from server:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDemos();
+  }, []);
+
+  const filteredDemos = demos.filter((demo) => {
     if (demo.status !== activeTab) return false;
     if (modeFilter !== 'Mode' && demo.mode !== modeFilter) return false;
     if (courseFilter !== 'Course' && demo.course.toLowerCase() !== courseFilter.toLowerCase()) return false;
@@ -307,51 +140,65 @@ export const AdminDemosPage: React.FC = () => {
             </div>
 
             {/* Dynamic Table By Tab */}
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 font-bold">
-                  <th className="pb-3.5">Sr. No.</th>
-                  <th className="pb-3.5">Name</th>
-                  <th className="pb-3.5">Time Slot</th>
-                  <th className="pb-3.5">Demo Date</th>
-                  <th className="pb-3.5">Course</th>
-                  <th className="pb-3.5">Mode</th>
-                  {activeTab === 'Completed' ? (
-                    <>
-                      <th className="pb-3.5">Demo Status</th>
-                      <th className="pb-3.5">Remark</th>
-                    </>
-                  ) : null}
-                  <th className="pb-3.5 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5">
-                {filteredDemos.map((demo) => (
-                  <tr key={demo.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                    <td className="py-3.5 text-[#050720]/70">{demo.srNo}</td>
-                    <td className="py-3.5 font-medium">{demo.name}</td>
-                    <td className="py-3.5 text-[#050720]/70">{demo.timeSlot}</td>
-                    <td className="py-3.5 text-[#050720]/70">{demo.demoDate}</td>
-                    <td className="py-3.5 text-[#050720]/70">{demo.course}</td>
-                    <td className="py-3.5 text-[#050720]/70">{demo.mode}</td>
+            {isLoading ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                Loading demo sessions from database...
+              </div>
+            ) : filteredDemos.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                No {activeTab.toLowerCase()} demos found.
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 font-bold">
+                    <th className="pb-3.5">Sr. No.</th>
+                    <th className="pb-3.5">Name</th>
+                    <th className="pb-3.5">Time Slot</th>
+                    <th className="pb-3.5">Demo Date</th>
+                    <th className="pb-3.5">Course</th>
+                    <th className="pb-3.5">Mode</th>
                     {activeTab === 'Completed' ? (
                       <>
-                        <td className="py-3.5 text-[#050720]/70">{demo.demoStatusLabel || 'Attended'}</td>
-                        <td className="py-3.5 text-[#050720]/70">{demo.remark || 'Joining soon'}</td>
+                        <th className="pb-3.5">Demo Status</th>
+                        <th className="pb-3.5">Remark</th>
                       </>
                     ) : null}
-                    <td className="py-3.5 text-right">
-                      <button
-                        onClick={() => setSelectedDemo(demo)}
-                        className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold hover:bg-[#050720]/5 transition-colors"
-                      >
-                        View
-                      </button>
-                    </td>
+                    <th className="pb-3.5 text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5">
+                  {filteredDemos.map((demo, index) => (
+                    <tr key={demo.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5 text-[#050720]/70">
+                        {String(index + 1).padStart(2, '0')}
+                      </td>
+                      <td className="py-3.5 font-medium">
+                        {demo.name} {demo.lastName || ''}
+                      </td>
+                      <td className="py-3.5 text-[#050720]/70">{demo.timeSlot}</td>
+                      <td className="py-3.5 text-[#050720]/70">{demo.demoDate}</td>
+                      <td className="py-3.5 text-[#050720]/70">{demo.course}</td>
+                      <td className="py-3.5 text-[#050720]/70">{demo.mode}</td>
+                      {activeTab === 'Completed' ? (
+                        <>
+                          <td className="py-3.5 text-[#050720]/70">{demo.demoStatusText || 'Attended'}</td>
+                          <td className="py-3.5 text-[#050720]/70">{demo.remark || 'Joining soon'}</td>
+                        </>
+                      ) : null}
+                      <td className="py-3.5 text-right">
+                        <button
+                          onClick={() => setSelectedDemo(demo)}
+                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold hover:bg-[#050720]/5 transition-colors cursor-pointer"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
             {/* Pagination */}
             <div className="flex items-center justify-end gap-3 pt-3 text-xs text-[#050720]/70">
@@ -394,7 +241,9 @@ export const AdminDemosPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-5 text-xs">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Lead Name</span>
-                <span className="font-semibold text-sm">{selectedDemo.name}</span>
+                <span className="font-semibold text-sm">
+                  {selectedDemo.name} {selectedDemo.lastName || ''}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Faculty Name</span>
@@ -439,7 +288,9 @@ export const AdminDemosPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-5 text-xs">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Lead Name</span>
-                <span className="font-semibold text-sm">{selectedDemo.name}</span>
+                <span className="font-semibold text-sm">
+                  {selectedDemo.name} {selectedDemo.lastName || ''}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Faculty Name</span>
@@ -485,11 +336,15 @@ export const AdminDemosPage: React.FC = () => {
                 </div>
                 <div className="p-3 bg-black flex gap-2">
                   <div className="w-1/2 aspect-video bg-neutral-800 rounded-lg overflow-hidden flex items-center justify-center relative">
-                    <img
-                      src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80"
-                      alt="Student"
-                      className="w-full h-full object-cover"
-                    />
+                    {selectedDemo.screenshotUrl ? (
+                      <img
+                        src={selectedDemo.screenshotUrl}
+                        alt="Student"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-white text-xs font-semibold">{selectedDemo.name}</div>
+                    )}
                     <span className="absolute bottom-1 left-2 text-[9px] bg-black/60 text-white px-1.5 py-0.5 rounded">
                       {selectedDemo.name}
                     </span>
@@ -529,7 +384,9 @@ export const AdminDemosPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-5 text-xs">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Lead Name</span>
-                <span className="font-semibold text-sm">{selectedDemo.name}</span>
+                <span className="font-semibold text-sm">
+                  {selectedDemo.name} {selectedDemo.lastName || ''}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Faculty Name</span>
@@ -563,4 +420,4 @@ export const AdminDemosPage: React.FC = () => {
       )}
     </div>
   );
-};  
+};
