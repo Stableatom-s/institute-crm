@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
   ChevronLeft, 
   ChevronRight, 
   ChevronDown, 
   Plus, 
-  Check 
+  Check,
+  Loader2 
 } from 'lucide-react';
+import { teamService } from '../../services/teamService';
 
 // --- TYPES ---
 export type MemberTab = 'Active' | 'Inactive';
@@ -45,112 +47,6 @@ export interface TeamMember {
   leaveHistory: LeaveHistoryItem[];
 }
 
-// --- SEED DATA MATCHING FIGMA ---
-const INITIAL_MEMBERS: TeamMember[] = [
-  {
-    id: 'tm-1',
-    srNo: '01',
-    firstName: 'Poorva',
-    lastName: 'Pande',
-    name: 'Poorva Pande',
-    role: 'Faculty',
-    mobile: '9078675645',
-    altMobile: '9875898412',
-    email: 'poorva@gmail.com',
-    address: 'Pune',
-    education: 'B.arch',
-    course: 'UI/UX Design',
-    assignedBatches: ['MWF-JAN-2026', 'Weekend-FEB-2026'],
-    status: 'Active',
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-    workHistory: {
-      companyName: 'Abc Pvt ltd',
-      jobTitle: 'Jr. Architect',
-      experienceYears: '01 years',
-    },
-    leaveHistory: [
-      { id: 'lh-1', leaveType: 'Sick', leaveDate: '21-12-2025', reason: 'Flu Recovery', applicationDate: '20-12-2025', status: 'Approved' },
-      { id: 'lh-2', leaveType: 'Casual', leaveDate: '05-11-2025', reason: 'Personal', applicationDate: '01-11-2025', status: 'Rejected' },
-      { id: 'lh-3', leaveType: 'Sick', leaveDate: '21-09-2025', reason: 'Flu Recovery', applicationDate: '20-09-2025', status: 'Approved' },
-      { id: 'lh-4', leaveType: 'Vacation', leaveDate: '25-02-2025', reason: 'Personal', applicationDate: '20-02-2025', status: 'Approved' },
-    ],
-  },
-  {
-    id: 'tm-2',
-    srNo: '02',
-    firstName: 'Neeraj',
-    lastName: 'Joshi',
-    name: 'Neeraj Joshi',
-    role: 'Faculty',
-    mobile: '9078123840',
-    altMobile: '9875898412',
-    email: 'neeraj@radiquolab.com',
-    address: 'Pune',
-    education: 'B.Tech CS',
-    course: 'Full Stack',
-    assignedBatches: ['MWF-JAN-2026'],
-    status: 'Active',
-    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
-    workHistory: {
-      companyName: 'Tech Innovators',
-      jobTitle: 'Full Stack Engineer',
-      experienceYears: '03 years',
-    },
-    leaveHistory: [
-      { id: 'lh-5', leaveType: 'Casual', leaveDate: '15-10-2025', reason: 'Family Event', applicationDate: '10-10-2025', status: 'Approved' }
-    ],
-  },
-  {
-    id: 'tm-3',
-    srNo: '03',
-    firstName: 'Sejal',
-    lastName: 'Singh',
-    name: 'Sejal Singh',
-    role: 'Sales',
-    mobile: '9123487752',
-    altMobile: '9875898412',
-    email: 'sejal@radiquolab.com',
-    address: 'Pune',
-    education: 'MBA Marketing',
-    course: 'UI/UX Design',
-    assignedBatches: [],
-    status: 'Active',
-    photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80',
-    workHistory: {
-      companyName: 'Edutech Global',
-      jobTitle: 'Sales Executive',
-      experienceYears: '02 years',
-    },
-    leaveHistory: [
-      { id: 'lh-6', leaveType: 'Sick', leaveDate: '12-02-2026', reason: 'Doctor Rest', applicationDate: '10-02-2026', status: 'Approved' }
-    ],
-  },
-  {
-    id: 'tm-4',
-    srNo: '01',
-    firstName: 'Sayali',
-    lastName: 'More',
-    name: 'Sayali More',
-    role: 'Faculty',
-    mobile: '9078675645',
-    altMobile: '9875898412',
-    email: 'sayali@gmail.com',
-    address: 'Pune',
-    education: 'B.arch',
-    course: 'UI/UX Design',
-    assignedBatches: ['MWF-JAN-2026', 'Weekend-FEB-2026'],
-    activeTill: '20-04-2025',
-    status: 'Inactive',
-    photoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80',
-    workHistory: {
-      companyName: 'Abc Pvt ltd',
-      jobTitle: 'Jr. Architect',
-      experienceYears: '01 years',
-    },
-    leaveHistory: [],
-  },
-];
-
 const AVAILABLE_COURSES = [
   'UI/UX Design',
   'No code',
@@ -161,14 +57,19 @@ const AVAILABLE_COURSES = [
 ];
 
 export const AdminTeamPage: React.FC = () => {
-  // Navigation states: 'roster' | 'view-member' | 'edit-member' | 'add-details' | 'add-credentials' | 'add-preview'
+  // Navigation states
   const [view, setView] = useState<
     'roster' | 'view-member' | 'edit-member' | 'add-details' | 'add-credentials' | 'add-preview'
   >('roster');
 
   const [activeTab, setActiveTab] = useState<MemberTab>('Active');
-  const [members, setMembers] = useState<TeamMember[]>(INITIAL_MEMBERS);
-  const [selectedMember, setSelectedMember] = useState<TeamMember>(INITIAL_MEMBERS[0]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+
+  // Async state
+  const [loading, setLoading] = useState<boolean>(true);
+  const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Edit / Add state tracking
   const [isDirty, setIsDirty] = useState(false);
@@ -194,7 +95,7 @@ export const AdminTeamPage: React.FC = () => {
   const [addLastName, setAddLastName] = useState('');
   const [addMobile, setAddMobile] = useState('');
   const [addAltMobile, setAddAltMobile] = useState('');
-  const [addEmail, setAddEmail] = useState('poorva@gmail.com');
+  const [addEmail, setAddEmail] = useState('');
   const [addAddress, setAddAddress] = useState('');
   const [addEducation, setAddEducation] = useState('');
   const [addRole, setAddRole] = useState<'Faculty' | 'Sales'>('Faculty');
@@ -213,158 +114,193 @@ export const AdminTeamPage: React.FC = () => {
   const [showSendCredentialsModal, setShowSendCredentialsModal] = useState(false);
   const [showCredentialsSentAlert, setShowCredentialsSentAlert] = useState(false);
 
-  // Active / Inactive filter count
+  // Fetch team members from server
+  const fetchMembers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await teamService.getMembers();
+      setMembers(data);
+    } catch (err) {
+      console.error('Failed to fetch team members:', err);
+      setError('Unable to load team members from server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMembers();
+  }, []);
+
+  // Filter calculations
   const activeCount = members.filter((m) => m.status === 'Active').length;
   const inactiveCount = members.filter((m) => m.status === 'Inactive').length;
   const currentList = members.filter((m) => m.status === activeTab);
 
-  // Open member details
+  // Handlers
   const handleOpenMember = (m: TeamMember) => {
     setSelectedMember(m);
     setView('view-member');
   };
 
-  // Launch Edit view
   const handleStartEdit = (m: TeamMember) => {
     setSelectedMember(m);
     setEditFirstName(m.firstName);
     setEditLastName(m.lastName);
     setEditMobile(m.mobile);
-    setEditAltMobile(m.altMobile || '9875898412');
+    setEditAltMobile(m.altMobile || '');
     setEditEmail(m.email);
     setEditAddress(m.address);
     setEditEducation(m.education);
     setEditRole(m.role === 'Sales' ? 'Sales' : 'Faculty');
-    setEditCompany(m.workHistory.companyName);
-    setEditJobTitle(m.workHistory.jobTitle);
-    setEditExperience(m.workHistory.experienceYears);
+    setEditCompany(m.workHistory?.companyName || '');
+    setEditJobTitle(m.workHistory?.jobTitle || '');
+    setEditExperience(m.workHistory?.experienceYears || '');
     setEditCourses([m.course]);
     setIsDirty(false);
     setView('edit-member');
   };
 
-  // Save changes from Edit Member
-  const handleSaveEditChanges = () => {
-    const updated: TeamMember = {
-      ...selectedMember,
-      firstName: editFirstName,
-      lastName: editLastName,
-      name: `${editFirstName} ${editLastName}`,
-      mobile: editMobile,
-      altMobile: editAltMobile,
-      email: editEmail,
-      address: editAddress,
-      education: editEducation,
-      role: editRole,
-      course: editCourses[0] || selectedMember.course,
-      workHistory: {
-        companyName: editCompany,
-        jobTitle: editJobTitle,
-        experienceYears: editExperience,
-      },
-    };
+  const handleSaveEditChanges = async () => {
+    if (!selectedMember) return;
+    try {
+      setActionLoading(true);
+      const payload: Partial<TeamMember> = {
+        firstName: editFirstName,
+        lastName: editLastName,
+        name: `${editFirstName} ${editLastName}`,
+        mobile: editMobile,
+        altMobile: editAltMobile,
+        email: editEmail,
+        address: editAddress,
+        education: editEducation,
+        role: editRole,
+        course: editCourses[0] || selectedMember.course,
+        workHistory: {
+          companyName: editCompany,
+          jobTitle: editJobTitle,
+          experienceYears: editExperience,
+        },
+      };
 
-    setMembers(members.map((m) => (m.id === updated.id ? updated : m)));
-    setSelectedMember(updated);
-    setIsDirty(false);
-    setView('view-member');
+      const updated = await teamService.updateMember(selectedMember.id, payload);
+      setMembers(members.map((m) => (m.id === updated.id ? updated : m)));
+      setSelectedMember(updated);
+      setIsDirty(false);
+      setView('view-member');
+    } catch (err) {
+      console.error('Failed to save edit changes:', err);
+      alert('Failed to update member. Please check server logs.');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  // Confirm Restore Access for Inactive member
-  const handleConfirmRestore = () => {
-    const restored: TeamMember = {
-      ...selectedMember,
-      status: 'Active',
-      activeTill: undefined,
-    };
-    setMembers(members.map((m) => (m.id === selectedMember.id ? restored : m)));
-    setSelectedMember(restored);
-    setShowRestoreModal(false);
-    setShowAccessRestoredAlert(true);
-    setTimeout(() => {
-      setShowAccessRestoredAlert(false);
-      setActiveTab('Active');
-      setView('roster');
-    }, 1500);
+  const handleConfirmRestore = async () => {
+    if (!selectedMember) return;
+    try {
+      setActionLoading(true);
+      const restored = await teamService.restoreAccess(selectedMember.id);
+      setMembers(members.map((m) => (m.id === selectedMember.id ? restored : m)));
+      setSelectedMember(restored);
+      setShowRestoreModal(false);
+      setShowAccessRestoredAlert(true);
+      setTimeout(() => {
+        setShowAccessRestoredAlert(false);
+        setActiveTab('Active');
+        setView('roster');
+      }, 1500);
+    } catch (err) {
+      console.error('Failed to restore member access:', err);
+      alert('Failed to restore access.');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  // Confirm Remove User
-  const handleConfirmRemoveUser = () => {
-    const deactivated: TeamMember = {
-      ...selectedMember,
-      status: 'Inactive',
-      activeTill: '20-09-2026',
-    };
-    setMembers(members.map((m) => (m.id === selectedMember.id ? deactivated : m)));
-    setSelectedMember(deactivated);
-    setShowRemoveUserModal(false);
-    setRemoveReason('');
-    setShowUserRemovedAlert(true);
-    setTimeout(() => {
-      setShowUserRemovedAlert(false);
-      setView('roster');
-    }, 1500);
+  const handleConfirmRemoveUser = async () => {
+    if (!selectedMember) return;
+    try {
+      setActionLoading(true);
+      const deactivated = await teamService.removeUser(selectedMember.id, removeReason);
+      setMembers(members.map((m) => (m.id === selectedMember.id ? deactivated : m)));
+      setSelectedMember(deactivated);
+      setShowRemoveUserModal(false);
+      setRemoveReason('');
+      setShowUserRemovedAlert(true);
+      setTimeout(() => {
+        setShowUserRemovedAlert(false);
+        setView('roster');
+      }, 1500);
+    } catch (err) {
+      console.error('Failed to remove user:', err);
+      alert('Failed to remove user.');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  // Save & Dispatch Credentials in Add Member Multi-Step
-  const handleConfirmSendCredentials = () => {
-    const newMember: TeamMember = {
-      id: `tm-${Date.now()}`,
-      srNo: String(members.filter((m) => m.status === 'Active').length + 1).padStart(2, '0'),
-      firstName: addFirstName || 'Poorva',
-      lastName: addLastName || 'Pande',
-      name: `${addFirstName || 'Poorva'} ${addLastName || 'Pande'}`,
-      role: addRole,
-      mobile: addMobile || '9078675645',
-      altMobile: addAltMobile || '9875898412',
-      email: addEmail || 'poorva@gmail.com',
-      address: addAddress || 'Pune',
-      education: addEducation || 'B.arch',
-      course: addCourses[0] || 'UI/UX Design',
-      assignedBatches: ['MWF-JAN-2026', 'Weekend-FEB-2026'],
-      status: 'Active',
-      photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-      workHistory: {
-        companyName: addCompany || 'Abc Pvt ltd',
-        jobTitle: addJobTitle || 'Jr. Architect',
-        experienceYears: addExperience || '01 years',
-      },
-      leaveHistory: [],
-    };
+  const handleConfirmSendCredentials = async () => {
+    try {
+      setActionLoading(true);
+      const newMember = await teamService.createMember({
+        firstName: addFirstName || 'New',
+        lastName: addLastName || 'Member',
+        name: `${addFirstName || 'New'} ${addLastName || 'Member'}`,
+        role: addRole,
+        mobile: addMobile,
+        altMobile: addAltMobile,
+        email: addEmail,
+        address: addAddress,
+        education: addEducation,
+        course: addCourses[0] || 'UI/UX Design',
+        assignedBatches: ['MWF-JAN-2026'],
+        status: 'Active',
+        password: addPassword,
+        workHistory: {
+          companyName: addCompany,
+          jobTitle: addJobTitle,
+          experienceYears: addExperience,
+        },
+      });
 
-    setMembers([newMember, ...members]);
-    setShowSendCredentialsModal(false);
-    setShowCredentialsSentAlert(true);
-    setTimeout(() => {
-      setShowCredentialsSentAlert(false);
-      setView('roster');
-    }, 1500);
+      setMembers([newMember, ...members]);
+      setShowSendCredentialsModal(false);
+      setShowCredentialsSentAlert(true);
+      setTimeout(() => {
+        setShowCredentialsSentAlert(false);
+        setView('roster');
+      }, 1500);
+    } catch (err) {
+      console.error('Failed to create team member:', err);
+      alert('Failed to create team member.');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
 
-      {/* ========================================================= */}
-      {/* 1. ROSTER VIEW (ACTIVE / INACTIVE TABS)                   */}
-      {/* ========================================================= */}
+      {/* ROSTER VIEW */}
       {view === 'roster' && (
         <div className="space-y-6">
-          {/* Header & Primary CTA */}
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold font-['Sora']">Team Members</h1>
             <button
               onClick={() => {
-                setAddFirstName('Poorva');
-                setAddLastName('Pande');
-                setAddMobile('9078675645');
-                setAddAltMobile('9875898412');
-                setAddEmail('poorva@gmail.com');
-                setAddAddress('Pune');
-                setAddEducation('B.arch');
+                setAddFirstName('');
+                setAddLastName('');
+                setAddMobile('');
+                setAddAltMobile('');
+                setAddEmail('');
+                setAddAddress('');
+                setAddEducation('');
                 setAddRole('Faculty');
-                setAddCompany('Abc Pvt ltd');
-                setAddJobTitle('Jr. Architect');
-                setAddExperience('01 years');
+                setAddCompany('');
+                setAddJobTitle('');
+                setAddExperience('');
                 setAddCourses(['UI/UX Design']);
                 setIsDirty(false);
                 setView('add-details');
@@ -375,12 +311,11 @@ export const AdminTeamPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Metric Overview Cards (Figma Screenshot 1) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-white p-6 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Active Members</span>
               <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
-                {activeCount > 3 ? `${activeCount}` : '3+'}
+                {String(activeCount).padStart(2, '0')}
               </span>
             </div>
             <div className="bg-white p-6 rounded-xl border border-[#050720]/10 text-center shadow-xs">
@@ -391,7 +326,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Tabbed Table Container */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-8 border-b border-[#050720]/10 pb-3">
               {(['Active', 'Inactive'] as MemberTab[]).map((tab) => (
@@ -412,42 +346,55 @@ export const AdminTeamPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Roster Table */}
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
-                  <th className="pb-3.5 font-semibold">Sr. No.</th>
-                  <th className="pb-3.5 font-semibold">Name</th>
-                  <th className="pb-3.5 font-semibold">Role</th>
-                  <th className="pb-3.5 font-semibold">Mobile</th>
-                  <th className="pb-3.5 font-semibold">Email</th>
-                  <th className="pb-3.5 font-semibold">Course</th>
-                  <th className="pb-3.5 text-right font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {currentList.map((m) => (
-                  <tr key={m.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                    <td className="py-3.5 text-[#050720]/70">{m.srNo}</td>
-                    <td className="py-3.5 font-medium">{m.name}</td>
-                    <td className="py-3.5 text-[#050720]/70">{m.role}</td>
-                    <td className="py-3.5 text-[#050720]/70">{m.mobile}</td>
-                    <td className="py-3.5 text-[#050720]/70">{m.email}</td>
-                    <td className="py-3.5 text-[#050720]/70">{m.course}</td>
-                    <td className="py-3.5 text-right">
-                      <button
-                        onClick={() => handleOpenMember(m)}
-                        className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
-                      >
-                        View
-                      </button>
-                    </td>
+            {loading ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-2 text-[#050720]/50">
+                <Loader2 className="w-6 h-6 animate-spin text-[#FFB908]" />
+                <span className="text-xs">Loading team members...</span>
+              </div>
+            ) : error ? (
+              <div className="py-8 text-center text-xs text-rose-500">{error}</div>
+            ) : currentList.length === 0 ? (
+              <div className="py-8 text-center text-xs text-[#050720]/50">
+                No {activeTab.toLowerCase()} team members found.
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
+                    <th className="pb-3.5 font-semibold">Sr. No.</th>
+                    <th className="pb-3.5 font-semibold">Name</th>
+                    <th className="pb-3.5 font-semibold">Role</th>
+                    <th className="pb-3.5 font-semibold">Mobile</th>
+                    <th className="pb-3.5 font-semibold">Email</th>
+                    <th className="pb-3.5 font-semibold">Course</th>
+                    <th className="pb-3.5 text-right font-semibold">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                  {currentList.map((m, idx) => (
+                    <tr key={m.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5 text-[#050720]/70">
+                        {m.srNo || String(idx + 1).padStart(2, '0')}
+                      </td>
+                      <td className="py-3.5 font-medium">{m.name}</td>
+                      <td className="py-3.5 text-[#050720]/70">{m.role}</td>
+                      <td className="py-3.5 text-[#050720]/70">{m.mobile}</td>
+                      <td className="py-3.5 text-[#050720]/70">{m.email}</td>
+                      <td className="py-3.5 text-[#050720]/70">{m.course}</td>
+                      <td className="py-3.5 text-right">
+                        <button
+                          onClick={() => handleOpenMember(m)}
+                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
-            {/* Pagination Footer */}
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#050720]/5 text-xs text-[#050720]/70">
               <span className="text-[11px]">Jump to</span>
               <input
@@ -457,7 +404,7 @@ export const AdminTeamPage: React.FC = () => {
               />
               <div className="flex items-center gap-1.5 ml-2">
                 <button className="p-1 hover:text-[#050720]"><ChevronLeft className="w-3.5 h-3.5" /></button>
-                <span className="text-[11px] font-semibold text-[#050720]">01 of 10</span>
+                <span className="text-[11px] font-semibold text-[#050720]">01 of 01</span>
                 <button className="p-1 hover:text-[#050720]"><ChevronRight className="w-3.5 h-3.5" /></button>
               </div>
             </div>
@@ -465,9 +412,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. VIEW MEMBER DETAILS (ACTIVE & INACTIVE)                */}
-      {/* ========================================================= */}
+      {/* VIEW MEMBER DETAILS */}
       {view === 'view-member' && selectedMember && (
         <div className="space-y-6 max-w-5xl">
           <div className="flex justify-between items-center">
@@ -496,7 +441,6 @@ export const AdminTeamPage: React.FC = () => {
             )}
           </div>
 
-          {/* Personal Details Card */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-sm font-bold font-['Sora']">Preview</h3>
@@ -505,16 +449,14 @@ export const AdminTeamPage: React.FC = () => {
               )}
             </div>
 
-            {/* Profile Avatar */}
             <div className="w-20 h-24 rounded-lg overflow-hidden border border-[#050720]/15 bg-slate-100">
               <img
-                src={selectedMember.photoUrl}
+                src={selectedMember.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'}
                 alt={selectedMember.name}
                 className="w-full h-full object-cover"
               />
             </div>
 
-            {/* Field Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">First Name*</span>
@@ -530,7 +472,7 @@ export const AdminTeamPage: React.FC = () => {
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Alternative Mobile*</span>
-                <span className="font-semibold text-sm">{selectedMember.altMobile || '9875898412'}</span>
+                <span className="font-semibold text-sm">{selectedMember.altMobile || 'N/A'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Email*</span>
@@ -557,7 +499,6 @@ export const AdminTeamPage: React.FC = () => {
               )}
             </div>
 
-            {/* Courses and Assigned Batches Tags */}
             <div className="space-y-3 pt-2">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block mb-1">Course</span>
@@ -584,38 +525,28 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Work History Card */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Work History</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Company Name</span>
-                <span className="font-semibold text-sm">{selectedMember.workHistory.companyName}</span>
+                <span className="font-semibold text-sm">{selectedMember.workHistory?.companyName || 'N/A'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Job Title</span>
-                <span className="font-semibold text-sm">{selectedMember.workHistory.jobTitle}</span>
+                <span className="font-semibold text-sm">{selectedMember.workHistory?.jobTitle || 'N/A'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Work experience</span>
-                <span className="font-semibold text-sm">{selectedMember.workHistory.experienceYears}</span>
+                <span className="font-semibold text-sm">{selectedMember.workHistory?.experienceYears || 'N/A'}</span>
               </div>
             </div>
           </div>
 
-          {/* Leave History Card (Visible if Active) */}
-          {selectedMember.status === 'Active' && (
+          {selectedMember.status === 'Active' && selectedMember.leaveHistory && (
             <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-sm font-bold font-['Sora']">Leave Record History</h3>
-                <div className="w-28 relative">
-                  <select className="w-full bg-[#F8FAFC] text-xs px-2.5 py-1.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none">
-                    <option>Leave Type</option>
-                    <option>Sick</option>
-                    <option>Casual</option>
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
               </div>
 
               <table className="w-full text-left text-xs">
@@ -629,44 +560,44 @@ export const AdminTeamPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                  {selectedMember.leaveHistory.map((l) => (
-                    <tr key={l.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                      <td className="py-3.5 font-medium">{l.leaveType}</td>
-                      <td className="py-3.5 text-[#050720]/80">{l.leaveDate}</td>
-                      <td className="py-3.5 text-[#050720]/80">{l.reason}</td>
-                      <td className="py-3.5 text-[#050720]/80">{l.applicationDate}</td>
-                      <td className="py-3.5 text-right">
-                        <span
-                          className={`font-semibold ${
-                            l.status === 'Approved'
-                              ? 'text-[#10B981]'
-                              : l.status === 'Rejected'
-                              ? 'text-[#EF4444]'
-                              : 'text-[#FFB908]'
-                          }`}
-                        >
-                          {l.status}
-                        </span>
+                  {selectedMember.leaveHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-4 text-center text-xs text-[#050720]/50">
+                        No leave history records.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    selectedMember.leaveHistory.map((l) => (
+                      <tr key={l.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                        <td className="py-3.5 font-medium">{l.leaveType}</td>
+                        <td className="py-3.5 text-[#050720]/80">{l.leaveDate}</td>
+                        <td className="py-3.5 text-[#050720]/80">{l.reason}</td>
+                        <td className="py-3.5 text-[#050720]/80">{l.applicationDate}</td>
+                        <td className="py-3.5 text-right">
+                          <span
+                            className={`font-semibold ${
+                              l.status === 'Approved'
+                                ? 'text-[#10B981]'
+                                : l.status === 'Rejected'
+                                ? 'text-[#EF4444]'
+                                : 'text-[#FFB908]'
+                            }`}
+                          >
+                            {l.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
-
-              <div className="flex items-center justify-center gap-3 pt-4 text-xs text-[#050720]/70">
-                <button className="p-1 hover:text-[#050720]"><ChevronLeft className="w-3.5 h-3.5" /></button>
-                <span className="text-[11px] font-semibold text-[#050720]">01 of 10</span>
-                <button className="p-1 hover:text-[#050720]"><ChevronRight className="w-3.5 h-3.5" /></button>
-              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 3. EDIT MEMBER VIEW (FIGMA SCREENSHOT 5)                  */}
-      {/* ========================================================= */}
-      {view === 'edit-member' && (
+      {/* EDIT MEMBER VIEW */}
+      {view === 'edit-member' && selectedMember && (
         <div className="space-y-6 max-w-5xl">
           <button
             onClick={() => {
@@ -683,13 +614,12 @@ export const AdminTeamPage: React.FC = () => {
             <span>Edit Member</span>
           </button>
 
-          {/* Personal Details */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-6">
             <h3 className="text-sm font-bold font-['Sora']">Personal Details</h3>
 
             <div className="w-20 h-24 rounded-lg overflow-hidden border border-[#050720]/15 bg-slate-100">
               <img
-                src={selectedMember.photoUrl}
+                src={selectedMember.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'}
                 alt={selectedMember.name}
                 className="w-full h-full object-cover"
               />
@@ -783,7 +713,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Work History */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Work History</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -820,7 +749,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Course Checkboxes */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Course</h3>
             <div className="flex flex-wrap items-center gap-6 text-xs">
@@ -847,7 +775,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-4">
             <button
               onClick={() => setShowRemoveUserModal(true)}
@@ -856,18 +783,18 @@ export const AdminTeamPage: React.FC = () => {
               Remove User
             </button>
             <button
+              disabled={actionLoading}
               onClick={handleSaveEditChanges}
-              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs flex items-center justify-center gap-2"
             >
-              Save Changes
+              {actionLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>Save Changes</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 4. ADD MEMBER - STEP 1: PERSONAL DETAILS (FIGMA 10)       */}
-      {/* ========================================================= */}
+      {/* ADD MEMBER - STEP 1 */}
       {view === 'add-details' && (
         <div className="space-y-6 max-w-5xl">
           <button
@@ -888,7 +815,6 @@ export const AdminTeamPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-6">
             <h3 className="text-sm font-bold font-['Sora']">Personal Details</h3>
 
-            {/* Photo Upload */}
             <div className="space-y-2">
               <div className="w-20 h-24 rounded-lg border border-[#050720]/15 bg-[#E2E8F0] flex items-center justify-center" />
               <div className="flex items-center gap-3">
@@ -989,7 +915,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Work History */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Work History</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1026,7 +951,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Course Checkboxes */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Course</h3>
             <div className="flex flex-wrap items-center gap-6 text-xs">
@@ -1070,9 +994,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 5. ADD MEMBER - STEP 2: SET CREDENTIALS (FIGMA 11 & 12)  */}
-      {/* ========================================================= */}
+      {/* ADD MEMBER - STEP 2 */}
       {view === 'add-credentials' && (
         <div className="space-y-6 max-w-4xl">
           <button
@@ -1126,9 +1048,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 6. ADD MEMBER - STEP 3: PREVIEW (FIGMA 13)               */}
-      {/* ========================================================= */}
+      {/* ADD MEMBER - STEP 3 PREVIEW */}
       {view === 'add-preview' && (
         <div className="space-y-6 max-w-5xl">
           <button
@@ -1153,31 +1073,31 @@ export const AdminTeamPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">First Name*</span>
-                <span className="font-semibold text-sm">{addFirstName || 'Poorva'}</span>
+                <span className="font-semibold text-sm">{addFirstName || 'N/A'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Last Name*</span>
-                <span className="font-semibold text-sm">{addLastName || 'Pande'}</span>
+                <span className="font-semibold text-sm">{addLastName || 'N/A'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Mobile*</span>
-                <span className="font-semibold text-sm">{addMobile || '9078675645'}</span>
+                <span className="font-semibold text-sm">{addMobile || 'N/A'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Alternative Mobile*</span>
-                <span className="font-semibold text-sm">{addAltMobile || '9875898412'}</span>
+                <span className="font-semibold text-sm">{addAltMobile || 'N/A'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Email*</span>
-                <span className="font-semibold text-sm">{addEmail || 'poorva@gmail.com'}</span>
+                <span className="font-semibold text-sm">{addEmail || 'N/A'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Address*</span>
-                <span className="font-semibold text-sm">{addAddress || 'Pune'}</span>
+                <span className="font-semibold text-sm">{addAddress || 'N/A'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Education*</span>
-                <span className="font-semibold text-sm">{addEducation || 'B.arch'}</span>
+                <span className="font-semibold text-sm">{addEducation || 'N/A'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Role</span>
@@ -1185,7 +1105,6 @@ export const AdminTeamPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Tags */}
             <div className="space-y-3 pt-2">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block mb-1">Course</span>
@@ -1193,36 +1112,23 @@ export const AdminTeamPage: React.FC = () => {
                   {addCourses[0] || 'UI/UX Design'}
                 </div>
               </div>
-
-              <div>
-                <span className="text-[10px] text-[#050720]/50 block mb-1">Assigned Batches</span>
-                <div className="flex flex-wrap gap-2">
-                  <span className="px-3 py-1 border border-[#0066FF] rounded text-xs font-semibold text-[#0066FF] bg-blue-50/30">
-                    MWF-JAN-2026
-                  </span>
-                  <span className="px-3 py-1 border border-[#0066FF] rounded text-xs font-semibold text-[#0066FF] bg-blue-50/30">
-                    Weekend-FEB-2026
-                  </span>
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Work History */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Work History</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Company Name</span>
-                <span className="font-semibold text-sm">{addCompany || 'Abc Pvt ltd'}</span>
+                <span className="font-semibold text-sm">{addCompany || 'N/A'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Job Title</span>
-                <span className="font-semibold text-sm">{addJobTitle || 'Jr. Architect'}</span>
+                <span className="font-semibold text-sm">{addJobTitle || 'N/A'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Work experience</span>
-                <span className="font-semibold text-sm">{addExperience || '01 years'}</span>
+                <span className="font-semibold text-sm">{addExperience || 'N/A'}</span>
               </div>
             </div>
           </div>
@@ -1236,11 +1142,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 7. MODALS & POPUPS                                        */}
-      {/* ========================================================= */}
-
-      {/* A. UNSAVED CHANGES WARNING MODAL (FIGMA 6, 7, 9, 14) */}
+      {/* MODALS */}
       {showUnsavedModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -1278,7 +1180,6 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* B. RESTORE ACCESS CONFIRMATION MODAL (FIGMA 8) */}
       {showRestoreModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -1294,17 +1195,18 @@ export const AdminTeamPage: React.FC = () => {
                 Discard Changes
               </button>
               <button
+                disabled={actionLoading}
                 onClick={handleConfirmRestore}
-                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs flex items-center justify-center gap-2"
               >
-                Restore Access
+                {actionLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+                <span>Restore Access</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* C. ACCESS RESTORED NOTIFICATION (FIGMA 9) */}
       {showAccessRestoredAlert && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-1.5 shadow-2xl">
@@ -1314,7 +1216,6 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* D. REMOVE USER MODAL (FIGMA 15) */}
       {showRemoveUserModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-7 max-w-md w-full space-y-4 shadow-2xl">
@@ -1336,17 +1237,18 @@ export const AdminTeamPage: React.FC = () => {
                 Keep User
               </button>
               <button
+                disabled={actionLoading}
                 onClick={handleConfirmRemoveUser}
-                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs flex items-center justify-center gap-2"
               >
-                Remove
+                {actionLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+                <span>Remove</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* E. USER HAS BEEN REMOVED CONFIRMATION POPUP (FIGMA 16) */}
       {showUserRemovedAlert && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
@@ -1355,7 +1257,6 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* F. SEND CREDENTIALS CONFIRMATION MODAL (FIGMA 12) */}
       {showSendCredentialsModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -1371,17 +1272,18 @@ export const AdminTeamPage: React.FC = () => {
                 Discard Changes
               </button>
               <button
+                disabled={actionLoading}
                 onClick={handleConfirmSendCredentials}
-                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs flex items-center justify-center gap-2"
               >
-                Save & Send
+                {actionLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+                <span>Save & Send</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* G. CREDENTIALS SENT CONFIRMATION POPUP (FIGMA 13) */}
       {showCredentialsSentAlert && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-1.5 shadow-2xl">

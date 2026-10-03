@@ -1,7 +1,7 @@
-import { Schema, model, Document } from 'mongoose';
+import mongoose, { Schema, Document } from "mongoose";
 
 export interface ITimelineEntry {
-  id?: string;
+  id: string;
   timestamp: string;
   status: string;
   title: string;
@@ -9,63 +9,68 @@ export interface ITimelineEntry {
 }
 
 export interface ILead extends Document {
-  srNo: string;
   firstName: string;
-  lastName: string;
+  lastName?: string;
   contactNo: string;
-  email: string;
+  email?: string;
   enquiryDate: string;
   course: string;
-  status: 'Interested' | 'Not Interested' | 'Demo Scheduled' | 'Enrolled' | 'Contacted';
+  status: "Interested" | "Not Interested" | "Demo Scheduled" | "Enrolled" | "Contacted";
   followUp: string;
   remark: string;
-  occupation: string;
-  leadSource: string;
-  address: string;
-  offeredFees: string;
-  finalFees: string;
-  referral: 'Yes' | 'No';
-  enquiringFor: 'Self' | 'Other';
+  occupation?: string;
+  leadSource?: string;
+  address?: string;
+  offeredFees?: string;
+  finalFees?: string;
+  referral?: "Yes" | "No";
+  enquiringFor?: "Self" | "Other";
   timeline: ITimelineEntry[];
 }
 
-const timelineSchema = new Schema<ITimelineEntry>(
-  {
-    id: { type: String, default: () => `t-${Date.now()}-${Math.random().toString(36).substr(2, 4)}` },
-    timestamp: { type: String, required: true },
-    status: { type: String, required: true },
-    title: { type: String, required: true },
-    description: { type: String, required: true },
-  },
-  { _id: false }
-);
+const TimelineSchema = new Schema<ITimelineEntry>({
+  id: { type: String, required: true },
+  timestamp: { type: String, required: true },
+  status: { type: String, required: true },
+  title: { type: String, required: true },
+  description: { type: String, required: true },
+});
 
-const leadSchema = new Schema<ILead>(
+const LeadSchema = new Schema<ILead>(
   {
-    srNo: { type: String, required: true },
     firstName: { type: String, required: true },
-    lastName: { type: String, default: '' },
+    lastName: { type: String, default: "" },
     contactNo: { type: String, required: true },
-    email: { type: String, default: '' },
+    email: { type: String, default: "" },
     enquiryDate: { type: String, required: true },
     course: { type: String, required: true },
     status: {
       type: String,
-      enum: ['Interested', 'Not Interested', 'Demo Scheduled', 'Enrolled', 'Contacted'],
-      default: 'Interested',
+      enum: ["Interested", "Not Interested", "Demo Scheduled", "Enrolled", "Contacted"],
+      default: "Interested",
     },
-    followUp: { type: String, default: '' },
-    remark: { type: String, default: '' },
-    occupation: { type: String, default: 'College Student' },
-    leadSource: { type: String, default: 'Instagram' },
-    address: { type: String, default: 'Pune' },
-    offeredFees: { type: String, default: '₹35,000' },
-    finalFees: { type: String, default: '₹35,000' },
-    referral: { type: String, enum: ['Yes', 'No'], default: 'No' },
-    enquiringFor: { type: String, enum: ['Self', 'Other'], default: 'Self' },
-    timeline: [timelineSchema],
+    followUp: { type: String, default: "Pending" },
+    remark: { type: String, default: "Newly Added" },
+    occupation: { type: String, default: "" },
+    leadSource: { type: String, default: "" },
+    address: { type: String, default: "" },
+    offeredFees: { type: String, default: "" },
+    finalFees: { type: String, default: "" },
+    referral: { type: String, enum: ["Yes", "No"], default: "No" },
+    enquiringFor: { type: String, enum: ["Self", "Other"], default: "Self" },
+    timeline: { type: [TimelineSchema], default: [] },
   },
   { timestamps: true }
 );
 
-export const Lead = model<ILead>('Lead', leadSchema);
+// Map MongoDB _id to `id` for frontend compatibility
+LeadSchema.set("toJSON", {
+  virtuals: true,
+  versionKey: false,
+  transform: function (_, ret: Record<string, any>) {
+    ret.id = ret._id.toString();
+    delete ret._id;
+  },
+});
+
+export const Lead = mongoose.model<ILead>("Lead", LeadSchema);

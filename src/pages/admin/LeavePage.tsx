@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
   ChevronDown, 
@@ -8,6 +8,7 @@ import {
   Check, 
   X 
 } from 'lucide-react';
+import { leaveService } from '../../services/leaveService';
 
 export type LeaveTab = 'Active' | 'Pending' | 'Rejected';
 
@@ -31,145 +32,14 @@ export interface LeaveRequest {
   rejectionReason?: string;
 }
 
-const INITIAL_LEAVE_REQUESTS: LeaveRequest[] = [
-  {
-    id: 'l-act-1',
-    srNo: '01',
-    name: 'Poorva Pande',
-    firstName: 'Poorva',
-    lastName: 'Pande',
-    role: 'Faculty',
-    mobile: '9784569874',
-    email: 'poorva@gmail.com',
-    leaveDate: '12-02-2026',
-    fromDate: '02-01-2026',
-    toDate: '03-01-2026',
-    leaveType: 'Sick',
-    reason: 'Advised rest by doctor',
-    applicationDate: '31-12-2025',
-    noOfDays: '02',
-    status: 'Active',
-  },
-  {
-    id: 'l-act-2',
-    srNo: '01',
-    name: 'Sejal Singh',
-    firstName: 'Sejal',
-    lastName: 'Singh',
-    role: 'Salesperson',
-    mobile: '9784569874',
-    email: 'poorva@gmail.com',
-    leaveDate: '12-02-2026',
-    fromDate: '12-02-2026',
-    toDate: '13-02-2026',
-    leaveType: 'Sick',
-    reason: 'Advised rest by doctor',
-    applicationDate: '10-02-2026',
-    noOfDays: '02',
-    status: 'Active',
-  },
-  {
-    id: 'l-pen-1',
-    srNo: '01',
-    name: 'Poorva Pande',
-    firstName: 'Poorva',
-    lastName: 'Pande',
-    role: 'Faculty',
-    mobile: '9784569874',
-    email: 'poorva@gmail.com',
-    leaveDate: '12-02-2026',
-    fromDate: '12-02-2026',
-    toDate: '12-02-2026',
-    leaveType: 'Sick',
-    reason: 'Advised Rest',
-    applicationDate: '11-02-2026',
-    noOfDays: '01',
-    status: 'Pending',
-  },
-  {
-    id: 'l-pen-2',
-    srNo: '02',
-    name: 'Neeraj Joshi',
-    firstName: 'Neeraj',
-    lastName: 'Joshi',
-    role: 'Faculty',
-    mobile: '9784569874',
-    email: 'neeraj@gmail.com',
-    leaveDate: '12-02-2026',
-    fromDate: '12-02-2026',
-    toDate: '12-02-2026',
-    leaveType: 'Casual',
-    reason: 'Personal',
-    applicationDate: '11-02-2026',
-    noOfDays: '01',
-    status: 'Pending',
-  },
-  {
-    id: 'l-rej-1',
-    srNo: '01',
-    name: 'Poorva Pande',
-    firstName: 'Poorva',
-    lastName: 'Pande',
-    role: 'Faculty',
-    mobile: '9784569874',
-    email: 'poorva@gmail.com',
-    leaveDate: '02-01-2026',
-    fromDate: '02-01-2026',
-    toDate: '03-01-2026',
-    leaveType: 'Casual',
-    reason: 'Personal',
-    applicationDate: '31-12-2025',
-    noOfDays: '02',
-    status: 'Rejected',
-    rejectionReason: 'Critical work scheduled on the requested date',
-  },
-  {
-    id: 'l-rej-2',
-    srNo: '02',
-    name: 'Neeraj Joshi',
-    firstName: 'Neeraj',
-    lastName: 'Joshi',
-    role: 'Faculty',
-    mobile: '9784569874',
-    email: 'neeraj@gmail.com',
-    leaveDate: '05-11-2025',
-    fromDate: '05-11-2025',
-    toDate: '06-11-2025',
-    leaveType: 'Casual',
-    reason: 'Personal Reason',
-    applicationDate: '01-11-2025',
-    noOfDays: '02',
-    status: 'Rejected',
-    rejectionReason: 'Faculty demo scheduled on this day',
-  },
-  {
-    id: 'l-rej-3',
-    srNo: '03',
-    name: 'Sejal Singh',
-    firstName: 'Sejal',
-    lastName: 'Singh',
-    role: 'Salesperson',
-    mobile: '9784569874',
-    email: 'sejal@gmail.com',
-    leaveDate: '12-02-2026',
-    fromDate: '12-02-2026',
-    toDate: '13-02-2026',
-    leaveType: 'Sick',
-    reason: 'Advised rest by doctor',
-    applicationDate: '10-02-2026',
-    noOfDays: '02',
-    status: 'Rejected',
-    rejectionReason: 'Exceeded maximum sick leave quota',
-  },
-];
-
 const LEAVE_TYPES = ['Leave Type', 'Sick', 'Casual', 'Vacation'];
 
 export const AdminLeavePage: React.FC = () => {
   const [view, setView] = useState<'table' | 'details'>('table');
   const [activeTab, setActiveTab] = useState<LeaveTab>('Active');
-  const [requests, setRequests] = useState<LeaveRequest[]>(INITIAL_LEAVE_REQUESTS);
-  const [selectedLeave, setSelectedLeave] = useState<LeaveRequest>(INITIAL_LEAVE_REQUESTS[0]);
+  const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Filters
   const [filterType, setFilterType] = useState('Leave Type');
@@ -185,51 +55,64 @@ export const AdminLeavePage: React.FC = () => {
   const [showApprovedNotice, setShowApprovedNotice] = useState(false);
   const [showRejectedNotice, setShowRejectedNotice] = useState(false);
 
-  // Current tab items
-  const tabItems = requests.filter((r) => r.status === activeTab);
+  // Fetch leave requests when activeTab changes
+  useEffect(() => {
+    fetchLeaves();
+  }, [activeTab]);
+
+  const fetchLeaves = async () => {
+    try {
+      setLoading(true);
+      const data = await leaveService.getLeavesByStatus(activeTab);
+      setRequests(data);
+    } catch (err) {
+      console.error('Failed to fetch leave requests:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filtered by leave type
-  const filteredItems = tabItems.filter((r) => {
+  const filteredItems = requests.filter((r) => {
     if (filterType === 'Leave Type') return true;
     return r.leaveType.toLowerCase() === filterType.toLowerCase();
   });
 
-  // Approve handler
-  const handleConfirmApprove = () => {
+  // Approve handler via API
+  const handleConfirmApprove = async () => {
     if (!targetRequest) return;
-    const updated = requests.map((r) =>
-      r.id === targetRequest.id ? { ...r, status: 'Active' as LeaveTab } : r
-    );
-    setRequests(updated);
-    setShowApproveModal(false);
-    setShowApprovedNotice(true);
-    setTimeout(() => setShowApprovedNotice(false), 2000);
+    try {
+      await leaveService.approveLeave(targetRequest.id);
+      setRequests((prev) => prev.filter((r) => r.id !== targetRequest.id));
+      setShowApproveModal(false);
+      setShowApprovedNotice(true);
+      setTimeout(() => setShowApprovedNotice(false), 2000);
+    } catch (err) {
+      console.error('Failed to approve leave:', err);
+      alert('Failed to approve leave request.');
+    }
   };
 
-  // Reject handler
-  const handleConfirmReject = () => {
+  // Reject handler via API
+  const handleConfirmReject = async () => {
     if (!targetRequest) return;
-    const updated = requests.map((r) =>
-      r.id === targetRequest.id
-        ? {
-            ...r,
-            status: 'Rejected' as LeaveTab,
-            rejectionReason: rejectionReasonInput || 'Leave request not approved by admin.',
-          }
-        : r
-    );
-    setRequests(updated);
-    setShowRejectModal(false);
-    setRejectionReasonInput('');
-    setShowRejectedNotice(true);
-    setTimeout(() => setShowRejectedNotice(false), 2000);
+    const reason = rejectionReasonInput || 'Leave request not approved by admin.';
+    try {
+      await leaveService.rejectLeave(targetRequest.id, reason);
+      setRequests((prev) => prev.filter((r) => r.id !== targetRequest.id));
+      setShowRejectModal(false);
+      setRejectionReasonInput('');
+      setShowRejectedNotice(true);
+      setTimeout(() => setShowRejectedNotice(false), 2000);
+    } catch (err) {
+      console.error('Failed to reject leave:', err);
+      alert('Failed to reject leave request.');
+    }
   };
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-      {/* ========================================================= */}
-      {/* 1. MAIN LEAVE MANAGEMENT TABLE VIEW                       */}
-      {/* ========================================================= */}
+      {/* 1. MAIN LEAVE MANAGEMENT TABLE VIEW */}
       {view === 'table' && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold font-['Sora']">Leave Management</h1>
@@ -292,145 +175,153 @@ export const AdminLeavePage: React.FC = () => {
               </div>
             </div>
 
-            {/* A. Active Tab Table */}
-            {activeTab === 'Active' && (
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
-                    <th className="pb-3.5 font-semibold">Sr. No.</th>
-                    <th className="pb-3.5 font-semibold">Name</th>
-                    <th className="pb-3.5 font-semibold">Role</th>
-                    <th className="pb-3.5 font-semibold">Mobile</th>
-                    <th className="pb-3.5 font-semibold">Email</th>
-                    <th className="pb-3.5 font-semibold">Leave date</th>
-                    <th className="pb-3.5 font-semibold">Leave Type</th>
-                    <th className="pb-3.5 font-semibold">Reason</th>
-                    <th className="pb-3.5 text-right font-semibold">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                  {filteredItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                      <td className="py-3.5 text-[#050720]/70">{item.srNo}</td>
-                      <td className="py-3.5 font-medium">{item.name}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.role}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.mobile}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.email}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.leaveDate}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.leaveType}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.reason}</td>
-                      <td className="py-3.5 text-right">
-                        <button
-                          onClick={() => {
-                            setSelectedLeave(item);
-                            setView('details');
-                          }}
-                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            {loading ? (
+              <div className="text-center py-8 text-xs text-[#050720]/50 font-medium">
+                Loading leave records...
+              </div>
+            ) : (
+              <>
+                {/* A. Active Tab Table */}
+                {activeTab === 'Active' && (
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
+                        <th className="pb-3.5 font-semibold">Sr. No.</th>
+                        <th className="pb-3.5 font-semibold">Name</th>
+                        <th className="pb-3.5 font-semibold">Role</th>
+                        <th className="pb-3.5 font-semibold">Mobile</th>
+                        <th className="pb-3.5 font-semibold">Email</th>
+                        <th className="pb-3.5 font-semibold">Leave date</th>
+                        <th className="pb-3.5 font-semibold">Leave Type</th>
+                        <th className="pb-3.5 font-semibold">Reason</th>
+                        <th className="pb-3.5 text-right font-semibold">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                      {filteredItems.map((item, idx) => (
+                        <tr key={item.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                          <td className="py-3.5 text-[#050720]/70">{item.srNo || String(idx + 1).padStart(2, '0')}</td>
+                          <td className="py-3.5 font-medium">{item.name}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.role}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.mobile}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.email}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.leaveDate}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.leaveType}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.reason}</td>
+                          <td className="py-3.5 text-right">
+                            <button
+                              onClick={() => {
+                                setSelectedLeave(item);
+                                setView('details');
+                              }}
+                              className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                            >
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
 
-            {/* B. Pending Tab Table (Screenshots 2 & Approvals) */}
-            {activeTab === 'Pending' && (
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
-                    <th className="pb-3.5 font-semibold">Sr. No.</th>
-                    <th className="pb-3.5 font-semibold">Name</th>
-                    <th className="pb-3.5 font-semibold">Role</th>
-                    <th className="pb-3.5 font-semibold">Mobile</th>
-                    <th className="pb-3.5 font-semibold">Email</th>
-                    <th className="pb-3.5 font-semibold">Leave Type</th>
-                    <th className="pb-3.5 font-semibold">Reason</th>
-                    <th className="pb-3.5 font-semibold">From</th>
-                    <th className="pb-3.5 font-semibold">To</th>
-                    <th className="pb-3.5 text-right font-semibold">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                  {filteredItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                      <td className="py-3.5 text-[#050720]/70">{item.srNo}</td>
-                      <td className="py-3.5 font-medium">{item.name}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.role}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.mobile}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.email}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.leaveType}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.reason}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.fromDate}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.toDate}</td>
-                      <td className="py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-2.5">
-                          <button
-                            onClick={() => {
-                              setTargetRequest(item);
-                              setShowApproveModal(true);
-                            }}
-                            title="Approve Leave"
-                            className="text-[#10B981] hover:scale-110 transition-transform p-0.5"
-                          >
-                            <Check className="w-4 h-4 stroke-[3]" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setTargetRequest(item);
-                              setShowRejectModal(true);
-                            }}
-                            title="Reject Leave"
-                            className="text-[#EF4444] hover:scale-110 transition-transform p-0.5"
-                          >
-                            <X className="w-4 h-4 stroke-[3]" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                {/* B. Pending Tab Table */}
+                {activeTab === 'Pending' && (
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
+                        <th className="pb-3.5 font-semibold">Sr. No.</th>
+                        <th className="pb-3.5 font-semibold">Name</th>
+                        <th className="pb-3.5 font-semibold">Role</th>
+                        <th className="pb-3.5 font-semibold">Mobile</th>
+                        <th className="pb-3.5 font-semibold">Email</th>
+                        <th className="pb-3.5 font-semibold">Leave Type</th>
+                        <th className="pb-3.5 font-semibold">Reason</th>
+                        <th className="pb-3.5 font-semibold">From</th>
+                        <th className="pb-3.5 font-semibold">To</th>
+                        <th className="pb-3.5 text-right font-semibold">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                      {filteredItems.map((item, idx) => (
+                        <tr key={item.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                          <td className="py-3.5 text-[#050720]/70">{item.srNo || String(idx + 1).padStart(2, '0')}</td>
+                          <td className="py-3.5 font-medium">{item.name}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.role}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.mobile}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.email}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.leaveType}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.reason}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.fromDate}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.toDate}</td>
+                          <td className="py-3.5 text-right">
+                            <div className="flex items-center justify-end gap-2.5">
+                              <button
+                                onClick={() => {
+                                  setTargetRequest(item);
+                                  setShowApproveModal(true);
+                                }}
+                                title="Approve Leave"
+                                className="text-[#10B981] hover:scale-110 transition-transform p-0.5"
+                              >
+                                <Check className="w-4 h-4 stroke-[3]" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setTargetRequest(item);
+                                  setShowRejectModal(true);
+                                }}
+                                title="Reject Leave"
+                                className="text-[#EF4444] hover:scale-110 transition-transform p-0.5"
+                              >
+                                <X className="w-4 h-4 stroke-[3]" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
 
-            {/* C. Rejected Tab Table (Screenshot 3) */}
-            {activeTab === 'Rejected' && (
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
-                    <th className="pb-3.5 font-semibold">Sr. No.</th>
-                    <th className="pb-3.5 font-semibold">Employee Name</th>
-                    <th className="pb-3.5 font-semibold">Role</th>
-                    <th className="pb-3.5 font-semibold">Leave Type</th>
-                    <th className="pb-3.5 font-semibold">Reason</th>
-                    <th className="pb-3.5 text-right font-semibold">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                  {filteredItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                      <td className="py-3.5 text-[#050720]/70">{item.srNo}</td>
-                      <td className="py-3.5 font-medium">{item.name}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.role}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.leaveType}</td>
-                      <td className="py-3.5 text-[#050720]/70">{item.reason}</td>
-                      <td className="py-3.5 text-right">
-                        <button
-                          onClick={() => {
-                            setSelectedLeave(item);
-                            setView('details');
-                          }}
-                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                {/* C. Rejected Tab Table */}
+                {activeTab === 'Rejected' && (
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
+                        <th className="pb-3.5 font-semibold">Sr. No.</th>
+                        <th className="pb-3.5 font-semibold">Employee Name</th>
+                        <th className="pb-3.5 font-semibold">Role</th>
+                        <th className="pb-3.5 font-semibold">Leave Type</th>
+                        <th className="pb-3.5 font-semibold">Reason</th>
+                        <th className="pb-3.5 text-right font-semibold">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                      {filteredItems.map((item, idx) => (
+                        <tr key={item.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                          <td className="py-3.5 text-[#050720]/70">{item.srNo || String(idx + 1).padStart(2, '0')}</td>
+                          <td className="py-3.5 font-medium">{item.name}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.role}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.leaveType}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.reason}</td>
+                          <td className="py-3.5 text-right">
+                            <button
+                              onClick={() => {
+                                setSelectedLeave(item);
+                                setView('details');
+                              }}
+                              className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                            >
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </>
             )}
 
             {/* Pagination Footer */}
@@ -451,9 +342,7 @@ export const AdminLeavePage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. LEAVE DETAILS VIEW (ACTIVE / REJECTED)                 */}
-      {/* ========================================================= */}
+      {/* 2. LEAVE DETAILS VIEW */}
       {view === 'details' && selectedLeave && (
         <div className="space-y-6 max-w-5xl">
           <button
@@ -500,7 +389,6 @@ export const AdminLeavePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Rejection notice box if status is Rejected */}
             {selectedLeave.status === 'Rejected' && (
               <div className="pt-2 border-t border-[#050720]/10">
                 <span className="text-[10px] text-[#050720]/50 block">Reason for rejection</span>
@@ -513,9 +401,7 @@ export const AdminLeavePage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 3. APPROVE LEAVE MODAL (SCREENSHOT 4)                     */}
-      {/* ========================================================= */}
+      {/* 3. APPROVE LEAVE MODAL */}
       {showApproveModal && targetRequest && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-7 max-w-lg w-full space-y-5 shadow-2xl">
@@ -566,9 +452,7 @@ export const AdminLeavePage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 4. REJECT LEAVE MODAL (SCREENSHOT 5)                      */}
-      {/* ========================================================= */}
+      {/* 4. REJECT LEAVE MODAL */}
       {showRejectModal && targetRequest && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-7 max-w-lg w-full space-y-4 shadow-2xl">
@@ -629,9 +513,7 @@ export const AdminLeavePage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 5. CONFIRMATION ALERT DIALOGS (SCREENSHOT 6)              */}
-      {/* ========================================================= */}
+      {/* 5. CONFIRMATION ALERT DIALOGS */}
       {showApprovedNotice && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-1.5 shadow-2xl">

@@ -1,52 +1,55 @@
-import { Router, Request, Response } from 'express';
-import { Lead } from '../models/Lead';
+import { Router, Request, Response } from "express";
+import { Lead } from "../models/Lead";
 
 const router = Router();
 
-// GET all leads
-router.get('/', async (_req: Request, res: Response) => {
+// GET /api/leads - Fetch all leads
+router.get("/", async (_req: Request, res: Response) => {
   try {
     const leads = await Lead.find().sort({ createdAt: -1 });
     res.json(leads);
   } catch (error) {
-    res.status(500).json({ message: 'Error retrieving leads', error });
+    res.status(500).json({ message: "Failed to fetch leads", error });
   }
 });
 
-// POST create lead
-router.post('/', async (req: Request, res: Response) => {
+// POST /api/leads - Create new lead
+router.post("/", async (req: Request, res: Response) => {
   try {
-    const count = await Lead.countDocuments();
-    const newLead = new Lead({
-      ...req.body,
-      srNo: String(count + 1).padStart(2, '0'),
-    });
-    const saved = await newLead.save();
-    res.status(201).json(saved);
+    const newLead = new Lead(req.body);
+    const savedLead = await newLead.save();
+    res.status(201).json(savedLead);
   } catch (error) {
-    res.status(400).json({ message: 'Failed to create lead', error });
+    res.status(400).json({ message: "Failed to create lead", error });
   }
 });
 
-// PATCH lead status and timeline
-router.patch('/:id/status', async (req: Request, res: Response) => {
+// PATCH /api/leads/:id/status - Update lead status & add remark/timeline
+router.patch("/:id/status", async (req: Request, res: Response) => {
   try {
-    const { status, remark, timelineEntry } = req.body;
-    const lead = await Lead.findById(req.params.id);
+    const { id } = req.params;
+    const { status, remark, newTimelineEntry } = req.body;
 
-    if (!lead) {
-      return res.status(404).json({ message: 'Lead not found' });
+    const updateQuery: any = { status };
+    if (remark) updateQuery.remark = remark;
+
+    const updateOperation: any = { $set: updateQuery };
+    if (newTimelineEntry) {
+      updateOperation.$push = { timeline: newTimelineEntry };
     }
 
-    if (status) lead.status = status;
-    if (remark) lead.remark = remark;
-    if (timelineEntry) lead.timeline.unshift(timelineEntry);
+    const updatedLead = await Lead.findByIdAndUpdate(id, updateOperation, {
+      new: true,
+    });
 
-    const updated = await lead.save();
-    res.json(updated);
+    if (!updatedLead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    res.json(updatedLead);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to update lead', error });
+    res.status(400).json({ message: "Failed to update lead", error });
   }
 });
 
-export const leadRoutes = router;
+export default router;

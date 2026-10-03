@@ -1,157 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
   ChevronDown, 
   ChevronUp, 
   ChevronLeft, 
   ChevronRight, 
-  
   Check 
 } from 'lucide-react';
-
-// --- TYPES ---
-export type LeadStatus = 'Interested' | 'Not Interested' | 'Demo Scheduled' | 'Enrolled' | 'Contacted';
-
-export interface TimelineEntry {
-  id: string;
-  timestamp: string;
-  status: string;
-  title: string;
-  description: string;
-}
-
-export interface DetailedLead {
-  id: string;
-  srNo: string;
-  firstName: string;
-  lastName: string;
-  contactNo: string;
-  email: string;
-  enquiryDate: string;
-  course: string;
-  status: LeadStatus;
-  followUp: string;
-  remark: string;
-  occupation: string;
-  leadSource: string;
-  address: string;
-  assignedTo: string;
-  offeredFees?: string;
-  finalFees?: string;
-  referral?: 'Yes' | 'No';
-  enquiringFor?: string;
-  timeline: TimelineEntry[];
-}
-
-// --- INITIAL SEED DATA (SCREENSHOT 1 & 2) ---
-const INITIAL_LEADS: DetailedLead[] = [
-  {
-    id: 'lead-1',
-    srNo: '01',
-    firstName: 'Aanya',
-    lastName: 'Shah',
-    contactNo: '9078675645',
-    email: 'aanya@gmail.com',
-    enquiryDate: '15-11-2025',
-    course: 'UI/UX Design',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Needs Time',
-    occupation: 'Working',
-    leadSource: 'Instagram',
-    address: 'Pune',
-    assignedTo: 'Sejal',
-    offeredFees: '₹35,000',
-    finalFees: '₹35,000',
-    referral: 'No',
-    enquiringFor: 'Self',
-    timeline: [
-      { id: 't1', timestamp: '15-11-2025, 10:05 AM', status: 'Interested', title: 'Lead Remark', description: 'Lead created via inquiry form' },
-      { id: 't2', timestamp: '16-11-2025, 10:10 AM', status: 'Interested', title: 'Lead Remark', description: 'Student requested a demo session' },
-      { id: 't3', timestamp: '17-11-2025, 10:10 AM', status: 'Demo Scheduled', title: 'Lead Remark', description: 'Demo scheduled at 12:00 PM' },
-    ]
-  },
-  {
-    id: 'lead-2',
-    srNo: '02',
-    firstName: 'Rohan',
-    lastName: 'Mehta',
-    contactNo: '9123456565',
-    email: 'rohan.m@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'No Code',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Needs Time',
-    occupation: 'College Student',
-    leadSource: 'Google Search',
-    address: 'Mumbai',
-    assignedTo: 'Sejal',
-    timeline: [
-      { id: 't4', timestamp: '21-12-2025, 11:00 AM', status: 'Interested', title: 'Lead Remark', description: 'Initial contact via website' }
-    ]
-  },
-  {
-    id: 'lead-3',
-    srNo: '03',
-    firstName: 'Neha',
-    lastName: 'Patel',
-    contactNo: '9767564995',
-    email: 'neha.patel@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'UI/UX Design',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Joining Soon',
-    occupation: 'Working',
-    leadSource: 'LinkedIn',
-    address: 'Pune',
-    assignedTo: 'Sejal',
-    timeline: [
-      { id: 't5', timestamp: '21-12-2025, 02:30 PM', status: 'Interested', title: 'Lead Remark', description: 'Interested in weekend batch' }
-    ]
-  },
-  {
-    id: 'lead-4',
-    srNo: '04',
-    firstName: 'Aman',
-    lastName: 'Verma',
-    contactNo: '9876694837',
-    email: 'aman.v@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'Portfolio',
-    status: 'Not Interested',
-    followUp: '01-01-2026',
-    remark: 'Call Back',
-    occupation: 'College Student',
-    leadSource: 'Walk-in',
-    address: 'Pune',
-    assignedTo: 'Salesperson 1',
-    timeline: [
-      { id: 't6', timestamp: '21-12-2025, 04:15 PM', status: 'Not Interested', title: 'Lead Remark', description: 'Requested call back next month' }
-    ]
-  },
-  {
-    id: 'lead-5',
-    srNo: '05',
-    firstName: 'Siddhi',
-    lastName: 'Shah',
-    contactNo: '9456578342',
-    email: 'siddhi.s@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'Full-Stack',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Joining Soon',
-    occupation: 'Working',
-    leadSource: 'Friend Referral',
-    address: 'Pune',
-    assignedTo: 'Salesperson 2',
-    timeline: [
-      { id: 't7', timestamp: '21-12-2025, 05:00 PM', status: 'Interested', title: 'Lead Remark', description: 'Wants placement assistance details' }
-    ]
-  },
-];
+import { DetailedLead, LeadStatus, TimelineEntry } from '../sales/SalesLeadsPage';
+import { leadService } from '../../services/leadService';
 
 const COURSES = ['Course', 'UI/UX Design', 'No Code', 'Portfolio', 'Full-Stack', 'React Native'];
 const STATUSES = ['Status', 'Interested', 'Not Interested', 'Demo Scheduled', 'Enrolled'];
@@ -160,8 +17,9 @@ const SALESPERSONS = ['Salesperson 1', 'Salesperson 2', 'Sejal Singh', 'Rahul De
 export const AdminLeadsPage: React.FC = () => {
   // Navigation states: 'list' | 'details' | 'add'
   const [view, setView] = useState<'list' | 'details' | 'add'>('list');
-  const [leads, setLeads] = useState<DetailedLead[]>(INITIAL_LEADS);
-  const [selectedLead, setSelectedLead] = useState<DetailedLead>(INITIAL_LEADS[0]);
+  const [leads, setLeads] = useState<DetailedLead[]>([]);
+  const [selectedLead, setSelectedLead] = useState<DetailedLead | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Directory Filters
   const [statusFilter, setStatusFilter] = useState('Status');
@@ -199,6 +57,23 @@ export const AdminLeadsPage: React.FC = () => {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showAssignedAlert, setShowAssignedAlert] = useState(false);
 
+  // Fetch leads on mount
+  useEffect(() => {
+    fetchLeads();
+  }, []);
+
+  const fetchLeads = async () => {
+    try {
+      setLoading(true);
+      const data = await leadService.getAllLeads();
+      setLeads(data);
+    } catch (err) {
+      console.error('Failed to fetch leads:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Filtered Leads
   const filteredLeads = leads.filter((l) => {
     const matchStatus = statusFilter === 'Status' || l.status.toLowerCase() === statusFilter.toLowerCase();
@@ -226,31 +101,42 @@ export const AdminLeadsPage: React.FC = () => {
   };
 
   // Save changes on Lead Details
-  const handleSaveLeadChanges = () => {
-    let updatedTimeline = [...selectedLead.timeline];
+  const handleSaveLeadChanges = async () => {
+    if (!selectedLead) return;
+
+    let updatedTimeline = [...(selectedLead.timeline || [])];
+    let newTimelineEntry: TimelineEntry | undefined = undefined;
+
     if (remarkDescription.trim()) {
       const now = new Date();
       const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-      updatedTimeline.push({
+      newTimelineEntry = {
         id: `t-${Date.now()}`,
         timestamp: dateStr,
         status: currentLeadStatus,
         title: `Lead Remark - ${remarkTitle}`,
         description: remarkDescription,
-      });
+      };
+      updatedTimeline.push(newTimelineEntry);
     }
 
-    const updated: DetailedLead = {
-      ...selectedLead,
-      status: currentLeadStatus,
-      timeline: updatedTimeline,
-    };
+    try {
+      const updated = await leadService.updateStatus(
+        selectedLead.id,
+        currentLeadStatus,
+        remarkDescription || selectedLead.remark,
+        newTimelineEntry
+      );
 
-    setLeads(leads.map((l) => (l.id === updated.id ? updated : l)));
-    setSelectedLead(updated);
-    setRemarkDescription('');
-    setIsDirty(false);
-    alert('Lead details saved successfully!');
+      setLeads(leads.map((l) => (l.id === updated.id ? updated : l)));
+      setSelectedLead(updated);
+      setRemarkDescription('');
+      setIsDirty(false);
+      alert('Lead details saved successfully!');
+    } catch (err) {
+      console.error('Failed to update lead:', err);
+      alert('Error updating lead details.');
+    }
   };
 
   // Toggle course checkbox in Add Form
@@ -271,9 +157,8 @@ export const AdminLeadsPage: React.FC = () => {
   };
 
   // Confirm Assign Lead
-  const handleConfirmAssign = () => {
-    const newLead: DetailedLead = {
-      id: `lead-${Date.now()}`,
+  const handleConfirmAssign = async () => {
+    const newLeadPayload: Omit<DetailedLead, 'id'> = {
       srNo: String(leads.length + 1).padStart(2, '0'),
       firstName: formFirstName,
       lastName: formLastName || 'Doe',
@@ -303,21 +188,25 @@ export const AdminLeadsPage: React.FC = () => {
       ],
     };
 
-    setLeads([newLead, ...leads]);
-    setShowAssignModal(false);
-    setShowAssignedAlert(true);
-    setTimeout(() => {
-      setShowAssignedAlert(false);
-      setView('list');
-    }, 1500);
+    try {
+      const createdLead = await leadService.createLead(newLeadPayload);
+      setLeads([createdLead, ...leads]);
+      setShowAssignModal(false);
+      setShowAssignedAlert(true);
+      setTimeout(() => {
+        setShowAssignedAlert(false);
+        setView('list');
+      }, 1500);
+    } catch (err) {
+      console.error('Failed to create lead:', err);
+      alert('Error creating lead.');
+    }
   };
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
 
-      {/* ========================================================= */}
-      {/* 1. LEADS DIRECTORY LISTING (SCREENSHOT 1)                  */}
-      {/* ========================================================= */}
+      {/* 1. LEADS DIRECTORY LISTING */}
       {view === 'list' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
@@ -353,7 +242,7 @@ export const AdminLeadsPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Total Leads</span>
-              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">150</span>
+              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">{leads.length}</span>
               <span className="text-[11px] text-[#050720]/50 font-medium">All time</span>
             </div>
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
@@ -363,7 +252,9 @@ export const AdminLeadsPage: React.FC = () => {
             </div>
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Enrolled</span>
-              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">30</span>
+              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
+                {leads.filter((l) => l.status === 'Enrolled').length}
+              </span>
               <span className="text-[11px] text-[#050720]/50 font-medium">Leads converted to students</span>
             </div>
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
@@ -440,47 +331,51 @@ export const AdminLeadsPage: React.FC = () => {
             </div>
 
             {/* Table */}
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
-                  <th className="pb-3.5 font-semibold">Sr. No.</th>
-                  <th className="pb-3.5 font-semibold">Name</th>
-                  <th className="pb-3.5 font-semibold">Contact No.</th>
-                  <th className="pb-3.5 font-semibold">Enquiry Date</th>
-                  <th className="pb-3.5 font-semibold">Course</th>
-                  <th className="pb-3.5 font-semibold">Status</th>
-                  <th className="pb-3.5 font-semibold">Follow-up</th>
-                  <th className="pb-3.5 font-semibold">Remark</th>
-                  <th className="pb-3.5 text-right font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                    <td className="py-3.5 text-[#050720]/70">{lead.srNo}</td>
-                    <td className="py-3.5 font-medium">{lead.firstName} {lead.lastName}</td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.contactNo}</td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.enquiryDate}</td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.course}</td>
-                    <td className="py-3.5">
-                      <span className={`font-semibold ${lead.status === 'Interested' ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                        {lead.status}
-                      </span>
-                    </td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.followUp}</td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.remark}</td>
-                    <td className="py-3.5 text-right">
-                      <button
-                        onClick={() => handleOpenLead(lead)}
-                        className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
-                      >
-                        View
-                      </button>
-                    </td>
+            {loading ? (
+              <div className="text-center py-8 text-xs text-[#050720]/50 font-medium">Loading leads...</div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
+                    <th className="pb-3.5 font-semibold">Sr. No.</th>
+                    <th className="pb-3.5 font-semibold">Name</th>
+                    <th className="pb-3.5 font-semibold">Contact No.</th>
+                    <th className="pb-3.5 font-semibold">Enquiry Date</th>
+                    <th className="pb-3.5 font-semibold">Course</th>
+                    <th className="pb-3.5 font-semibold">Status</th>
+                    <th className="pb-3.5 font-semibold">Follow-up</th>
+                    <th className="pb-3.5 font-semibold">Remark</th>
+                    <th className="pb-3.5 text-right font-semibold">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                  {filteredLeads.map((lead, idx) => (
+                    <tr key={lead.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5 text-[#050720]/70">{lead.srNo || String(idx + 1).padStart(2, '0')}</td>
+                      <td className="py-3.5 font-medium">{lead.firstName} {lead.lastName}</td>
+                      <td className="py-3.5 text-[#050720]/70">{lead.contactNo}</td>
+                      <td className="py-3.5 text-[#050720]/70">{lead.enquiryDate}</td>
+                      <td className="py-3.5 text-[#050720]/70">{lead.course}</td>
+                      <td className="py-3.5">
+                        <span className={`font-semibold ${lead.status === 'Interested' || lead.status === 'Enrolled' ? 'text-[#10B981]' : lead.status === 'Not Interested' ? 'text-[#EF4444]' : 'text-[#0066FF]'}`}>
+                          {lead.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 text-[#050720]/70">{lead.followUp}</td>
+                      <td className="py-3.5 text-[#050720]/70">{lead.remark}</td>
+                      <td className="py-3.5 text-right">
+                        <button
+                          onClick={() => handleOpenLead(lead)}
+                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
             {/* Pagination Footer */}
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#050720]/5 text-xs text-[#050720]/70">
@@ -500,9 +395,7 @@ export const AdminLeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. VIEW LEAD DETAILS (SCREENSHOT 2 & 3)                    */}
-      {/* ========================================================= */}
+      {/* 2. VIEW LEAD DETAILS */}
       {view === 'details' && selectedLead && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
@@ -522,9 +415,8 @@ export const AdminLeadsPage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left 2 Columns: Overview & Timeline */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Student Overview Card with Assigned To (Screenshot 2) */}
+              {/* Student Overview Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Student Overview</h3>
                 <div className="grid grid-cols-2 gap-y-4 text-xs">
@@ -562,7 +454,7 @@ export const AdminLeadsPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Assigned to</span>
-                    <span className="font-semibold text-sm">{selectedLead.assignedTo}</span>
+                    <span className="font-semibold text-sm">{selectedLead.assignedTo || 'Unassigned'}</span>
                   </div>
                 </div>
               </div>
@@ -571,7 +463,7 @@ export const AdminLeadsPage: React.FC = () => {
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Timeline</h3>
                 <div className="space-y-3">
-                  {selectedLead.timeline.map((entry) => (
+                  {(selectedLead.timeline || []).map((entry) => (
                     <div key={entry.id} className="border border-[#050720]/10 rounded-xl p-4">
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-xs font-bold text-[#050720]">{entry.timestamp}</span>
@@ -589,7 +481,6 @@ export const AdminLeadsPage: React.FC = () => {
 
             {/* Right Column: Status & Remark Editors */}
             <div className="space-y-6">
-              {/* Current Status Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
                 <h3 className="text-sm font-bold font-['Sora']">Current Status</h3>
                 <div>
@@ -613,7 +504,6 @@ export const AdminLeadsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Add Remark Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Add Remark</h3>
                 <div>
@@ -654,9 +544,7 @@ export const AdminLeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 3. LEAVE WITHOUT SAVING MODAL (SCREENSHOT 3)              */}
-      {/* ========================================================= */}
+      {/* 3. LEAVE WITHOUT SAVING MODAL */}
       {showUnsavedModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -690,9 +578,7 @@ export const AdminLeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 4. ADD NEW LEADS VIEW (SCREENSHOT 4 & 7)                  */}
-      {/* ========================================================= */}
+      {/* 4. ADD NEW LEADS VIEW */}
       {view === 'add' && (
         <div className="space-y-6 max-w-4xl">
           <button
@@ -905,7 +791,7 @@ export const AdminLeadsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 6: Assign To (Admin-exclusive) */}
+          {/* Section 6: Assign To */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
             <h3 className="text-sm font-bold font-['Sora']">Assign to</h3>
             <div className="relative">
@@ -941,9 +827,7 @@ export const AdminLeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 5. ASSIGN LEAD CONFIRMATION MODAL (SCREENSHOT 5)          */}
-      {/* ========================================================= */}
+      {/* 5. ASSIGN LEAD CONFIRMATION MODAL */}
       {showAssignModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-7 max-w-sm w-full text-center space-y-4 shadow-2xl">
@@ -969,9 +853,7 @@ export const AdminLeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 6. LEAD ASSIGNED NOTIFICATION (SCREENSHOT 6)              */}
-      {/* ========================================================= */}
+      {/* 6. LEAD ASSIGNED NOTIFICATION */}
       {showAssignedAlert && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-7 max-w-sm w-full text-center space-y-1.5 shadow-2xl">

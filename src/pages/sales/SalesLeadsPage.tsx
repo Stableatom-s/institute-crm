@@ -31,7 +31,7 @@ export interface TimelineEntry {
 
 export interface DetailedLead {
   id: string;
-  srNo: string;
+  srNo?: string;
   firstName: string;
   lastName: string;
   contactNo: string;
@@ -44,13 +44,13 @@ export interface DetailedLead {
   occupation: string;
   leadSource: string;
   address: string;
+  assignedTo?: string;
   offeredFees?: string;
   finalFees?: string;
-  referral?: "Yes" | "No";
-  enquiringFor?: "Self" | "Other";
+  referral?: 'Yes' | 'No';
+  enquiringFor?: string;
   timeline: TimelineEntry[];
 }
-
 const COURSES = [
   "All",
   "UI/UX Design",

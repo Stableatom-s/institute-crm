@@ -47,4 +47,15 @@ router.patch('/:id/installment', async (req: Request, res: Response) => {
   }
 });
 
+
+router.get('/fees', async (req, res) => {
+  try {
+    // Return fee data or empty array if not yet in DB
+    res.json([]);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching fees' });
+  }
+});
+
+
 export const invoiceRoutes = router;

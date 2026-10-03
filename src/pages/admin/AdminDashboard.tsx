@@ -1,44 +1,40 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
-
-interface ScheduledDemoItem {
-  srNo: string;
-  name: string;
-  timeSlot: string;
-  demoDate: string;
-  course: string;
-  mode: 'Online' | 'Offline';
-  faculty: string;
-}
-
-interface OngoingBatchItem {
-  srNo: string;
-  batch: string;
-  startDate: string;
-  course: string;
-  faculty: string;
-  studentCount: string;
-}
-
-const SCHEDULED_DEMOS: ScheduledDemoItem[] = [
-  { srNo: '01', name: 'Aanya Shah', timeSlot: '11:00 - 12:00', demoDate: '21-12-2025', course: 'UI/UX Design', mode: 'Online', faculty: 'Tanmay Kalbhor' },
-  { srNo: '02', name: 'Rohan Mehta', timeSlot: '01:00 - 02:00', demoDate: '21-12-2025', course: 'No Code', mode: 'Online', faculty: 'Poorva Pande' },
-  { srNo: '03', name: 'Neha Patel', timeSlot: '03:00 - 04:00', demoDate: '21-12-2025', course: 'UI/UX Design', mode: 'Offline', faculty: 'Tanmay Kalbhor' },
-  { srNo: '04', name: 'Anish Verma', timeSlot: '03:00 - 04:00', demoDate: '21-12-2025', course: 'Portfolio', mode: 'Offline', faculty: 'Poorva Pande' },
-  { srNo: '05', name: 'Siddhi Shah', timeSlot: '01:00 - 02:00', demoDate: '21-12-2025', course: 'Full-Stack', mode: 'Online', faculty: 'Neeraj Joshi' },
-];
-
-const ONGOING_BATCHES: OngoingBatchItem[] = [
-  { srNo: '01', batch: 'MWF-JAN-2026', startDate: '01-01-2026', course: 'UI/UX Design', faculty: 'Poorva Pande', studentCount: '05' },
-  { srNo: '02', batch: 'TTS-JAN-2026', startDate: '03-01-2026', course: 'No Code', faculty: 'Tanmay Kalbhor', studentCount: '06' },
-  { srNo: '03', batch: 'WEEKEND-JAN-2026', startDate: '07-01-2026', course: 'UI/UX Design', faculty: 'Tanmay Kalbhor', studentCount: '04' },
-  { srNo: '04', batch: 'MWF-FEB-2026', startDate: '07-02-2026', course: 'UI/UX Design', faculty: 'Tanmay Kalbhor', studentCount: '04' },
-  { srNo: '05', batch: 'TTS-FEB-2026', startDate: '08-01-2026', course: 'UI/UX Design', faculty: 'Tanmay Kalbhor', studentCount: '04' },
-];
+import { useDemos } from '../../hooks/useDemos';
+import { useBatches } from '../../hooks/useBatches';
+import { useLeads } from '../../hooks/useLeads';
+import { useInvoices } from '../../hooks/useInvoices';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+
+  // Real backend data hooks
+  const { demos, loading: demosLoading } = useDemos();
+  const { batches, loading: batchesLoading } = useBatches();
+  const { leads, loading: leadsLoading } = useLeads();
+  const { invoices, loading: invoicesLoading } = useInvoices();
+
+  const isLoading = demosLoading || batchesLoading || leadsLoading || invoicesLoading;
+
+  // Overview Counts
+  const todayStr = new Date().toISOString().split('T')[0];
+  
+  const leadsCreatedToday = leads.filter((l: any) => l.createdAt?.startsWith(todayStr) || l.date === todayStr).length;
+  const todayDemosCount = demos.filter((d: any) => d.demoDate === todayStr || d.date === todayStr).length || demos.length;
+  const activeBatchesCount = batches.filter((b: any) => b.status === 'Active' || b.status === 'Ongoing').length || batches.length;
+  const pendingPaymentsCount = invoices.filter((i: any) => i.status === 'Requests' || i.status === 'pending').length;
+
+  // Pipeline Metrics
+  const newLeads = leads.filter((l: any) => l.status === 'New' || l.stage === 'New').length;
+  const contactedLeads = leads.filter((l: any) => l.status === 'Contacted' || l.stage === 'Contacted').length;
+  const scheduledLeads = leads.filter((l: any) => l.status === 'Demo Scheduled' || l.stage === 'Demo Scheduled').length;
+  const interestedLeads = leads.filter((l: any) => l.status === 'Interested' || l.stage === 'Interested').length;
+  const convertedLeads = leads.filter((l: any) => l.status === 'Converted' || l.stage === 'Converted').length;
+
+  if (isLoading) {
+    return <div className="p-8 text-center text-xs font-semibold">Loading dashboard overview...</div>;
+  }
 
   return (
     <div className="font-['Onest'] text-[#050720] space-y-6 pb-16">
@@ -68,19 +64,27 @@ export const AdminDashboard: React.FC = () => {
             <div className="grid grid-cols-4 gap-2 text-center mt-5">
               <div>
                 <span className="text-[10px] text-[#050720]/60 block font-medium">Leads created today</span>
-                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">05</span>
+                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
+                  {String(leadsCreatedToday).padStart(2, '0')}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/60 block font-medium">Today's Demos</span>
-                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">05</span>
+                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
+                  {String(todayDemosCount).padStart(2, '0')}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/60 block font-medium">Active Batches</span>
-                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">05</span>
+                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
+                  {String(activeBatchesCount).padStart(2, '0')}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/60 block font-medium">Payment Due</span>
-                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">02</span>
+                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
+                  {String(pendingPaymentsCount).padStart(2, '0')}
+                </span>
               </div>
             </div>
           </div>
@@ -96,23 +100,33 @@ export const AdminDashboard: React.FC = () => {
             <div className="grid grid-cols-5 gap-1 text-center mt-5">
               <div>
                 <span className="text-[10px] text-[#050720]/60 block font-medium">New</span>
-                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">05</span>
+                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
+                  {String(newLeads).padStart(2, '0')}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/60 block font-medium">Contacted</span>
-                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">05</span>
+                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
+                  {String(contactedLeads).padStart(2, '0')}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/60 block font-medium">Demo Scheduled</span>
-                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">05</span>
+                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
+                  {String(scheduledLeads).padStart(2, '0')}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/60 block font-medium">Interested</span>
-                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">03</span>
+                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
+                  {String(interestedLeads).padStart(2, '0')}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/60 block font-medium">Converted</span>
-                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">03</span>
+                <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
+                  {String(convertedLeads).padStart(2, '0')}
+                </span>
               </div>
             </div>
           </div>
@@ -146,15 +160,15 @@ export const AdminDashboard: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-            {SCHEDULED_DEMOS.map((demo) => (
-              <tr key={demo.srNo} className="hover:bg-[#FFB908]/5 transition-colors">
-                <td className="py-3.5 text-[#050720]/70">{demo.srNo}</td>
-                <td className="py-3.5 font-medium">{demo.name}</td>
-                <td className="py-3.5 text-[#050720]/70">{demo.timeSlot}</td>
-                <td className="py-3.5 text-[#050720]/70">{demo.demoDate}</td>
-                <td className="py-3.5 text-[#050720]/70">{demo.course}</td>
-                <td className="py-3.5 text-[#050720]/70">{demo.mode}</td>
-                <td className="py-3.5 text-[#050720]/70">{demo.faculty}</td>
+            {demos.slice(0, 5).map((demo: any, idx: number) => (
+              <tr key={demo.id || demo._id || idx} className="hover:bg-[#FFB908]/5 transition-colors">
+                <td className="py-3.5 text-[#050720]/70">{demo.srNo || String(idx + 1).padStart(2, '0')}</td>
+                <td className="py-3.5 font-medium">{demo.studentName || demo.name || 'N/A'}</td>
+                <td className="py-3.5 text-[#050720]/70">{demo.timeSlot || demo.time || '11:00 - 12:00'}</td>
+                <td className="py-3.5 text-[#050720]/70">{demo.demoDate || demo.date || '21-12-2025'}</td>
+                <td className="py-3.5 text-[#050720]/70">{demo.course || 'UI/UX Design'}</td>
+                <td className="py-3.5 text-[#050720]/70">{demo.mode || 'Online'}</td>
+                <td className="py-3.5 text-[#050720]/70">{demo.faculty || 'Tanmay Kalbhor'}</td>
                 <td className="py-3.5 text-right">
                   <button
                     onClick={() => navigate('/admin/demos')}
@@ -194,14 +208,14 @@ export const AdminDashboard: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-            {ONGOING_BATCHES.map((batch) => (
-              <tr key={batch.srNo} className="hover:bg-[#FFB908]/5 transition-colors">
-                <td className="py-3.5 text-[#050720]/70">{batch.srNo}</td>
-                <td className="py-3.5 font-medium">{batch.batch}</td>
-                <td className="py-3.5 text-[#050720]/70">{batch.startDate}</td>
-                <td className="py-3.5 text-[#050720]/70">{batch.course}</td>
-                <td className="py-3.5 text-[#050720]/70">{batch.faculty}</td>
-                <td className="py-3.5 text-[#050720]/70">{batch.studentCount}</td>
+            {batches.slice(0, 5).map((batch: any, idx: number) => (
+              <tr key={batch.id || batch._id || idx} className="hover:bg-[#FFB908]/5 transition-colors">
+                <td className="py-3.5 text-[#050720]/70">{batch.srNo || String(idx + 1).padStart(2, '0')}</td>
+                <td className="py-3.5 font-medium">{batch.batchName || batch.batch || 'MWF-JAN-2026'}</td>
+                <td className="py-3.5 text-[#050720]/70">{batch.startDate || '01-01-2026'}</td>
+                <td className="py-3.5 text-[#050720]/70">{batch.course || 'UI/UX Design'}</td>
+                <td className="py-3.5 text-[#050720]/70">{batch.faculty || 'Poorva Pande'}</td>
+                <td className="py-3.5 text-[#050720]/70">{batch.studentCount || '05'}</td>
                 <td className="py-3.5 text-right">
                   <button
                     onClick={() => navigate('/admin/batch')}

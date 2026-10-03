@@ -2,69 +2,91 @@ import { apiRequest } from '../lib/api';
 
 export interface InvoiceItem {
   id: string;
-  srNo: string;
-  studentName: string;
-  firstName?: string;
-  lastName?: string;
-  course: string;
-  invoiceCode: string;
-  totalFees: number;
-  paidFees: number;
-  remainingFees: number;
-  dueDate: string;
+  srNo?: string | number;
+  name?: string;
+  course?: string;
+  paidFees?: string | number;
+  mobile?: string;
+  approvedOn?: string;
+  email?: string;
+  invoiceId?: string;
+  status?: string;
+  [key: string]: any;
+}
+
+export interface FeeItem {
+  id: string;
+  srNo?: string | number;
+  name?: string;
+  course?: string;
+  totalFees?: string | number;
+  paid?: string | number;
   lastFollowUp?: string;
-  status: 'Paid' | 'Partially Paid' | 'Overdue';
-  timeline?: any[];
+  remarks?: string;
+  [key: string]: any;
+}
+
+export interface CreateInvoicePayload {
+  companyName?: string;
+  companyPhone?: string;
+  companyAddress?: string;
+  companyEmail?: string;
+  gstin?: string;
+  courseName?: string;
+  companyPan?: string;
+  iecCode?: string;
+  bankName?: string;
+  bankBranch?: string;
+  accountName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  swiftCode?: string;
+  billTo?: string;
+  amount?: number;
+  [key: string]: any;
 }
 
 export const financeService = {
-  getAllInvoices: async (): Promise<InvoiceItem[]> => {
-    const data = await apiRequest<any[]>('/invoices');
-    return data.map((item) => ({
-      ...item,
-      id: item._id || item.id,
-      firstName: item.firstName || item.studentName.split(' ')[0] || '',
-      lastName: item.lastName || item.studentName.split(' ').slice(1).join(' ') || '',
-      remainingFees: item.remainingFees ?? Math.max(0, item.totalFees - item.paidFees),
-      lastFollowUp: item.lastFollowUp || item.dueDate || '21-12-2025',
-      timeline: item.timeline || [
-        {
-          id: `inst-${item._id || 'init'}`,
-          title: 'Installment #1',
-          dueDate: item.dueDate || '21-12-2025',
-          paidDate: item.paidFees > 0 ? (item.dueDate || '21-12-2025') : undefined,
-          amount: `₹${(item.paidFees || item.totalFees).toLocaleString()}`,
-          amountLeft: item.remainingFees === 0 ? 'Nil' : `₹${item.remainingFees.toLocaleString()}`,
-          status: item.paidFees >= item.totalFees ? 'Paid' : 'Pending',
-          hasInvoice: true,
-        },
-      ],
-    }));
+  getInvoices: async (): Promise<InvoiceItem[]> => {
+    return apiRequest('/invoices', { method: 'GET' });
   },
 
-  createInvoice: async (invoiceData: Partial<InvoiceItem>): Promise<InvoiceItem> => {
-    const data = await apiRequest<any>('/invoices', {
+  createInvoice: async (payload: CreateInvoicePayload): Promise<InvoiceItem> => {
+    return apiRequest<InvoiceItem>('/invoices', {
       method: 'POST',
-      body: JSON.stringify(invoiceData),
+      body: JSON.stringify(payload),
     });
-    return {
-      ...data,
-      id: data._id || data.id,
-    };
   },
 
-  recordInstallment: async (
-    id: string,
-    amount: number,
-    installmentRecord: any
-  ): Promise<InvoiceItem> => {
-    const data = await apiRequest<any>(`/invoices/${id}/installment`, {
+  approveInvoice: async (id: string | undefined): Promise<InvoiceItem> => {
+    if (!id) throw new Error('Invoice ID is required for approval');
+    return apiRequest<InvoiceItem>(`/invoices/${id}/approve`, {
       method: 'PATCH',
-      body: JSON.stringify({ amount, installmentRecord }),
     });
-    return {
-      ...data,
-      id: data._id || data.id,
-    };
+  },
+
+  rejectInvoice: async (id: string | undefined, reason: string): Promise<InvoiceItem> => {
+    if (!id) throw new Error('Invoice ID is required for rejection');
+    return apiRequest<InvoiceItem>(`/invoices/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  getFees: async (): Promise<FeeItem[]> => {
+    return apiRequest('/invoices/fees', { method: 'GET' });
+  },
+
+  saveFeeRemark: async (
+    feeId: string | undefined,
+    title: string,
+    date: string,
+    description: string
+  ): Promise<void> => {
+    if (!feeId) throw new Error('Fee ID is required');
+    return apiRequest<void>(`/invoices/fees/${feeId}/remarks`, {
+      method: 'POST',
+      body: JSON.stringify({ title, date, description }),
+    });
   },
 };
