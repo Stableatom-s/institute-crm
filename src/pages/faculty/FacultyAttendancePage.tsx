@@ -98,22 +98,22 @@ export const FacultyAttendancePage: React.FC = () => {
   };
 
   // Fetch live logs on mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        const [attLogs, leaveLogs] = await Promise.all([
-          attendanceService.getMyAttendance(),
-          attendanceService.getMyLeaves(),
-        ]);
-        setAttendanceHistory(attLogs);
-        setLeaveHistory(leaveLogs);
-      } catch (err) {
-        console.error('Failed to load faculty attendance:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const [attLogs, leaveLogs] = await Promise.all([
+        attendanceService.getMyAttendance(currentUserName),
+        attendanceService.getMyLeaves(currentUserName),
+      ]);
+      setAttendanceHistory(attLogs);
+      setLeaveHistory(leaveLogs);
+    } catch (err) {
+      console.error('Failed to load faculty attendance:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
     fetchData();
 
@@ -147,7 +147,7 @@ export const FacultyAttendancePage: React.FC = () => {
         setActivities([]);
       }
     }
-  }, []);
+  }, [currentUserName]);
 
   const handleAddActivity = () => {
     if (!selectedActivity || (!hours && !minutes)) return;
@@ -214,9 +214,15 @@ export const FacultyAttendancePage: React.FC = () => {
       .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
       .replace(/\//g, '-');
 
-    const payload: Partial<LeaveRecord> = {
+    const payload = {
+      userId: auth?.user?.id || 'faculty-1',
+      userName: currentUserName,
+      role: currentUserRole,
+      userRole: currentUserRole,
       leaveType,
-      leaveDate: fromDate,
+      fromDate,
+      toDate: toDate || fromDate,
+      noOfDays: calculateDays(),
       reason: leaveReason || 'Personal Leave',
       applicationDate: todayStr,
       status: 'Pending',
@@ -226,15 +232,7 @@ export const FacultyAttendancePage: React.FC = () => {
       const saved = await attendanceService.applyLeave(payload);
       setLeaveHistory([saved, ...leaveHistory]);
     } catch {
-      const fallbackLeave: LeaveRecord = {
-        id: `leave-${Date.now()}`,
-        leaveType,
-        leaveDate: fromDate,
-        reason: leaveReason || 'Personal Leave',
-        applicationDate: todayStr,
-        status: 'Pending',
-      };
-      setLeaveHistory([fallbackLeave, ...leaveHistory]);
+      // offline fallback
     }
 
     setFromDate('');

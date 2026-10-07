@@ -64,13 +64,13 @@ export const SalesAttendancePage: React.FC = () => {
   const [leaveDateError, setLeaveDateError] = useState<boolean>(false);
 
   // Fetch live attendance history & leave records
-  useEffect(() => {
+useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
         const [attLogs, leaveLogs] = await Promise.all([
-          attendanceService.getMyAttendance(),
-          attendanceService.getMyLeaves(),
+          attendanceService.getMyAttendance(currentUserName),
+          attendanceService.getMyLeaves(currentUserName),
         ]);
         setAttendanceHistory(attLogs);
         setLeaves(leaveLogs);
@@ -122,7 +122,7 @@ export const SalesAttendancePage: React.FC = () => {
         setActivities([]);
       }
     }
-  }, []);
+  }, [currentUserName]);
 
   // Add new activity
   const handleAddActivity = () => {
@@ -213,9 +213,15 @@ export const SalesAttendancePage: React.FC = () => {
       })
       .replace(/\//g, "-");
 
-    const payload: Partial<LeaveRecord> = {
+    const payload = {
+      userId: auth?.user?.id || 'sales-1',
+      userName: currentUserName,
+      role: currentUserRole,
+      userRole: currentUserRole,
       leaveType,
-      leaveDate: leaveFromDate,
+      fromDate: leaveFromDate,
+      toDate: leaveToDate || leaveFromDate,
+      noOfDays: leaveDays || '01',
       reason: leaveReason || "Personal Leave",
       applicationDate: todayStr,
       status: "Pending",
@@ -225,15 +231,7 @@ export const SalesAttendancePage: React.FC = () => {
       const saved = await attendanceService.applyLeave(payload);
       setLeaves([saved, ...leaves]);
     } catch {
-      const fallbackLeave: LeaveRecord = {
-        id: `leave-${Date.now()}`,
-        leaveType,
-        leaveDate: leaveFromDate,
-        reason: leaveReason || "Personal Leave",
-        applicationDate: todayStr,
-        status: "Pending",
-      };
-      setLeaves([fallbackLeave, ...leaves]);
+      // offline fallback
     }
 
     setLeaveFromDate("");
