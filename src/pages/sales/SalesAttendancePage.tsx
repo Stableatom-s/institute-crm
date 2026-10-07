@@ -104,7 +104,7 @@ export const SalesAttendancePage: React.FC = () => {
       });
       localStorage.setItem("radiquolab_punch_in", formatted);
       setInTimeText(formatted);
-      attendanceService.clockIn(formatted, todayStr).catch(() => {});
+      attendanceService.clockIn(formatted, todayStr).catch(() => { });
     }
 
     const savedOutTime = localStorage.getItem(`radiquolab_clock_out_${todayStr}`);
@@ -127,9 +127,8 @@ export const SalesAttendancePage: React.FC = () => {
   // Add new activity
   const handleAddActivity = () => {
     if (selectedActivity === "Select Activity") return;
-    const duration = `${hoursSpent !== "Hours" ? hoursSpent : "00"}:${
-      minutesSpent !== "Minutes" ? minutesSpent : "00"
-    } Hrs`;
+    const duration = `${hoursSpent !== "Hours" ? hoursSpent : "00"}:${minutesSpent !== "Minutes" ? minutesSpent : "00"
+      } Hrs`;
 
     const newAct: ActivityItem = {
       id: `act-${Date.now()}`,
@@ -186,7 +185,10 @@ export const SalesAttendancePage: React.FC = () => {
     };
 
     try {
-      await attendanceService.clockOut(formattedOut, activities);
+      await attendanceService.clockOut(formattedOut, activities, "09:00", {
+        userName: currentUserName,
+        date: todayStr
+      });
     } catch {
       // Offline fallback
     }
@@ -610,11 +612,10 @@ export const SalesAttendancePage: React.FC = () => {
                 <button
                   key={t}
                   onClick={() => setLeaveTab(t)}
-                  className={`text-sm font-semibold transition-all relative pb-2 ${
-                    leaveTab === t
+                  className={`text-sm font-semibold transition-all relative pb-2 ${leaveTab === t
                       ? "text-[#050720] font-bold"
                       : "text-[#050720]/50 hover:text-[#050720]"
-                  }`}
+                    }`}
                 >
                   <span>{t}</span>
                   {leaveTab === t && (
@@ -647,13 +648,12 @@ export const SalesAttendancePage: React.FC = () => {
                       <td className="py-3.5 text-[#050720]/80">{l.applicationDate}</td>
                       <td className="py-3.5 text-right">
                         <span
-                          className={`font-semibold ${
-                            l.status === "Approved"
+                          className={`font-semibold ${l.status === "Approved"
                               ? "text-[#10B981]"
                               : l.status === "Rejected"
-                              ? "text-[#EF4444]"
-                              : "text-[#FFB908]"
-                          }`}
+                                ? "text-[#EF4444]"
+                                : "text-[#FFB908]"
+                            }`}
                         >
                           {l.status}
                         </span>
@@ -686,13 +686,12 @@ export const SalesAttendancePage: React.FC = () => {
                     <td className="py-3.5 text-[#050720]/80">{l.applicationDate}</td>
                     <td className="py-3.5 text-right">
                       <span
-                        className={`font-semibold ${
-                          l.status === "Approved"
+                        className={`font-semibold ${l.status === "Approved"
                             ? "text-[#10B981]"
                             : l.status === "Rejected"
-                            ? "text-[#EF4444]"
-                            : "text-[#FFB908]"
-                        }`}
+                              ? "text-[#EF4444]"
+                              : "text-[#FFB908]"
+                          }`}
                       >
                         {l.status}
                       </span>
@@ -731,11 +730,10 @@ export const SalesAttendancePage: React.FC = () => {
                     setLeaveFromDate(e.target.value);
                     if (e.target.value) setLeaveDateError(false);
                   }}
-                  className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border ${
-                    leaveDateError
+                  className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border ${leaveDateError
                       ? "border-rose-500 ring-1 ring-rose-500"
                       : "border-[#050720]/15"
-                  } focus:outline-none`}
+                    } focus:outline-none`}
                 />
                 {leaveDateError && (
                   <span className="text-[10px] font-semibold text-rose-500 mt-1 block">

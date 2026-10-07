@@ -66,31 +66,34 @@ export const AdminAttendancePage: React.FC = () => {
   const loadAttendance = async () => {
     try {
       setIsLoading(true);
-      // Attempt backend retrieval if available on attendanceService
-      const fetchFn = (attendanceService as any).getAllEmployeeAttendance || attendanceService.getMyAttendance;
-      const data = await fetchFn();
+      const data = await attendanceService.getAllEmployeeAttendance();
 
       if (Array.isArray(data) && data.length > 0) {
-        const mapped: EmployeeAttendance[] = data.map((item: any, idx: number) => ({
-          id: item.id || item._id || `emp-${idx}`,
-          srNo: String(idx + 1).padStart(2, '0'),
-          employeeName: item.employeeName || item.userName || 'Faculty Member',
-          role: item.role || 'Faculty',
-          clockIn: item.inTime || '09:30 AM',
-          clockOut: item.outTime || 'Yet to check-out',
-          status: item.status || 'Present',
-          remarkStatus: item.remarkStatus || '-',
-          remarkCourse: item.course || 'UI/UX Design',
-          location: item.location || 'Radiquolab Design Institute - 18.5075, 73.8216',
-          clockOutLocation: item.clockOutLocation || '-',
-          workingHours: item.workingHours || '04:30 Hrs',
-          todayActivities: item.activities || [],
-          leaveHistory: item.leaveHistory || [],
-        }));
+        const mapped: EmployeeAttendance[] = data.map((item: any, idx: number) => {
+          const roleDisplay = item.userRole === 'sales' ? 'Salesperson' : 'Faculty';
+          return {
+            id: item._id || item.id || `emp-${idx}`,
+            srNo: String(idx + 1).padStart(2, '0'),
+            employeeName: item.userName || 'Staff Member',
+            role: roleDisplay,
+            clockIn: item.inTime || '09:30 AM',
+            clockOut: item.outTime || 'Yet to checkout',
+            status: item.outTime && item.outTime !== 'Yet to checkout' ? 'Present' : 'Present',
+            remarkStatus: '-',
+            remarkCourse: 'UI/UX Design',
+            location: 'Radiquolab Design Institute - 18.5075, 73.8216',
+            clockOutLocation: item.outTime && item.outTime !== 'Yet to checkout' ? 'Office (Pune)' : '-',
+            workingHours: item.workingHours || '04:30 Hrs',
+            todayActivities: (item.activities || []).map((a: any) => ({
+              activity: a.activity,
+              timeSpent: a.timeSpent,
+            })),
+            leaveHistory: [],
+          };
+        });
         setEmployees(mapped);
         if (!selectedEmployee) setSelectedEmployee(mapped[0]);
       } else {
-        // Fallback placeholder sync if empty
         const defaultList: EmployeeAttendance[] = [
           {
             id: 'emp-1',

@@ -130,7 +130,7 @@ export const FacultyAttendancePage: React.FC = () => {
       const formatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
       localStorage.setItem('radiquolab_punch_in', formatted);
       setInTime(formatted);
-      attendanceService.clockIn(formatted, todayStr).catch(() => {});
+      attendanceService.clockIn(formatted, todayStr).catch(() => { });
     }
 
     const savedOutTime = localStorage.getItem(`radiquolab_clock_out_${todayStr}`);
@@ -196,7 +196,10 @@ export const FacultyAttendancePage: React.FC = () => {
     };
 
     try {
-      await attendanceService.clockOut(formattedOut, activities, computedWorkingHours);
+      await attendanceService.clockOut(formattedOut, activities, computedWorkingHours, {
+        userName: currentUserName,
+        date: todayStr
+      });
     } catch {
       // Offline fallback
     }
@@ -321,7 +324,7 @@ export const FacultyAttendancePage: React.FC = () => {
             <h2 className="text-sm font-bold text-[#050720] font-['Sora']">Time Spent</h2>
             <div className="flex flex-wrap sm:flex-nowrap gap-3">
               <div className="flex-1 min-w-[200px]">
-                <select 
+                <select
                   value={selectedActivity}
                   onChange={(e) => setSelectedActivity(e.target.value)}
                   className="w-full border border-[#050720]/15 rounded-lg px-3 py-2 text-xs text-[#050720] bg-white focus:outline-none"
@@ -335,7 +338,7 @@ export const FacultyAttendancePage: React.FC = () => {
                 </select>
               </div>
               <div className="w-28">
-                <select 
+                <select
                   value={hours}
                   onChange={(e) => setHours(e.target.value)}
                   className="w-full border border-[#050720]/15 rounded-lg px-3 py-2 text-xs text-[#050720] bg-white focus:outline-none"
@@ -347,7 +350,7 @@ export const FacultyAttendancePage: React.FC = () => {
                 </select>
               </div>
               <div className="w-28">
-                <select 
+                <select
                   value={minutes}
                   onChange={(e) => setMinutes(e.target.value)}
                   className="w-full border border-[#050720]/15 rounded-lg px-3 py-2 text-xs text-[#050720] bg-white focus:outline-none"
@@ -446,7 +449,7 @@ export const FacultyAttendancePage: React.FC = () => {
                       <td className="py-3.5">{row.outTime}</td>
                       <td className="py-3.5 font-semibold text-[#050720]">{row.workingHours}</td>
                       <td className="py-3.5 text-right">
-                        <button 
+                        <button
                           onClick={() => {
                             setSelectedWorkDate(row.date);
                             setSelectedWorkActivities(row.activities || activities);
@@ -677,7 +680,7 @@ export const FacultyAttendancePage: React.FC = () => {
                       </td>
                       {leaveTab === 'cancelled' && (
                         <td className="py-3.5 text-right">
-                          <button 
+                          <button
                             onClick={() => setShowReapplyModal(true)}
                             className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-slate-100 cursor-pointer"
                           >
@@ -749,7 +752,7 @@ export const FacultyAttendancePage: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-semibold text-[#050720]/60 mb-1.5">From date*</label>
-                <input 
+                <input
                   type="date"
                   required
                   value={fromDate}
@@ -759,7 +762,7 @@ export const FacultyAttendancePage: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-[#050720]/60 mb-1.5">To date*</label>
-                <input 
+                <input
                   type="date"
                   required
                   value={toDate}
@@ -772,7 +775,7 @@ export const FacultyAttendancePage: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-semibold text-[#050720]/60 mb-1.5">Leave type</label>
-                <select 
+                <select
                   value={leaveType}
                   onChange={(e) => setLeaveType(e.target.value as 'Casual' | 'Sick' | 'Vacation')}
                   className="w-full border border-[#050720]/15 rounded-lg px-3 py-2 text-xs text-[#050720] bg-white focus:outline-none"
@@ -784,7 +787,7 @@ export const FacultyAttendancePage: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-[#050720]/60 mb-1.5">Number of days</label>
-                <input 
+                <input
                   type="text"
                   readOnly
                   value={calculateDays()}
@@ -795,7 +798,7 @@ export const FacultyAttendancePage: React.FC = () => {
 
             <div>
               <label className="block text-[11px] font-semibold text-[#050720]/60 mb-1.5">Reason for Leave*</label>
-              <textarea 
+              <textarea
                 rows={4}
                 required
                 placeholder="Reason for Leave*"
