@@ -1,12 +1,17 @@
 import mongoose from 'mongoose';
 
-export const connectDB = async (): Promise<void> => {
+export const connectDB = async () => {
   try {
-    const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/institute_crm';
-    const conn = await mongoose.connect(uri);
-    console.log(` MongoDB Connected: ${conn.connection.host}`);
-  } catch (error) {
-    console.error(' MongoDB Connection Error:', error);
+    const connStr = process.env.MONGODB_URI || process.env.MONGO_URI;
+
+    if (!connStr) {
+      throw new Error('MONGODB_URI environment variable is missing in .env');
+    }
+
+    const conn = await mongoose.connect(connStr);
+    console.log(`✅ MongoDB Atlas Connected: ${conn.connection.host}`);
+  } catch (error: any) {
+    console.error(`❌ MongoDB Connection Error: ${error.message}`);
     process.exit(1);
   }
 };
