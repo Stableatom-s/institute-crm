@@ -13,7 +13,6 @@ export const FacultyDashboardPage: React.FC = () => {
   const [batches, setBatches] = useState<BatchItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Fetch live demos & batches from MongoDB on mount
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -23,7 +22,6 @@ export const FacultyDashboardPage: React.FC = () => {
           batchService.getAllBatches(),
         ]);
 
-        // Filter items belonging to the current faculty instructor
         const facultyDemos = allDemos.filter(
           (d) =>
             d.faculty.toLowerCase().includes(currentUserName.toLowerCase()) ||
@@ -49,7 +47,6 @@ export const FacultyDashboardPage: React.FC = () => {
     fetchDashboardData();
   }, [currentUserName]);
 
-  // Compute live metrics dynamically from MongoDB records
   const totalBatchesCount = batches.length;
   const ongoingBatches = batches.filter((b) => (b.students?.length || 0) > 0);
   const upcomingBatches = batches.filter((b) => (b.students?.length || 0) === 0);
@@ -83,10 +80,8 @@ export const FacultyDashboardPage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] space-y-6 pb-12">
-      {/* Page Title */}
       <h1 className="text-2xl font-bold text-[#050720] font-['Sora']">Dashboard</h1>
 
-      {/* 4 Metric Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {metricCards.map((card, idx) => (
           <div
@@ -102,7 +97,6 @@ export const FacultyDashboardPage: React.FC = () => {
         ))}
       </div>
 
-      {/* Table 1: Upcoming Demo */}
       <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-sm font-bold text-[#050720] font-['Sora']">Upcoming Demo</h2>
@@ -163,7 +157,6 @@ export const FacultyDashboardPage: React.FC = () => {
         )}
       </div>
 
-      {/* Table 2: Ongoing Batches */}
       <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-sm font-bold text-[#050720] font-['Sora']">Ongoing Batches</h2>

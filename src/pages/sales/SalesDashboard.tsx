@@ -13,7 +13,6 @@ export const SalesDashboard: React.FC = () => {
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Fetch live metrics & tables from backend
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -28,7 +27,7 @@ export const SalesDashboard: React.FC = () => {
         setDemos(demosData);
 
         const pendingInv = invoicesData.filter(
-          (inv) => inv.status === 'Partially Paid' || inv.status === 'Overdue'
+          (inv: any) => (inv.status || inv.paymentStatus) === 'Partially Paid' || (inv.status || inv.paymentStatus) === 'Overdue'
         ).length;
         setPendingInvoicesCount(pendingInv);
       } catch (err) {
@@ -41,22 +40,18 @@ export const SalesDashboard: React.FC = () => {
     fetchDashboardData();
   }, []);
 
-  // Compute live pipeline statistics
   const totalLeadsCount = leads.length;
   const contactedCount = leads.filter((l) => l.status === 'Contacted').length;
   const demoScheduledCount = leads.filter((l) => l.status === 'Demo Scheduled').length;
   const interestedCount = leads.filter((l) => l.status === 'Interested').length;
   const convertedCount = leads.filter((l) => l.status === 'Enrolled').length;
 
-  // Filter active follow-ups list
   const activeFollowUps = leads.filter(
     (l) => l.status === 'Interested' || l.status === 'Demo Scheduled'
   );
 
-  // Filter scheduled demos list
   const scheduledDemos = demos.filter((d) => d.status === 'Scheduled');
 
-  // Leads created today
   const todayStr = new Date()
     .toLocaleDateString('en-GB', {
       day: '2-digit',
@@ -70,21 +65,19 @@ export const SalesDashboard: React.FC = () => {
 
   return (
     <div className="font-['Onest'] text-[#050720] space-y-6 pb-16">
-      
-      {/* Top Header Row */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold font-['Sora']">Dashboard</h1>
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/sales/demos')}
-            className="flex items-center gap-2 px-4 py-2 border border-[#050720]/25 rounded-lg text-xs font-bold text-[#050720] bg-white hover:bg-[#050720]/5 transition-colors shadow-xs"
+            className="flex items-center gap-2 px-4 py-2 border border-[#050720]/25 rounded-lg text-xs font-bold text-[#050720] bg-white hover:bg-[#050720]/5 transition-colors shadow-xs cursor-pointer"
           >
             <Calendar className="w-3.5 h-3.5" />
             <span>Schedule Demo</span>
           </button>
           <button
             onClick={() => navigate('/sales/leads')}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+            className="flex items-center gap-1.5 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add new lead</span>
@@ -92,10 +85,7 @@ export const SalesDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Snapshot Cards Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Card 1: Sales Action Overview */}
         <div className="bg-white rounded-xl border border-[#050720]/10 p-5 shadow-xs relative overflow-hidden">
           <div className="absolute left-0 top-6 bottom-6 w-1 bg-[#FFB908] rounded-r" />
           <div className="pl-3">
@@ -116,7 +106,7 @@ export const SalesDashboard: React.FC = () => {
                 </span>
               </div>
               <div>
-                <span className="text-[10px] text-[#050720]/60 block font-medium">Today's Demos</span>
+                <span className="text-[10px] text-[#050720]/60 block font-medium">Today&apos;s Demos</span>
                 <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
                   {String(scheduledDemos.length).padStart(2, '0')}
                 </span>
@@ -131,7 +121,6 @@ export const SalesDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 2: Lead Pipeline Snapshot */}
         <div className="bg-white rounded-xl border border-[#050720]/10 p-5 shadow-xs relative overflow-hidden">
           <div className="absolute left-0 top-6 bottom-6 w-1 bg-[#FFB908] rounded-r" />
           <div className="pl-3">
@@ -172,16 +161,14 @@ export const SalesDashboard: React.FC = () => {
             </div>
           </div>
         </div>
-
       </div>
 
-      {/* Follow-ups Table Card */}
       <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-sm font-bold font-['Sora']">Follow-ups</h3>
           <button
             onClick={() => navigate('/sales/follow-up')}
-            className="text-xs font-bold text-[#0066FF] hover:underline"
+            className="text-xs font-bold text-[#0066FF] hover:underline cursor-pointer"
           >
             View all
           </button>
@@ -221,9 +208,8 @@ export const SalesDashboard: React.FC = () => {
                   <td className="py-3.5 text-[#050720]/70">{item.enquiryDate}</td>
                   <td className="py-3.5 text-[#050720]/70">{item.course}</td>
                   <td className="py-3.5">
-                    <span className={`font-semibold ${
-                      item.status === 'Interested' ? 'text-[#10B981]' : 'text-[#0066FF]'
-                    }`}>
+                    <span className={`font-semibold ${item.status === 'Interested' ? 'text-[#10B981]' : 'text-[#0066FF]'
+                      }`}>
                       {item.status}
                     </span>
                   </td>
@@ -232,7 +218,7 @@ export const SalesDashboard: React.FC = () => {
                   <td className="py-3.5 text-right">
                     <button
                       onClick={() => navigate(`/sales/leads?leadId=${item.id}`)}
-                      className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                      className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
                     >
                       View
                     </button>
@@ -244,13 +230,12 @@ export const SalesDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Scheduled Demos Table Card */}
       <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-sm font-bold font-['Sora']">Scheduled Demos</h3>
           <button
             onClick={() => navigate('/sales/demos')}
-            className="text-xs font-bold text-[#0066FF] hover:underline"
+            className="text-xs font-bold text-[#0066FF] hover:underline cursor-pointer"
           >
             View all
           </button>
@@ -293,7 +278,7 @@ export const SalesDashboard: React.FC = () => {
                   <td className="py-3.5 text-right">
                     <button
                       onClick={() => navigate('/sales/demos')}
-                      className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                      className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
                     >
                       View
                     </button>
@@ -304,7 +289,6 @@ export const SalesDashboard: React.FC = () => {
           </table>
         )}
       </div>
-
     </div>
   );
 };
