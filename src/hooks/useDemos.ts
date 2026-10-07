@@ -1,6 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { DemoSession } from '../types';
-import { demoService } from '../services/demoService';
+import { demoService, DemoItem } from '../services/demoService';
+
+export interface DemoSession {
+  id: string;
+  srNo: string;
+  name: string;
+  timeSlot: string;
+  demoDate: string;
+  course: string;
+  mode: 'Online' | 'Offline';
+  faculty: string;
+  status: 'Scheduled' | 'Completed' | 'Cancelled';
+}
 
 const MOCK_DEMOS: DemoSession[] = [
   {
@@ -65,7 +76,6 @@ export const useDemos = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [modeFilter, setModeFilter] = useState<string>('All');
 
@@ -73,9 +83,21 @@ export const useDemos = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await demoService.getAll();
+      const data = await demoService.getAllDemos();
       if (data && data.length > 0) {
-        setDemos(data);
+        setDemos(
+          data.map((d: DemoItem, idx: number) => ({
+            id: d.id,
+            srNo: String(idx + 1).padStart(2, '0'),
+            name: `${d.name} ${d.lastName || ''}`.trim(),
+            timeSlot: d.timeSlot,
+            demoDate: d.demoDate,
+            course: d.course,
+            mode: (d.mode === 'Offline' ? 'Offline' : 'Online') as 'Online' | 'Offline',
+            faculty: d.faculty,
+            status: (d.status || 'Scheduled') as any,
+          }))
+        );
       }
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Failed to fetch demos');
@@ -100,15 +122,25 @@ export const useDemos = () => {
     });
   }, [demos, statusFilter, modeFilter]);
 
-  // Schedule / Book Demo Mutation
   const scheduleDemo = async (
     demoData: Omit<DemoSession, 'id' | 'srNo'>
   ): Promise<DemoSession> => {
     setLoading(true);
     try {
-      const created = await demoService.create(demoData);
-      setDemos((prev) => [created, ...prev]);
-      return created;
+      const created = await demoService.scheduleDemo(demoData as any);
+      const formatted: DemoSession = {
+        id: created.id,
+        srNo: String(demos.length + 1).padStart(2, '0'),
+        name: created.name,
+        timeSlot: created.timeSlot,
+        demoDate: created.demoDate,
+        course: created.course,
+        mode: created.mode as 'Online' | 'Offline',
+        faculty: created.faculty,
+        status: created.status as any,
+      };
+      setDemos((prev) => [formatted, ...prev]);
+      return formatted;
     } catch {
       const fallbackDemo: DemoSession = {
         ...demoData,
@@ -122,12 +154,11 @@ export const useDemos = () => {
     }
   };
 
-  // Status Update Mutation (e.g., Scheduled -> Completed)
   const updateDemoStatus = async (id: string, status: DemoSession['status']) => {
     try {
-      await demoService.updateStatus(id, status);
+      await demoService.updateDemoStatus(id, status);
     } catch {
-      // Fallback local update
+      // local fallback
     } finally {
       setDemos((prev) =>
         prev.map((d) => (d.id === id ? { ...d, status } : d))

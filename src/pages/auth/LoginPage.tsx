@@ -4,13 +4,16 @@ import { useAuth } from '../../context/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const auth = useAuth() as any; // Prevents the type collision on 'login' vs 'signIn'
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
 
     // Verification workflow check (e.g. pending approval accounts)
     if (email.includes('pending') || email.includes('verify')) {
@@ -18,20 +21,45 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    // Call context login/signIn if implemented
-    if (typeof auth.login === 'function') {
-      await auth.login(email, password);
-    } else if (typeof auth.signIn === 'function') {
-      await auth.signIn(email, password);
-    }
+    setIsLoading(true);
 
-    // Role-based redirect routing
-    if (email.startsWith('admin') || email.includes('admin')) {
-      navigate('/admin');
-    } else if (email.startsWith('sales') || email.startsWith('sejal') || email.includes('sales')) {
-      navigate('/sales');
-    } else {
-      navigate('/faculty');
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Invalid email or password');
+      }
+
+      // Store real JWT token and User session
+      if (typeof login === 'function') {
+        login(data.token, data.user);
+      } else {
+        localStorage.setItem('crm_token', data.token);
+        localStorage.setItem('crm_user', JSON.stringify(data.user));
+      }
+
+      // Role-based destination based on verified DB user role
+      const userRole = (data.user?.role || '').toLowerCase();
+      if (userRole === 'admin') {
+        navigate('/admin', { replace: true });
+      } else if (userRole === 'faculty') {
+        navigate('/faculty/dashboard', { replace: true });
+      } else {
+        navigate('/sales', { replace: true });
+      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || 'Failed to authenticate. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -53,6 +81,13 @@ export const LoginPage: React.FC = () => {
         {/* Heading */}
         <h2 className="text-xl font-bold font-['Sora'] text-[#050720]">Login</h2>
 
+        {/* Error Alert */}
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg text-left">
+            {error}
+          </div>
+        )}
+
         {/* Credentials Form */}
         <form onSubmit={handleLogin} className="space-y-4 text-left">
           {/* Email input */}
@@ -61,11 +96,12 @@ export const LoginPage: React.FC = () => {
               Email
             </label>
             <input
-              type="text"
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-white pt-5 pb-2 px-3.5 rounded-lg border border-[#050720]/15 text-xs text-[#050720] font-medium focus:outline-none focus:border-[#FFB908]"
               placeholder="name@radiquolab.com"
+              autoComplete="username"
               required
             />
           </div>
@@ -81,6 +117,7 @@ export const LoginPage: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-white pt-5 pb-2 px-3.5 rounded-lg border border-[#050720]/15 text-xs text-[#050720] font-medium tracking-widest focus:outline-none focus:border-[#FFB908]"
               placeholder="••••••••"
+              autoComplete="current-password"
               required
             />
           </div>
@@ -88,9 +125,10 @@ export const LoginPage: React.FC = () => {
           {/* Submit Action */}
           <button
             type="submit"
-            className="w-full py-3 bg-[#FFB908] hover:bg-[#E5A607] text-[#050720] rounded-lg text-xs font-bold font-['Sora'] transition-colors shadow-xs"
+            disabled={isLoading}
+            className="w-full py-3 bg-[#FFB908] hover:bg-[#E5A607] disabled:opacity-50 text-[#050720] rounded-lg text-xs font-bold font-['Sora'] transition-colors shadow-xs cursor-pointer"
           >
-            Login
+            {isLoading ? 'Signing in...' : 'Login'}
           </button>
         </form>
       </div>
@@ -110,7 +148,7 @@ export const LoginPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowVerificationModal(false)}
-                className="w-full py-3 bg-[#FFB908] hover:bg-[#E5A607] text-[#050720] rounded-lg text-xs font-bold font-['Sora'] transition-colors"
+                className="w-full py-3 bg-[#FFB908] hover:bg-[#E5A607] text-[#050720] rounded-lg text-xs font-bold font-['Sora'] transition-colors cursor-pointer"
               >
                 Back to login
               </button>

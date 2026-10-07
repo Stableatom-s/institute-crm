@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { batchService, BatchItem } from '../../services/batchService';
 

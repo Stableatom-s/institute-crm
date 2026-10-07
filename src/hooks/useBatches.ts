@@ -1,6 +1,18 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Batch } from '../types';
 import { batchService } from '../services/batchService';
+
+export interface Batch {
+  id: string;
+  srNo: string;
+  batchCode: string;
+  startDate: string;
+  course: string;
+  faculty: string;
+  studentCount: number;
+  phase?: string;
+  students?: any[];
+  lectures?: any[];
+}
 
 const MOCK_BATCHES: Batch[] = [
   {
@@ -65,9 +77,22 @@ export const useBatches = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await batchService.getAll();
+      const data = await batchService.getAllBatches();
       if (data && data.length > 0) {
-        setBatches(data);
+        setBatches(
+          data.map((b: any, idx: number) => ({
+            id: b.id || b._id,
+            srNo: String(idx + 1).padStart(2, '0'),
+            batchCode: b.batchCode || b.batch,
+            startDate: b.startDate,
+            course: b.course,
+            faculty: b.faculty,
+            studentCount: b.students?.length || Number(b.studentCount) || 0,
+            phase: b.phase || 'Module 1',
+            students: b.students || [],
+            lectures: b.lectures || [],
+          }))
+        );
       }
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Failed to fetch batches');
@@ -87,11 +112,16 @@ export const useBatches = () => {
     );
   }, [batches, courseFilter]);
 
-  // Create batch mutation
   const createBatch = async (batchData: Omit<Batch, 'id' | 'srNo'>): Promise<Batch> => {
     setLoading(true);
     try {
-      const newBatch = await batchService.create(batchData);
+      const created: any = await batchService.createBatch(batchData as any);
+      const newBatch: Batch = {
+        ...created,
+        id: created.id || created._id,
+        srNo: String(batches.length + 1).padStart(2, '0'),
+        studentCount: created.students?.length || 0,
+      };
       setBatches((prev) => [newBatch, ...prev]);
       return newBatch;
     } catch {
@@ -107,7 +137,6 @@ export const useBatches = () => {
     }
   };
 
-  // Adjust student enrollment count
   const incrementStudentCount = (batchId: string) => {
     setBatches((prev) =>
       prev.map((b) =>

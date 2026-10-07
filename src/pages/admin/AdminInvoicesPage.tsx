@@ -5,8 +5,7 @@ import {
   ChevronRight, 
   ChevronDown,
   Search,
-  CheckCircle2,
-  Download
+  CheckCircle2
 } from 'lucide-react';
 import { financeService, InvoiceItem as ServiceInvoiceItem } from '../../services/financeService';
 import { leadService } from '../../services/leadService';

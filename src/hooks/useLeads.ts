@@ -1,6 +1,27 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Lead } from '../types';
 import { leadService } from '../services/leadService';
+
+export type LeadStatus =
+  | 'New'
+  | 'Contacted'
+  | 'Interested'
+  | 'Demo Scheduled'
+  | 'Not Interested'
+  | 'Enrolled';
+
+export interface Lead {
+  id: string;
+  srNo: string;
+  name: string;
+  contactNo: string;
+  email?: string;
+  enquiryDate: string;
+  course: string;
+  status: LeadStatus;
+  followUpDate?: string;
+  remark?: string;
+  history?: Array<{ date: string; remark: string; by: string }>;
+}
 
 const MOCK_LEADS: Lead[] = [
   {
@@ -74,22 +95,33 @@ export const useLeads = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [courseFilter, setCourseFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Fetch leads from backend API, fallback to mock data on error/offline
   const fetchLeads = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await leadService.getAll();
+      const data = await leadService.getAllLeads();
       if (data && data.length > 0) {
-        setLeads(data);
+        setLeads(
+          data.map((l: any, idx: number) => ({
+            id: l.id || l._id,
+            srNo: String(idx + 1).padStart(2, '0'),
+            name: `${l.firstName || ''} ${l.lastName || ''}`.trim() || l.name || 'Lead',
+            contactNo: l.contactNo || l.mobile || '',
+            email: l.email,
+            enquiryDate: l.enquiryDate || l.date || 'Today',
+            course: l.course || 'UI/UX Design',
+            status: (l.status || 'New') as LeadStatus,
+            followUpDate: l.followUpDate || l.followUp,
+            remark: l.remark || '',
+            history: l.history || [],
+          }))
+        );
       }
     } catch (err: any) {
-      // Keep mock data if server is offline during development
       setError(err?.response?.data?.message || err?.message || 'Failed to fetch leads');
     } finally {
       setLoading(false);
@@ -100,7 +132,6 @@ export const useLeads = () => {
     fetchLeads();
   }, [fetchLeads]);
 
-  // Filtered Leads derived state
   const filteredLeads = useMemo(() => {
     return leads.filter((lead) => {
       const matchesStatus =
@@ -121,18 +152,27 @@ export const useLeads = () => {
     });
   }, [leads, statusFilter, courseFilter, searchQuery]);
 
-  // Create lead mutation
   const createLead = async (
     leadData: Omit<Lead, 'id' | 'srNo'>
   ): Promise<Lead> => {
     setLoading(true);
     setError(null);
     try {
-      const created = await leadService.create(leadData);
-      setLeads((prev) => [created, ...prev]);
-      return created;
+      const names = leadData.name.split(' ');
+      const payload = {
+        ...leadData,
+        firstName: names[0] || 'Lead',
+        lastName: names.slice(1).join(' ') || '',
+      };
+      const created: any = await leadService.createLead(payload as any);
+      const newLead: Lead = {
+        ...leadData,
+        id: created.id || created._id,
+        srNo: String(leads.length + 1).padStart(2, '0'),
+      };
+      setLeads((prev) => [newLead, ...prev]);
+      return newLead;
     } catch (err: any) {
-      // Local fallback creation
       const localCreated: Lead = {
         ...leadData,
         id: `lead-${Date.now()}`,
@@ -145,16 +185,19 @@ export const useLeads = () => {
     }
   };
 
-  // Update lead status mutation
   const updateLeadStatus = async (
     id: string,
-    status: Lead['status'],
+    status: LeadStatus,
     remark?: string
   ) => {
     try {
-      await leadService.updateStatus(id, status, remark);
+      if (typeof (leadService as any).updateLeadStatus === 'function') {
+        await (leadService as any).updateLeadStatus(id, status, remark);
+      } else if (typeof (leadService as any).updateLead === 'function') {
+        await (leadService as any).updateLead(id, { status, remark });
+      }
     } catch {
-      // Local state fallback if backend endpoint isn't ready
+      // local fallback
     } finally {
       setLeads((prev) =>
         prev.map((lead) =>
