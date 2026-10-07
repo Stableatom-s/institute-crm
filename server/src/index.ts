@@ -9,6 +9,7 @@ import { Batch } from './models/Batch';
 import { invoiceRoutes } from './routes/invoices';
 import { attendanceRoutes } from './routes/attendance';
 import leaveRoutes from './routes/leaves';
+import teamRoutes from './routes/team';
 dotenv.config();
 
 const app = express();
@@ -36,6 +37,7 @@ app.use('/api/batches', batchRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leaves', leaveRoutes);
+app.use('/api/team', teamRoutes);
 app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
   ChevronLeft, 
@@ -7,6 +7,7 @@ import {
   Plus, 
   Check 
 } from 'lucide-react';
+import { teamService } from '../../services/teamService';
 
 // --- TYPES ---
 export type MemberTab = 'Active' | 'Inactive';
@@ -45,112 +46,6 @@ export interface TeamMember {
   leaveHistory: LeaveHistoryItem[];
 }
 
-// --- SEED DATA MATCHING FIGMA ---
-const INITIAL_MEMBERS: TeamMember[] = [
-  {
-    id: 'tm-1',
-    srNo: '01',
-    firstName: 'Poorva',
-    lastName: 'Pande',
-    name: 'Poorva Pande',
-    role: 'Faculty',
-    mobile: '9078675645',
-    altMobile: '9875898412',
-    email: 'poorva@gmail.com',
-    address: 'Pune',
-    education: 'B.arch',
-    course: 'UI/UX Design',
-    assignedBatches: ['MWF-JAN-2026', 'Weekend-FEB-2026'],
-    status: 'Active',
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-    workHistory: {
-      companyName: 'Abc Pvt ltd',
-      jobTitle: 'Jr. Architect',
-      experienceYears: '01 years',
-    },
-    leaveHistory: [
-      { id: 'lh-1', leaveType: 'Sick', leaveDate: '21-12-2025', reason: 'Flu Recovery', applicationDate: '20-12-2025', status: 'Approved' },
-      { id: 'lh-2', leaveType: 'Casual', leaveDate: '05-11-2025', reason: 'Personal', applicationDate: '01-11-2025', status: 'Rejected' },
-      { id: 'lh-3', leaveType: 'Sick', leaveDate: '21-09-2025', reason: 'Flu Recovery', applicationDate: '20-09-2025', status: 'Approved' },
-      { id: 'lh-4', leaveType: 'Vacation', leaveDate: '25-02-2025', reason: 'Personal', applicationDate: '20-02-2025', status: 'Approved' },
-    ],
-  },
-  {
-    id: 'tm-2',
-    srNo: '02',
-    firstName: 'Neeraj',
-    lastName: 'Joshi',
-    name: 'Neeraj Joshi',
-    role: 'Faculty',
-    mobile: '9078123840',
-    altMobile: '9875898412',
-    email: 'neeraj@radiquolab.com',
-    address: 'Pune',
-    education: 'B.Tech CS',
-    course: 'Full Stack',
-    assignedBatches: ['MWF-JAN-2026'],
-    status: 'Active',
-    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
-    workHistory: {
-      companyName: 'Tech Innovators',
-      jobTitle: 'Full Stack Engineer',
-      experienceYears: '03 years',
-    },
-    leaveHistory: [
-      { id: 'lh-5', leaveType: 'Casual', leaveDate: '15-10-2025', reason: 'Family Event', applicationDate: '10-10-2025', status: 'Approved' }
-    ],
-  },
-  {
-    id: 'tm-3',
-    srNo: '03',
-    firstName: 'Sejal',
-    lastName: 'Singh',
-    name: 'Sejal Singh',
-    role: 'Sales',
-    mobile: '9123487752',
-    altMobile: '9875898412',
-    email: 'sejal@radiquolab.com',
-    address: 'Pune',
-    education: 'MBA Marketing',
-    course: 'UI/UX Design',
-    assignedBatches: [],
-    status: 'Active',
-    photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80',
-    workHistory: {
-      companyName: 'Edutech Global',
-      jobTitle: 'Sales Executive',
-      experienceYears: '02 years',
-    },
-    leaveHistory: [
-      { id: 'lh-6', leaveType: 'Sick', leaveDate: '12-02-2026', reason: 'Doctor Rest', applicationDate: '10-02-2026', status: 'Approved' }
-    ],
-  },
-  {
-    id: 'tm-4',
-    srNo: '01',
-    firstName: 'Sayali',
-    lastName: 'More',
-    name: 'Sayali More',
-    role: 'Faculty',
-    mobile: '9078675645',
-    altMobile: '9875898412',
-    email: 'sayali@gmail.com',
-    address: 'Pune',
-    education: 'B.arch',
-    course: 'UI/UX Design',
-    assignedBatches: ['MWF-JAN-2026', 'Weekend-FEB-2026'],
-    activeTill: '20-04-2025',
-    status: 'Inactive',
-    photoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80',
-    workHistory: {
-      companyName: 'Abc Pvt ltd',
-      jobTitle: 'Jr. Architect',
-      experienceYears: '01 years',
-    },
-    leaveHistory: [],
-  },
-];
-
 const AVAILABLE_COURSES = [
   'UI/UX Design',
   'No code',
@@ -167,8 +62,8 @@ export const AdminTeamPage: React.FC = () => {
   >('roster');
 
   const [activeTab, setActiveTab] = useState<MemberTab>('Active');
-  const [members, setMembers] = useState<TeamMember[]>(INITIAL_MEMBERS);
-  const [selectedMember, setSelectedMember] = useState<TeamMember>(INITIAL_MEMBERS[0]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
 
   // Edit / Add state tracking
   const [isDirty, setIsDirty] = useState(false);
@@ -194,7 +89,7 @@ export const AdminTeamPage: React.FC = () => {
   const [addLastName, setAddLastName] = useState('');
   const [addMobile, setAddMobile] = useState('');
   const [addAltMobile, setAddAltMobile] = useState('');
-  const [addEmail, setAddEmail] = useState('poorva@gmail.com');
+  const [addEmail, setAddEmail] = useState('');
   const [addAddress, setAddAddress] = useState('');
   const [addEducation, setAddEducation] = useState('');
   const [addRole, setAddRole] = useState<'Faculty' | 'Sales'>('Faculty');
@@ -202,7 +97,7 @@ export const AdminTeamPage: React.FC = () => {
   const [addJobTitle, setAddJobTitle] = useState('');
   const [addExperience, setAddExperience] = useState('');
   const [addCourses, setAddCourses] = useState<string[]>(['UI/UX Design']);
-  const [addPassword, setAddPassword] = useState('password123');
+  const [addPassword, setAddPassword] = useState('');
 
   // Modals & Feedback popups
   const [showRestoreModal, setShowRestoreModal] = useState(false);
@@ -212,6 +107,26 @@ export const AdminTeamPage: React.FC = () => {
   const [showUserRemovedAlert, setShowUserRemovedAlert] = useState(false);
   const [showSendCredentialsModal, setShowSendCredentialsModal] = useState(false);
   const [showCredentialsSentAlert, setShowCredentialsSentAlert] = useState(false);
+
+  // Load backend members on mount
+  const loadMembers = async () => {
+    try {
+      const live = await teamService.getAllMembers();
+      if (live && live.length > 0) {
+        setMembers(live);
+        if (!selectedMember) setSelectedMember(live[0]);
+      } else {
+        setMembers([]);
+        setSelectedMember(null);
+      }
+    } catch (err) {
+      console.error('Failed to load team members:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadMembers();
+  }, []);
 
   // Active / Inactive filter count
   const activeCount = members.filter((m) => m.status === 'Active').length;
@@ -230,26 +145,27 @@ export const AdminTeamPage: React.FC = () => {
     setEditFirstName(m.firstName);
     setEditLastName(m.lastName);
     setEditMobile(m.mobile);
-    setEditAltMobile(m.altMobile || '9875898412');
+    setEditAltMobile(m.altMobile || '');
     setEditEmail(m.email);
     setEditAddress(m.address);
     setEditEducation(m.education);
     setEditRole(m.role === 'Sales' ? 'Sales' : 'Faculty');
-    setEditCompany(m.workHistory.companyName);
-    setEditJobTitle(m.workHistory.jobTitle);
-    setEditExperience(m.workHistory.experienceYears);
+    setEditCompany(m.workHistory?.companyName || '');
+    setEditJobTitle(m.workHistory?.jobTitle || '');
+    setEditExperience(m.workHistory?.experienceYears || '');
     setEditCourses([m.course]);
     setIsDirty(false);
     setView('edit-member');
   };
 
   // Save changes from Edit Member
-  const handleSaveEditChanges = () => {
+  const handleSaveEditChanges = async () => {
+    if (!selectedMember) return;
     const updated: TeamMember = {
       ...selectedMember,
       firstName: editFirstName,
       lastName: editLastName,
-      name: `${editFirstName} ${editLastName}`,
+      name: `${editFirstName} ${editLastName}`.trim(),
       mobile: editMobile,
       altMobile: editAltMobile,
       email: editEmail,
@@ -264,6 +180,14 @@ export const AdminTeamPage: React.FC = () => {
       },
     };
 
+    try {
+      if (selectedMember.id && selectedMember.id.length > 10) {
+        await teamService.updateMember(selectedMember.id, updated);
+      }
+    } catch (err) {
+      console.error('Failed to update member in database:', err);
+    }
+
     setMembers(members.map((m) => (m.id === updated.id ? updated : m)));
     setSelectedMember(updated);
     setIsDirty(false);
@@ -271,7 +195,16 @@ export const AdminTeamPage: React.FC = () => {
   };
 
   // Confirm Restore Access for Inactive member
-  const handleConfirmRestore = () => {
+  const handleConfirmRestore = async () => {
+    if (!selectedMember) return;
+    try {
+      if (selectedMember.id && selectedMember.id.length > 10) {
+        await teamService.updateStatus(selectedMember.id, 'Active');
+      }
+    } catch (err) {
+      console.error('Failed to restore member:', err);
+    }
+
     const restored: TeamMember = {
       ...selectedMember,
       status: 'Active',
@@ -289,11 +222,21 @@ export const AdminTeamPage: React.FC = () => {
   };
 
   // Confirm Remove User
-  const handleConfirmRemoveUser = () => {
+  const handleConfirmRemoveUser = async () => {
+    if (!selectedMember) return;
+    const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
+    try {
+      if (selectedMember.id && selectedMember.id.length > 10) {
+        await teamService.updateStatus(selectedMember.id, 'Inactive', todayStr);
+      }
+    } catch (err) {
+      console.error('Failed to deactivate member:', err);
+    }
+
     const deactivated: TeamMember = {
       ...selectedMember,
       status: 'Inactive',
-      activeTill: '20-09-2026',
+      activeTill: todayStr,
     };
     setMembers(members.map((m) => (m.id === selectedMember.id ? deactivated : m)));
     setSelectedMember(deactivated);
@@ -307,32 +250,43 @@ export const AdminTeamPage: React.FC = () => {
   };
 
   // Save & Dispatch Credentials in Add Member Multi-Step
-  const handleConfirmSendCredentials = () => {
-    const newMember: TeamMember = {
-      id: `tm-${Date.now()}`,
-      srNo: String(members.filter((m) => m.status === 'Active').length + 1).padStart(2, '0'),
-      firstName: addFirstName || 'Poorva',
-      lastName: addLastName || 'Pande',
-      name: `${addFirstName || 'Poorva'} ${addLastName || 'Pande'}`,
+  const handleConfirmSendCredentials = async () => {
+    const payload: any = {
+      firstName: addFirstName,
+      lastName: addLastName,
+      name: `${addFirstName} ${addLastName}`.trim(),
       role: addRole,
-      mobile: addMobile || '9078675645',
-      altMobile: addAltMobile || '9875898412',
-      email: addEmail || 'poorva@gmail.com',
-      address: addAddress || 'Pune',
-      education: addEducation || 'B.arch',
+      mobile: addMobile,
+      altMobile: addAltMobile,
+      email: addEmail,
+      address: addAddress,
+      education: addEducation,
       course: addCourses[0] || 'UI/UX Design',
       assignedBatches: ['MWF-JAN-2026', 'Weekend-FEB-2026'],
       status: 'Active',
       photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
       workHistory: {
-        companyName: addCompany || 'Abc Pvt ltd',
-        jobTitle: addJobTitle || 'Jr. Architect',
-        experienceYears: addExperience || '01 years',
+        companyName: addCompany,
+        jobTitle: addJobTitle,
+        experienceYears: addExperience,
       },
       leaveHistory: [],
+      password: addPassword || 'password123',
     };
 
-    setMembers([newMember, ...members]);
+    try {
+      const created = await teamService.createMember(payload);
+      setMembers([created, ...members]);
+    } catch (err) {
+      console.error('Failed to save team member to database:', err);
+      const fallbackMember: TeamMember = {
+        ...payload,
+        id: `tm-${Date.now()}`,
+        srNo: String(members.filter((m) => m.status === 'Active').length + 1).padStart(2, '0'),
+      };
+      setMembers([fallbackMember, ...members]);
+    }
+
     setShowSendCredentialsModal(false);
     setShowCredentialsSentAlert(true);
     setTimeout(() => {
@@ -354,33 +308,34 @@ export const AdminTeamPage: React.FC = () => {
             <h1 className="text-2xl font-bold font-['Sora']">Team Members</h1>
             <button
               onClick={() => {
-                setAddFirstName('Poorva');
-                setAddLastName('Pande');
-                setAddMobile('9078675645');
-                setAddAltMobile('9875898412');
-                setAddEmail('poorva@gmail.com');
-                setAddAddress('Pune');
-                setAddEducation('B.arch');
+                setAddFirstName('');
+                setAddLastName('');
+                setAddMobile('');
+                setAddAltMobile('');
+                setAddEmail('');
+                setAddAddress('');
+                setAddEducation('');
                 setAddRole('Faculty');
-                setAddCompany('Abc Pvt ltd');
-                setAddJobTitle('Jr. Architect');
-                setAddExperience('01 years');
+                setAddCompany('');
+                setAddJobTitle('');
+                setAddExperience('');
                 setAddCourses(['UI/UX Design']);
+                setAddPassword('');
                 setIsDirty(false);
                 setView('add-details');
               }}
-              className="px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               Add new member
             </button>
           </div>
 
-          {/* Metric Overview Cards (Figma Screenshot 1) */}
+          {/* Metric Overview Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-white p-6 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Active Members</span>
               <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
-                {activeCount > 3 ? `${activeCount}` : '3+'}
+                {String(activeCount).padStart(2, '0')}
               </span>
             </div>
             <div className="bg-white p-6 rounded-xl border border-[#050720]/10 text-center shadow-xs">
@@ -398,7 +353,7 @@ export const AdminTeamPage: React.FC = () => {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`text-sm font-semibold transition-all relative pb-2 ${
+                  className={`text-sm font-semibold transition-all relative pb-2 cursor-pointer ${
                     activeTab === tab
                       ? 'text-[#050720] font-bold'
                       : 'text-[#050720]/50 hover:text-[#050720]'
@@ -426,24 +381,32 @@ export const AdminTeamPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {currentList.map((m) => (
-                  <tr key={m.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                    <td className="py-3.5 text-[#050720]/70">{m.srNo}</td>
-                    <td className="py-3.5 font-medium">{m.name}</td>
-                    <td className="py-3.5 text-[#050720]/70">{m.role}</td>
-                    <td className="py-3.5 text-[#050720]/70">{m.mobile}</td>
-                    <td className="py-3.5 text-[#050720]/70">{m.email}</td>
-                    <td className="py-3.5 text-[#050720]/70">{m.course}</td>
-                    <td className="py-3.5 text-right">
-                      <button
-                        onClick={() => handleOpenMember(m)}
-                        className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
-                      >
-                        View
-                      </button>
+                {currentList.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-xs text-[#050720]/40 italic">
+                      No {activeTab.toLowerCase()} team members found. Click &quot;Add new member&quot; to create one.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  currentList.map((m) => (
+                    <tr key={m.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5 text-[#050720]/70">{m.srNo}</td>
+                      <td className="py-3.5 font-medium">{m.name}</td>
+                      <td className="py-3.5 text-[#050720]/70">{m.role}</td>
+                      <td className="py-3.5 text-[#050720]/70">{m.mobile}</td>
+                      <td className="py-3.5 text-[#050720]/70">{m.email}</td>
+                      <td className="py-3.5 text-[#050720]/70">{m.course}</td>
+                      <td className="py-3.5 text-right">
+                        <button
+                          onClick={() => handleOpenMember(m)}
+                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
 
@@ -456,9 +419,9 @@ export const AdminTeamPage: React.FC = () => {
                 className="w-8 h-7 text-center border border-[#050720]/20 rounded text-xs text-[#050720] font-semibold"
               />
               <div className="flex items-center gap-1.5 ml-2">
-                <button className="p-1 hover:text-[#050720]"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" /></button>
                 <span className="text-[11px] font-semibold text-[#050720]">01 of 10</span>
-                <button className="p-1 hover:text-[#050720]"><ChevronRight className="w-3.5 h-3.5" /></button>
+                <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronRight className="w-3.5 h-3.5" /></button>
               </div>
             </div>
           </div>
@@ -473,7 +436,7 @@ export const AdminTeamPage: React.FC = () => {
           <div className="flex justify-between items-center">
             <button
               onClick={() => setView('roster')}
-              className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
             >
               <ArrowLeft className="w-6 h-6 text-[#050720]" />
               <span>Team Members</span>
@@ -482,14 +445,14 @@ export const AdminTeamPage: React.FC = () => {
             {selectedMember.status === 'Active' ? (
               <button
                 onClick={() => handleStartEdit(selectedMember)}
-                className="px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 Edit member
               </button>
             ) : (
               <button
                 onClick={() => setShowRestoreModal(true)}
-                className="px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 Restore Access
               </button>
@@ -590,26 +553,26 @@ export const AdminTeamPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Company Name</span>
-                <span className="font-semibold text-sm">{selectedMember.workHistory.companyName}</span>
+                <span className="font-semibold text-sm">{selectedMember.workHistory?.companyName || '-'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Job Title</span>
-                <span className="font-semibold text-sm">{selectedMember.workHistory.jobTitle}</span>
+                <span className="font-semibold text-sm">{selectedMember.workHistory?.jobTitle || '-'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Work experience</span>
-                <span className="font-semibold text-sm">{selectedMember.workHistory.experienceYears}</span>
+                <span className="font-semibold text-sm">{selectedMember.workHistory?.experienceYears || '-'}</span>
               </div>
             </div>
           </div>
 
-          {/* Leave History Card (Visible if Active) */}
+          {/* Leave History Card */}
           {selectedMember.status === 'Active' && (
             <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-sm font-bold font-['Sora']">Leave Record History</h3>
                 <div className="w-28 relative">
-                  <select className="w-full bg-[#F8FAFC] text-xs px-2.5 py-1.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none">
+                  <select className="w-full bg-[#F8FAFC] text-xs px-2.5 py-1.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer">
                     <option>Leave Type</option>
                     <option>Sick</option>
                     <option>Casual</option>
@@ -618,45 +581,51 @@ export const AdminTeamPage: React.FC = () => {
                 </div>
               </div>
 
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
-                    <th className="pb-3.5 font-semibold">Leave Type</th>
-                    <th className="pb-3.5 font-semibold">Leave Date</th>
-                    <th className="pb-3.5 font-semibold">Reason</th>
-                    <th className="pb-3.5 font-semibold">Application Date</th>
-                    <th className="pb-3.5 text-right font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                  {selectedMember.leaveHistory.map((l) => (
-                    <tr key={l.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                      <td className="py-3.5 font-medium">{l.leaveType}</td>
-                      <td className="py-3.5 text-[#050720]/80">{l.leaveDate}</td>
-                      <td className="py-3.5 text-[#050720]/80">{l.reason}</td>
-                      <td className="py-3.5 text-[#050720]/80">{l.applicationDate}</td>
-                      <td className="py-3.5 text-right">
-                        <span
-                          className={`font-semibold ${
-                            l.status === 'Approved'
-                              ? 'text-[#10B981]'
-                              : l.status === 'Rejected'
-                              ? 'text-[#EF4444]'
-                              : 'text-[#FFB908]'
-                          }`}
-                        >
-                          {l.status}
-                        </span>
-                      </td>
+              {selectedMember.leaveHistory && selectedMember.leaveHistory.length > 0 ? (
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
+                      <th className="pb-3.5 font-semibold">Leave Type</th>
+                      <th className="pb-3.5 font-semibold">Leave Date</th>
+                      <th className="pb-3.5 font-semibold">Reason</th>
+                      <th className="pb-3.5 font-semibold">Application Date</th>
+                      <th className="pb-3.5 text-right font-semibold">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                    {selectedMember.leaveHistory.map((l) => (
+                      <tr key={l.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                        <td className="py-3.5 font-medium">{l.leaveType}</td>
+                        <td className="py-3.5 text-[#050720]/80">{l.leaveDate}</td>
+                        <td className="py-3.5 text-[#050720]/80">{l.reason}</td>
+                        <td className="py-3.5 text-[#050720]/80">{l.applicationDate}</td>
+                        <td className="py-3.5 text-right">
+                          <span
+                            className={`font-semibold ${
+                              l.status === 'Approved'
+                                ? 'text-[#10B981]'
+                                : l.status === 'Rejected'
+                                ? 'text-[#EF4444]'
+                                : 'text-[#FFB908]'
+                            }`}
+                          >
+                            {l.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="py-4 text-center text-xs text-[#050720]/40 italic">
+                  No leave records found for this team member.
+                </div>
+              )}
 
               <div className="flex items-center justify-center gap-3 pt-4 text-xs text-[#050720]/70">
-                <button className="p-1 hover:text-[#050720]"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" /></button>
                 <span className="text-[11px] font-semibold text-[#050720]">01 of 10</span>
-                <button className="p-1 hover:text-[#050720]"><ChevronRight className="w-3.5 h-3.5" /></button>
+                <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronRight className="w-3.5 h-3.5" /></button>
               </div>
             </div>
           )}
@@ -664,7 +633,7 @@ export const AdminTeamPage: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 3. EDIT MEMBER VIEW (FIGMA SCREENSHOT 5)                  */}
+      {/* 3. EDIT MEMBER VIEW                                       */}
       {/* ========================================================= */}
       {view === 'edit-member' && (
         <div className="space-y-6 max-w-5xl">
@@ -677,7 +646,7 @@ export const AdminTeamPage: React.FC = () => {
                 setView('view-member');
               }
             }}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Edit Member</span>
@@ -689,8 +658,8 @@ export const AdminTeamPage: React.FC = () => {
 
             <div className="w-20 h-24 rounded-lg overflow-hidden border border-[#050720]/15 bg-slate-100">
               <img
-                src={selectedMember.photoUrl}
-                alt={selectedMember.name}
+                src={selectedMember?.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'}
+                alt={selectedMember?.name || 'Member'}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -851,13 +820,13 @@ export const AdminTeamPage: React.FC = () => {
           <div className="flex gap-4">
             <button
               onClick={() => setShowRemoveUserModal(true)}
-              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
             >
               Remove User
             </button>
             <button
               onClick={handleSaveEditChanges}
-              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               Save Changes
             </button>
@@ -866,7 +835,7 @@ export const AdminTeamPage: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 4. ADD MEMBER - STEP 1: PERSONAL DETAILS (FIGMA 10)       */}
+      {/* 4. ADD MEMBER - STEP 1: PERSONAL DETAILS                  */}
       {/* ========================================================= */}
       {view === 'add-details' && (
         <div className="space-y-6 max-w-5xl">
@@ -879,7 +848,7 @@ export const AdminTeamPage: React.FC = () => {
                 setView('roster');
               }
             }}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Add Member</span>
@@ -1056,13 +1025,13 @@ export const AdminTeamPage: React.FC = () => {
           <div className="flex gap-4">
             <button
               onClick={() => setView('roster')}
-              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={() => setView('add-credentials')}
-              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               Save & Next
             </button>
@@ -1071,13 +1040,13 @@ export const AdminTeamPage: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 5. ADD MEMBER - STEP 2: SET CREDENTIALS (FIGMA 11 & 12)  */}
+      {/* 5. ADD MEMBER - STEP 2: SET CREDENTIALS                   */}
       {/* ========================================================= */}
       {view === 'add-credentials' && (
         <div className="space-y-6 max-w-4xl">
           <button
             onClick={() => setView('add-details')}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Add Member</span>
@@ -1111,13 +1080,13 @@ export const AdminTeamPage: React.FC = () => {
             <div className="flex gap-4 pt-4">
               <button
                 onClick={() => setView('add-preview')}
-                className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
               >
                 Preview
               </button>
               <button
                 onClick={() => setShowSendCredentialsModal(true)}
-                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 Save & Send
               </button>
@@ -1127,13 +1096,13 @@ export const AdminTeamPage: React.FC = () => {
       )}
 
       {/* ========================================================= */}
-      {/* 6. ADD MEMBER - STEP 3: PREVIEW (FIGMA 13)               */}
+      {/* 6. ADD MEMBER - STEP 3: PREVIEW                          */}
       {/* ========================================================= */}
       {view === 'add-preview' && (
         <div className="space-y-6 max-w-5xl">
           <button
             onClick={() => setView('add-credentials')}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Add Member</span>
@@ -1153,31 +1122,31 @@ export const AdminTeamPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">First Name*</span>
-                <span className="font-semibold text-sm">{addFirstName || 'Poorva'}</span>
+                <span className="font-semibold text-sm">{addFirstName || '-'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Last Name*</span>
-                <span className="font-semibold text-sm">{addLastName || 'Pande'}</span>
+                <span className="font-semibold text-sm">{addLastName || '-'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Mobile*</span>
-                <span className="font-semibold text-sm">{addMobile || '9078675645'}</span>
+                <span className="font-semibold text-sm">{addMobile || '-'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Alternative Mobile*</span>
-                <span className="font-semibold text-sm">{addAltMobile || '9875898412'}</span>
+                <span className="font-semibold text-sm">{addAltMobile || '-'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Email*</span>
-                <span className="font-semibold text-sm">{addEmail || 'poorva@gmail.com'}</span>
+                <span className="font-semibold text-sm">{addEmail || '-'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Address*</span>
-                <span className="font-semibold text-sm">{addAddress || 'Pune'}</span>
+                <span className="font-semibold text-sm">{addAddress || '-'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Education*</span>
-                <span className="font-semibold text-sm">{addEducation || 'B.arch'}</span>
+                <span className="font-semibold text-sm">{addEducation || '-'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Role</span>
@@ -1214,22 +1183,22 @@ export const AdminTeamPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Company Name</span>
-                <span className="font-semibold text-sm">{addCompany || 'Abc Pvt ltd'}</span>
+                <span className="font-semibold text-sm">{addCompany || '-'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Job Title</span>
-                <span className="font-semibold text-sm">{addJobTitle || 'Jr. Architect'}</span>
+                <span className="font-semibold text-sm">{addJobTitle || '-'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Work experience</span>
-                <span className="font-semibold text-sm">{addExperience || '01 years'}</span>
+                <span className="font-semibold text-sm">{addExperience || '-'}</span>
               </div>
             </div>
           </div>
 
           <button
             onClick={() => setShowSendCredentialsModal(true)}
-            className="w-full py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+            className="w-full py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
           >
             Save & Send
           </button>
@@ -1240,7 +1209,7 @@ export const AdminTeamPage: React.FC = () => {
       {/* 7. MODALS & POPUPS                                        */}
       {/* ========================================================= */}
 
-      {/* A. UNSAVED CHANGES WARNING MODAL (FIGMA 6, 7, 9, 14) */}
+      {/* A. UNSAVED CHANGES WARNING MODAL */}
       {showUnsavedModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -1255,7 +1224,7 @@ export const AdminTeamPage: React.FC = () => {
                   setIsDirty(false);
                   setView(nextDestinationView);
                 }}
-                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
               >
                 Discard Changes
               </button>
@@ -1269,7 +1238,7 @@ export const AdminTeamPage: React.FC = () => {
                     setView('add-credentials');
                   }
                 }}
-                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 Save Changes
               </button>
@@ -1278,7 +1247,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* B. RESTORE ACCESS CONFIRMATION MODAL (FIGMA 8) */}
+      {/* B. RESTORE ACCESS CONFIRMATION MODAL */}
       {showRestoreModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -1289,13 +1258,13 @@ export const AdminTeamPage: React.FC = () => {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setShowRestoreModal(false)}
-                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
               >
                 Discard Changes
               </button>
               <button
                 onClick={handleConfirmRestore}
-                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 Restore Access
               </button>
@@ -1304,7 +1273,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* C. ACCESS RESTORED NOTIFICATION (FIGMA 9) */}
+      {/* C. ACCESS RESTORED NOTIFICATION */}
       {showAccessRestoredAlert && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-1.5 shadow-2xl">
@@ -1314,7 +1283,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* D. REMOVE USER MODAL (FIGMA 15) */}
+      {/* D. REMOVE USER MODAL */}
       {showRemoveUserModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-7 max-w-md w-full space-y-4 shadow-2xl">
@@ -1331,13 +1300,13 @@ export const AdminTeamPage: React.FC = () => {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setShowRemoveUserModal(false)}
-                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
               >
                 Keep User
               </button>
               <button
                 onClick={handleConfirmRemoveUser}
-                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 Remove
               </button>
@@ -1346,7 +1315,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* E. USER HAS BEEN REMOVED CONFIRMATION POPUP (FIGMA 16) */}
+      {/* E. USER HAS BEEN REMOVED CONFIRMATION POPUP */}
       {showUserRemovedAlert && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
@@ -1355,7 +1324,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* F. SEND CREDENTIALS CONFIRMATION MODAL (FIGMA 12) */}
+      {/* F. SEND CREDENTIALS CONFIRMATION MODAL */}
       {showSendCredentialsModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -1366,13 +1335,13 @@ export const AdminTeamPage: React.FC = () => {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setShowSendCredentialsModal(false)}
-                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
               >
                 Discard Changes
               </button>
               <button
                 onClick={handleConfirmSendCredentials}
-                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 Save & Send
               </button>
@@ -1381,7 +1350,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* G. CREDENTIALS SENT CONFIRMATION POPUP (FIGMA 13) */}
+      {/* G. CREDENTIALS SENT CONFIRMATION POPUP */}
       {showCredentialsSentAlert && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-1.5 shadow-2xl">
