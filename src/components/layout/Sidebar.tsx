@@ -1,13 +1,13 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { 
-  LayoutGrid, 
-  CalendarCheck2, 
-  Clock, 
-  PhoneCall, 
-  UserSquare2, 
-  Layers, 
-  CreditCard, 
+import {
+  LayoutGrid,
+  CalendarCheck2,
+  Clock,
+  PhoneCall,
+  UserSquare2,
+  Layers,
+  CreditCard,
   Receipt,
   UserCheck,
   CalendarX,
@@ -60,11 +60,11 @@ export const Sidebar: React.FC = () => {
   ];
 
   // Select list based on active role
-  const menuItems = normalizedRole === 'admin' 
-    ? adminLinks 
-    : normalizedRole === 'faculty' 
-    ? facultyLinks 
-    : salesLinks;
+  const menuItems = normalizedRole === 'admin'
+    ? adminLinks
+    : normalizedRole === 'faculty'
+      ? facultyLinks
+      : salesLinks;
 
   const handleLogout = () => {
     logout();
@@ -72,8 +72,8 @@ export const Sidebar: React.FC = () => {
   };
 
   // Safe initial character extraction
-  const avatarInitial = (user.name && user.name.trim().length > 0) 
-    ? user.name.trim().charAt(0).toUpperCase() 
+  const avatarInitial = (user.name && user.name.trim().length > 0)
+    ? user.name.trim().charAt(0).toUpperCase()
     : (user.email ? user.email.charAt(0).toUpperCase() : 'U');
 
   return (
@@ -101,10 +101,9 @@ export const Sidebar: React.FC = () => {
                 to={item.path}
                 end={item.path === '/sales' || item.path === '/faculty' || item.path === '/faculty/dashboard' || item.path === '/admin'}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all ${
-                    isActive
-                      ? 'bg-[#050720] text-white font-semibold shadow-xs'
-                      : 'text-[#050720]/80 hover:bg-[#050720]/5 hover:text-[#050720]'
+                  `flex items-center gap-3 px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all ${isActive
+                    ? 'bg-[#050720] text-white font-semibold shadow-xs'
+                    : 'text-[#050720]/80 hover:bg-[#050720]/5 hover:text-[#050720]'
                   }`
                 }
               >
@@ -117,34 +116,21 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Footer Profile & Logout (Secured - Bypass Removed) */}
-      <div className="p-4 border-t border-[#050720]/10 bg-white space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-md bg-[#FFB908]/20 text-[#050720] overflow-hidden flex items-center justify-center font-bold text-xs shrink-0 font-['Sora']">
-            {avatarInitial}
-          </div>
-          <div className="overflow-hidden min-w-0 flex-1">
-            <h4 className="text-xs font-bold text-[#050720] truncate font-['Sora']">
-              {user.name || 'User'}
-            </h4>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-semibold uppercase px-1.5 py-0.2 bg-[#050720]/5 rounded text-[#050720]/70">
-                {user.role}
-              </span>
-              <p className="text-[10px] text-[#050720]/50 truncate font-['Onest']">
-                {user.email}
-              </p>
-            </div>
-          </div>
+      <div
+        onClick={() => navigate('/profile')}
+        className="flex items-center gap-3 p-2 rounded-lg hover:bg-[#050720]/5 cursor-pointer transition-colors"
+      >
+        <div className="w-9 h-9 rounded-md bg-[#FFB908]/20 text-[#050720] overflow-hidden flex items-center justify-center font-bold text-xs shrink-0 font-['Sora']">
+          {avatarInitial}
         </div>
-
-        {/* Real Logout Button */}
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 py-2 px-3 border border-[#050720]/15 hover:border-[#EF4444]/40 hover:bg-[#EF4444]/5 hover:text-[#EF4444] rounded-lg text-xs font-semibold text-[#050720]/70 transition-colors cursor-pointer"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          <span>Sign out</span>
-        </button>
+        <div className="overflow-hidden min-w-0 flex-1">
+          <h4 className="text-xs font-bold text-[#050720] truncate font-['Sora']">
+            {user.name || 'User'}
+          </h4>
+          <p className="text-[10px] text-[#050720]/50 truncate font-['Onest']">
+            {user.email}
+          </p>
+        </div>
       </div>
     </aside>
   );

@@ -76,3 +76,46 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
 
 export const authRoutes = router;
 export default router;
+
+import bcrypt from 'bcryptjs';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { User } from '../models/User';
+
+// PUT /api/auth/reset-password
+router.put('/reset-password', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { oldPassword, newPassword, confirmPassword } = req.body;
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ message: 'All fields are required.' });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: 'New password and confirm password do not match.' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters.' });
+    }
+
+    const user = await User.findById(req.user?.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    // Verify old password
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Incorrect old password.' });
+    }
+
+    // Hash and save new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({ message: 'Password reset successfully.' });
+  } catch (error: any) {
+    res.status(500).json({ message: 'Failed to reset password.', error: error.message });
+  }
+});

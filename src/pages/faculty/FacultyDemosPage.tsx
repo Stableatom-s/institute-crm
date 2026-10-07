@@ -3,7 +3,7 @@ import { ArrowLeft, Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { demoService, DemoItem as ServiceDemoItem, DemoTab } from '../../services/demoService';
 
-type PageView = 'list' | 'details';
+type PageView = 'list' | 'scheduled_details' | 'completed_form' | 'completed_details';
 
 interface DemoItem {
   id: string;
@@ -31,23 +31,25 @@ export const FacultyDemoPage: React.FC = () => {
   const [selectedDemo, setSelectedDemo] = useState<DemoItem | null>(null);
   const [demos, setDemos] = useState<DemoItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // Filters
   const [modeFilter, setModeFilter] = useState('All');
   const [courseFilter, setCourseFilter] = useState('All');
 
-  // Form State
-  const [feedbackText, setFeedbackText] = useState('');
+  // Completed Form State
+  const [feedbackText, setFeedbackText] = useState(
+    'Student showed strong interest in the course structure and tools. Asked relevant questions about projects and placement support. Recommended for follow-up within 24 hours.'
+  );
   const [uploadedFileName, setUploadedFileName] = useState('name.jpeg/png/jpg');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  // Fetch demos directly from MongoDB backend
+  // Fetch demos from backend
   const loadFacultyDemos = async () => {
     try {
       setIsLoading(true);
       const data = await demoService.getAllDemos();
 
-      // Filter demos assigned to this instructor (or show all if generic)
       const facultyDemos = data.filter(
         (d) =>
           d.faculty.toLowerCase().includes(currentUserName.toLowerCase()) ||
@@ -70,7 +72,7 @@ export const FacultyDemoPage: React.FC = () => {
         remark: d.remark || (d.status === 'Completed' ? 'Joining soon' : undefined),
         feedback: d.feedback,
         cancellationReason: d.cancellationReason,
-       screenshotUrl: (d as any).screenshotUrl,
+        screenshotUrl: (d as any).screenshotUrl,
       }));
 
       setDemos(mapped);
@@ -92,7 +94,7 @@ export const FacultyDemoPage: React.FC = () => {
     return true;
   });
 
-  const handleOpenDetails = (demo: DemoItem) => {
+  const handleOpenDemo = (demo: DemoItem) => {
     setSelectedDemo(demo);
     setFeedbackText(
       demo.feedback ||
@@ -100,7 +102,23 @@ export const FacultyDemoPage: React.FC = () => {
     );
     setUploadedFileName('name.jpeg/png/jpg');
     setPreviewImage(demo.screenshotUrl || null);
-    setCurrentView('details');
+
+    if (demo.status === 'Scheduled') {
+      setCurrentView('scheduled_details');
+    } else {
+      setCurrentView('completed_details');
+    }
+  };
+
+  const handleStartCompleteWorkflow = (demo: DemoItem) => {
+    setSelectedDemo(demo);
+    setFeedbackText(
+      demo.feedback ||
+        'Student showed strong interest in the course structure and tools. Asked relevant questions about projects and placement support. Recommended for follow-up within 24 hours.'
+    );
+    setUploadedFileName('name.jpeg/png/jpg');
+    setPreviewImage(demo.screenshotUrl || null);
+    setCurrentView('completed_form');
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,30 +133,42 @@ export const FacultyDemoPage: React.FC = () => {
     if (!selectedDemo) return;
 
     try {
+      setIsSaving(true);
       await demoService.updateDemoStatus(selectedDemo.id, 'Completed', {
         feedback: feedbackText,
         screenshotUrl: previewImage || undefined,
       } as any);
 
+      // Update state locally
       setDemos((prev) =>
         prev.map((d) =>
           d.id === selectedDemo.id
-            ? { ...d, feedback: feedbackText, screenshotUrl: previewImage || undefined }
+            ? {
+                ...d,
+                status: 'Completed',
+                feedback: feedbackText,
+                screenshotUrl: previewImage || undefined,
+                demoStatus: 'Attended',
+                remark: 'Joining soon',
+              }
             : d
         )
       );
-      alert('Demo feedback saved successfully!');
+
+      setActiveTab('Completed');
       setCurrentView('list');
     } catch (err) {
-      console.error('Failed to update demo on database:', err);
-      alert('Error saving feedback to server.');
+      console.error('Failed to update demo:', err);
+      alert('Error updating demo status on server.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
     <div className="font-['Onest'] space-y-6 pb-12">
       {/* ─────────────────────────────────────────────────────────────
-          1. LIST VIEW (SCHEDULED / COMPLETED / CANCELLED TABS)
+          1. LIST VIEW
       ───────────────────────────────────────────────────────────── */}
       {currentView === 'list' && (
         <div className="space-y-6">
@@ -153,7 +183,7 @@ export const FacultyDemoPage: React.FC = () => {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`pb-3 text-sm font-semibold relative transition-colors ${
+                    className={`pb-3 text-sm font-semibold relative transition-colors cursor-pointer ${
                       isActive ? 'text-[#050720]' : 'text-[#050720]/40 hover:text-[#050720]/70'
                     }`}
                   >
@@ -191,7 +221,7 @@ export const FacultyDemoPage: React.FC = () => {
               </select>
             </div>
 
-            {/* Live Demo Table */}
+            {/* Table */}
             {isLoading ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
                 Loading demo sessions from database...
@@ -237,147 +267,192 @@ export const FacultyDemoPage: React.FC = () => {
                         </>
                       )}
                       <td className="py-3.5 text-right">
-                        <button
-                          onClick={() => handleOpenDetails(row)}
-                          className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
-                        >
-                          View
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          {row.status === 'Scheduled' && (
+                            <button
+                              onClick={() => handleStartCompleteWorkflow(row)}
+                              className="px-3 py-1 bg-[#FFB908] hover:bg-[#E5A607] rounded text-[11px] font-bold text-[#050720] transition-colors cursor-pointer"
+                            >
+                              Complete
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleOpenDemo(row)}
+                            className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
+                          >
+                            View
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
+          </div>
+        </div>
+      )}
 
-            {/* Pagination Controls */}
-            <div className="flex justify-end items-center gap-3 mt-6 text-xs text-[#050720]/60">
-              <span>Jump to</span>
-              <span className="border border-[#050720]/20 rounded px-2 py-0.5 text-[#050720] font-medium">01</span>
-              <span>&lt; 01 of 10 &gt;</span>
+      {/* ─────────────────────────────────────────────────────────────
+          2. SCHEDULED DEMO DETAILS VIEW (FIGMA SCREEN 1)
+      ───────────────────────────────────────────────────────────── */}
+      {currentView === 'scheduled_details' && selectedDemo && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentView('list')}
+                className="p-1 rounded hover:bg-[#050720]/5 text-[#050720] cursor-pointer"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <h1 className="text-2xl font-bold text-[#050720] font-['Sora']">
+                Scheduled demo details
+              </h1>
+            </div>
+
+            {/* Complete action button */}
+            <button
+              onClick={() => setCurrentView('completed_form')}
+              className="px-5 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors cursor-pointer shadow-xs"
+            >
+              Mark as Completed
+            </button>
+          </div>
+
+          <div className="bg-white border border-[#050720]/10 rounded-xl p-8 shadow-xs space-y-6">
+            <h3 className="text-base font-bold text-[#050720] font-['Sora']">Demo Overview</h3>
+
+            <div className="grid grid-cols-2 gap-y-6 text-xs max-w-2xl">
+              <div>
+                <span className="text-[#050720]/50 block text-[11px]">Lead Name</span>
+                <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.leadName}</span>
+              </div>
+              <div>
+                <span className="text-[#050720]/50 block text-[11px]">Faculty Name</span>
+                <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.facultyName}</span>
+              </div>
+              <div>
+                <span className="text-[#050720]/50 block text-[11px]">Demo Date</span>
+                <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.demoDate}</span>
+              </div>
+              <div>
+                <span className="text-[#050720]/50 block text-[11px]">Demo Time</span>
+                <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.timeSlot}</span>
+              </div>
+              <div>
+                <span className="text-[#050720]/50 block text-[11px]">Course</span>
+                <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.course}</span>
+              </div>
+              <div>
+                <span className="text-[#050720]/50 block text-[11px]">Mode</span>
+                <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.mode}</span>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          2. DETAILS VIEW (SCHEDULED / COMPLETED / CANCELLED)
+          3. COMPLETED DEMO VIEW / FORM (FIGMA SCREEN 2)
       ───────────────────────────────────────────────────────────── */}
-      {currentView === 'details' && selectedDemo && (
+      {(currentView === 'completed_form' || currentView === 'completed_details') && selectedDemo && (
         <div className="space-y-6">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentView('list')}
-              className="p-1 rounded hover:bg-slate-100 text-[#050720] cursor-pointer"
+              className="p-1 rounded hover:bg-[#050720]/5 text-[#050720] cursor-pointer"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <h1 className="text-2xl font-bold text-[#050720] font-['Sora']">
-              {selectedDemo.status === 'Scheduled' && 'Scheduled demo details'}
-              {selectedDemo.status === 'Completed' && 'Completed demo details'}
-              {selectedDemo.status === 'Cancelled' && 'Cancelled demo details'}
+              Completed demo details
             </h1>
           </div>
 
-          <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-6">
-            <h3 className="text-sm font-bold text-[#050720] font-['Sora']">Demo Overview</h3>
+          <div className="bg-white border border-[#050720]/10 rounded-xl p-8 shadow-xs space-y-6">
+            <h3 className="text-base font-bold text-[#050720] font-['Sora']">Demo Overview</h3>
 
-            {/* Read-Only Overview Grid */}
-            <div className="grid grid-cols-2 gap-y-4 text-xs">
+            {/* Read-Only Demo Overview (Top Section) */}
+            <div className="grid grid-cols-2 gap-y-6 text-xs max-w-2xl">
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Lead Name</span>
-                <span className="font-semibold text-[#050720]">{selectedDemo.leadName}</span>
+                <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.leadName}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Faculty Name</span>
-                <span className="font-semibold text-[#050720]">{selectedDemo.facultyName}</span>
+                <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.facultyName}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Demo Date</span>
-                <span className="font-semibold text-[#050720]">{selectedDemo.demoDate}</span>
+                <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.demoDate}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Demo Time</span>
-                <span className="font-semibold text-[#050720]">{selectedDemo.timeSlot}</span>
+                <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.timeSlot}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Course</span>
-                <span className="font-semibold text-[#050720]">{selectedDemo.course}</span>
+                <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.course}</span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Mode</span>
-                <span className="font-semibold text-[#050720]">{selectedDemo.mode}</span>
+                <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.mode}</span>
               </div>
-
-              {/* Cancelled-only specific field */}
-              {selectedDemo.status === 'Cancelled' && (
-                <div className="col-span-2 pt-2">
-                  <span className="text-[#050720]/50 block text-[11px]">Reason for cancellation</span>
-                  <span className="text-xs text-[#050720] font-medium mt-0.5 block">
-                    {selectedDemo.cancellationReason || 'Unavailable for demo'}
-                  </span>
-                </div>
-              )}
             </div>
 
-            {/* Completed Section: Feedback & Attendance Screenshot */}
-            {selectedDemo.status === 'Completed' && (
-              <div className="space-y-4 pt-2 border-t border-[#050720]/5">
-                <div>
-                  <label className="text-[11px] text-[#050720]/60 block mb-1">Demo feedback</label>
-                  <textarea
-                    value={feedbackText}
-                    onChange={(e) => setFeedbackText(e.target.value)}
-                    rows={3}
-                    className="w-full border border-[#050720]/15 rounded-lg p-3 text-xs text-[#050720] focus:outline-none focus:border-[#FFB908]"
+            {/* Feedback & Screenshot (Matching Completed Demo View in Figma) */}
+            <div className="space-y-5 pt-4">
+              {/* Demo feedback box */}
+              <div className="relative border border-[#050720]/15 rounded-lg p-3.5 bg-white">
+                <span className="text-[10px] text-[#050720]/50 absolute top-2 left-3.5 block font-medium">
+                  Demo feedback
+                </span>
+                <textarea
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  readOnly={currentView === 'completed_details'}
+                  rows={3}
+                  className="w-full pt-4 text-xs text-[#050720] font-medium leading-relaxed bg-transparent focus:outline-none resize-none"
+                />
+              </div>
+
+              {/* Attendance Screenshot Selector */}
+              <div className="flex items-center gap-4">
+                <label className="flex items-center justify-center gap-2 px-5 py-2.5 border border-[#050720]/40 rounded-lg text-xs font-semibold text-[#050720] cursor-pointer hover:bg-[#050720]/5 transition-colors">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Attendance Screenshot</span>
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, image/jpg"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    disabled={currentView === 'completed_details'}
                   />
+                </label>
+                <span className="text-xs text-[#050720]/50">{uploadedFileName}</span>
+              </div>
+
+              {/* Screenshot Preview */}
+              {previewImage && (
+                <div className="rounded-xl overflow-hidden border border-[#050720]/10 max-w-md">
+                  <img src={previewImage} alt="Attendance preview" className="w-full h-auto object-cover" />
                 </div>
+              )}
 
-                <div>
-                  <label className="text-[11px] text-[#050720]/60 block mb-2">Attendance screenshot</label>
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 px-4 py-2 border border-[#050720]/30 rounded-lg text-xs font-semibold text-[#050720] cursor-pointer hover:bg-slate-50 transition-colors">
-                      <Plus className="w-4 h-4" />
-                      <span>Add Attendance Screenshot</span>
-                      <input
-                        type="file"
-                        accept="image/png, image/jpeg, image/jpg"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
-                    </label>
-                    <span className="text-xs text-[#050720]/50">{uploadedFileName}</span>
-                  </div>
-                </div>
-
-                {previewImage ? (
-                  <div className="mt-4 rounded-xl overflow-hidden border border-[#050720]/10 max-w-xl">
-                    <img src={previewImage} alt="Attendance verification" className="w-full h-auto object-cover" />
-                  </div>
-                ) : (
-                  <div className="mt-4 bg-[#1A1A1A] rounded-xl p-4 max-w-xl border border-black/20 text-white space-y-2">
-                    <div className="text-[11px] text-gray-400 font-mono">Zoom Meeting Preview</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="h-32 bg-stone-700 rounded-lg flex items-center justify-center text-[11px] text-gray-300">
-                        Faculty ({selectedDemo.facultyName})
-                      </div>
-                      <div className="h-32 bg-stone-800 rounded-lg flex items-center justify-center text-[11px] text-gray-300">
-                        Student ({selectedDemo.leadName})
-                      </div>
-                    </div>
-                  </div>
-                )}
-
+              {/* Yellow Save Button */}
+              {currentView === 'completed_form' && (
                 <div className="pt-2">
                   <button
                     onClick={handleSaveCompleted}
-                    className="w-full py-3 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors cursor-pointer"
+                    disabled={isSaving}
+                    className="w-full py-3.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer font-['Sora'] disabled:opacity-50"
                   >
-                    Save
+                    {isSaving ? 'Saving...' : 'Save'}
                   </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}

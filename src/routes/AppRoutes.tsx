@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 // ─── Auth & Utility Pages ───
 import { LoginPage } from '../pages/auth/LoginPage';
 import { NotificationsPage } from '../components/common/NotificationsPage';
+import { ProfilePage } from '../components/common/ProfilePage';
 
 // ─── Admin Pages ───
 import { AdminDashboard } from '../pages/admin/AdminDashboard';
@@ -58,6 +59,11 @@ export const AppRoutes = () => {
 
         {/* Global Notifications Page (Accessible across roles) */}
         <Route path="notifications" element={<NotificationsPage />} />
+
+        <Route path="profile" element={<ProfilePage />} />
+        <Route path="admin/profile" element={<ProfilePage />} />
+        <Route path="faculty/profile" element={<ProfilePage />} />
+        <Route path="sales/profile" element={<ProfilePage />} />
 
         {/* ─── ADMIN ROUTES ─── */}
         <Route element={<ProtectedRoute allowedRoles={['admin', 'ADMIN']} />}>
