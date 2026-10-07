@@ -11,6 +11,8 @@ export interface BatchStudent {
   contact: string;
   attendance?: string;
   attendanceRatio?: string;
+  attendedLectures?: number;
+  totalLectures?: number;
   remark: string;
   fees?: string;
   email?: string;
@@ -23,6 +25,7 @@ export interface BatchLecture {
   srNo: string;
   title?: string;
   topic?: string;
+  lectureTopic?: string;
   date: string;
   timeSlot: string;
   course: string;
@@ -34,6 +37,7 @@ export interface BatchLecture {
   totalStudents: number;
   presentStudents: number;
   attendance?: string;
+  attendanceRatio?: string;
   studentsList?: any[];
 }
 
@@ -47,6 +51,8 @@ export interface BatchItem {
   course: string;
   faculty: string;
   studentCount: number;
+  completedLectures?: number;
+  hoursSpent?: number;
   timeSlot?: string;
   students: BatchStudent[];
   lectures: BatchLecture[];
@@ -58,8 +64,20 @@ export const batchService = {
     return data.map((b) => ({
       ...b,
       id: b._id || b.id,
-      students: b.students || [],
-      lectures: b.lectures || [],
+      students: (b.students || []).map((s: any) => ({
+        ...s,
+        id: s._id || s.id,
+        attendance: s.attendanceRatio || s.attendance || '100%',
+      })),
+      lectures: (b.lectures || []).map((l: any) => ({
+        ...l,
+        id: l._id || l.id,
+        title: l.lectureTopic || l.title || 'Lecture Session',
+        topic: l.lectureTopic || l.title || 'Lecture Session',
+        topicsCovered: l.topicsCovered || l.topics || [],
+        assignmentGiven: l.assignmentGiven || l.assignment || 'None',
+        attendance: l.attendanceRatio || l.attendance || `${l.presentStudents || 0}/${l.totalStudents || 0}`,
+      })),
       studentCount: b.students ? b.students.length : b.studentCount || 0,
     }));
   },
@@ -101,5 +119,41 @@ export const batchService = {
       students: data.students || [],
       lectures: data.lectures || [],
     };
+  },
+
+  updateStudentAttendance: async (
+    batchId: string,
+    studentName: string,
+    newAttended: number,
+    remark?: string
+  ): Promise<BatchItem> => {
+    const data = await apiRequest<any>(
+      `/batches/${batchId}/students/${encodeURIComponent(studentName)}/attendance`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ newAttended, remark }),
+      }
+    );
+    return {
+      ...data,
+      id: data._id || data.id,
+      students: data.students || [],
+      lectures: data.lectures || [],
+    };
+  },
+
+  // Helper utility to compute dynamic percentage from an attendance string ('02/02' -> 100)
+  calculateAttendancePercentage: (attendanceStr?: string): number => {
+    if (!attendanceStr) return 100;
+    if (attendanceStr.includes('%')) {
+      const parsed = parseInt(attendanceStr.replace('%', ''), 10);
+      return isNaN(parsed) ? 100 : parsed;
+    }
+    if (attendanceStr.includes('/')) {
+      const [attended, total] = attendanceStr.split('/').map((n) => parseInt(n, 10));
+      if (!total || total === 0) return 100;
+      return Math.round((attended / total) * 100);
+    }
+    return 100;
   },
 };

@@ -1,11 +1,24 @@
 import { apiRequest } from '../lib/api';
 
+export interface InstallmentItem {
+  id: string;
+  installmentTitle: string;
+  dueDate: string;
+  paidDate?: string;
+  amount: string;
+  amountLeft: string;
+  status: 'Paid' | 'Pending' | 'Overdue';
+  invoiceRequested?: boolean;
+}
+
 export interface InvoiceItem {
   id: string;
   srNo: string;
   studentName: string;
   firstName?: string;
   lastName?: string;
+  mobile?: string;
+  email?: string;
   course: string;
   invoiceCode: string;
   totalFees: number;
@@ -13,33 +26,48 @@ export interface InvoiceItem {
   remainingFees: number;
   dueDate: string;
   lastFollowUp?: string;
-  status: 'Paid' | 'Partially Paid' | 'Overdue';
-  timeline?: any[];
+  paymentStatus: 'Paid' | 'Partially Paid' | 'Overdue';
+  approvalStatus: 'Approved' | 'Requests' | 'Cancelled';
+  approvedOn?: string;
+  rejectedReason?: string;
+  timeline: InstallmentItem[];
+  installments?: any[];
 }
 
 export const financeService = {
   getAllInvoices: async (): Promise<InvoiceItem[]> => {
     const data = await apiRequest<any[]>('/invoices');
-    return data.map((item) => ({
-      ...item,
-      id: item._id || item.id,
-      firstName: item.firstName || item.studentName.split(' ')[0] || '',
-      lastName: item.lastName || item.studentName.split(' ').slice(1).join(' ') || '',
-      remainingFees: item.remainingFees ?? Math.max(0, item.totalFees - item.paidFees),
-      lastFollowUp: item.lastFollowUp || item.dueDate || '21-12-2025',
-      timeline: item.timeline || [
-        {
-          id: `inst-${item._id || 'init'}`,
-          title: 'Installment #1',
-          dueDate: item.dueDate || '21-12-2025',
-          paidDate: item.paidFees > 0 ? (item.dueDate || '21-12-2025') : undefined,
-          amount: `₹${(item.paidFees || item.totalFees).toLocaleString()}`,
-          amountLeft: item.remainingFees === 0 ? 'Nil' : `₹${item.remainingFees.toLocaleString()}`,
-          status: item.paidFees >= item.totalFees ? 'Paid' : 'Pending',
-          hasInvoice: true,
-        },
-      ],
-    }));
+    return data.map((item) => {
+      const total = Number(item.totalFees) || 0;
+      const paid = Number(item.paidFees) || 0;
+      const remaining = Math.max(0, total - paid);
+
+      const mappedTimeline: InstallmentItem[] = (item.installments || []).map((t: any, idx: number) => ({
+        id: t.id || `inst-${idx}`,
+        installmentTitle: t.installmentTitle || `Installment #${idx + 1}`,
+        dueDate: t.dueDate || item.dueDate || '—',
+        paidDate: t.paidDate || '—',
+        amount: `₹${(Number(t.amount) || 0).toLocaleString()}`,
+        amountLeft: `₹${(Number(t.amountLeft) || 0).toLocaleString()}`,
+        status: t.status || 'Paid',
+      }));
+
+      return {
+        ...item,
+        id: item._id || item.id,
+        firstName: item.firstName || item.studentName?.split(' ')[0] || '',
+        lastName: item.lastName || item.studentName?.split(' ').slice(1).join(' ') || '',
+        totalFees: total,
+        paidFees: paid,
+        remainingFees: remaining,
+        dueDate: item.dueDate || '—',
+        lastFollowUp: item.lastFollowUp || '—',
+        paymentStatus: item.paymentStatus || (paid >= total && total > 0 ? 'Paid' : 'Partially Paid'),
+        approvalStatus: item.approvalStatus || 'Requests',
+        approvedOn: item.approvedOn || '—',
+        timeline: mappedTimeline,
+      };
+    });
   },
 
   createInvoice: async (invoiceData: Partial<InvoiceItem>): Promise<InvoiceItem> => {
@@ -61,6 +89,27 @@ export const financeService = {
     const data = await apiRequest<any>(`/invoices/${id}/installment`, {
       method: 'PATCH',
       body: JSON.stringify({ amount, installmentRecord }),
+    });
+    return {
+      ...data,
+      id: data._id || data.id,
+    };
+  },
+
+  approveInvoice: async (id: string): Promise<InvoiceItem> => {
+    const data = await apiRequest<any>(`/invoices/${id}/approve`, {
+      method: 'PATCH',
+    });
+    return {
+      ...data,
+      id: data._id || data.id,
+    };
+  },
+
+  rejectInvoice: async (id: string, reason: string): Promise<InvoiceItem> => {
+    const data = await apiRequest<any>(`/invoices/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
     });
     return {
       ...data,

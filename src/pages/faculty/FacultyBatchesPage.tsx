@@ -68,10 +68,8 @@ export const FacultyBatchesPage: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Filters
   const [courseFilter, setCourseFilter] = useState('All');
 
-  // New Lecture Form State
   const [newLectureForm, setNewLectureForm] = useState({
     title: '',
     course: '',
@@ -81,16 +79,13 @@ export const FacultyBatchesPage: React.FC = () => {
     assignmentGiven: '',
   });
 
-  // Roll call checkbox list for adding new lectures
   const [rollCallStudents, setRollCallStudents] = useState<Student[]>([]);
 
-  // 1. Fetch live batches from MongoDB
   const loadBatches = async () => {
     try {
       setIsLoading(true);
       const allBatches = await batchService.getAllBatches();
 
-      // Filter batches belonging to the instructor
       const facultyBatches = allBatches.filter(
         (b) =>
           b.faculty.toLowerCase().includes(currentUserName.toLowerCase()) ||
@@ -114,7 +109,6 @@ export const FacultyBatchesPage: React.FC = () => {
     loadBatches();
   }, [currentUserName]);
 
-  // 2. Handle deep-linking navigation from FacultyStudentsPage
   useEffect(() => {
     if (stateData?.student) {
       const incoming = stateData.student;
@@ -124,7 +118,7 @@ export const FacultyBatchesPage: React.FC = () => {
         name: incoming.name,
         startDate: incoming.startDate,
         contact: incoming.contact,
-        attendanceRatio: incoming.attendanceRatio || incoming.attendance || '100%',
+        attendanceRatio: incoming.attendanceRatio || incoming.attendance || '00/00',
         remark: incoming.remark || 'Active',
         email: incoming.email,
         course: incoming.course,
@@ -140,7 +134,6 @@ export const FacultyBatchesPage: React.FC = () => {
     }
   }, [stateData, batches]);
 
-  // 3. Keep roll call and new lecture defaults synchronized when selected batch changes
   useEffect(() => {
     if (selectedBatch) {
       const list: Student[] = (selectedBatch.students || []).map((st: any, idx: number) => ({
@@ -149,7 +142,7 @@ export const FacultyBatchesPage: React.FC = () => {
         name: st.name || `${st.firstName || ''} ${st.lastName || ''}`.trim() || 'Student',
         startDate: st.startDate || selectedBatch.startDate,
         contact: st.contact || '—',
-        attendanceRatio: st.attendance || st.attendanceRatio || '100%',
+        attendanceRatio: st.attendance || st.attendanceRatio || '00/00',
         remark: st.remark || 'Active',
         presentInLecture: true,
         email: st.email,
@@ -178,7 +171,6 @@ export const FacultyBatchesPage: React.FC = () => {
     );
   };
 
-  // 4. Save new lecture to MongoDB
   const handleSaveLecture = async () => {
     if (!selectedBatch) return;
     if (!newLectureForm.title.trim()) {
@@ -191,6 +183,7 @@ export const FacultyBatchesPage: React.FC = () => {
 
     const payload = {
       title: newLectureForm.title.trim(),
+      lectureTopic: newLectureForm.title.trim(),
       date: newLectureForm.date,
       timeSlot: newLectureForm.timeSlot,
       course: newLectureForm.course || selectedBatch.course,
@@ -200,6 +193,9 @@ export const FacultyBatchesPage: React.FC = () => {
       presentStudents: presentCount,
       studentsList: rollCallStudents.map((s) => ({
         name: s.name,
+        contact: s.contact,
+        startDate: s.startDate,
+        isPresent: s.presentInLecture,
         present: s.presentInLecture,
       })),
     };
@@ -216,7 +212,7 @@ export const FacultyBatchesPage: React.FC = () => {
         topicsCovered: '',
         assignmentGiven: '',
       });
-      alert('Lecture recorded successfully!');
+      alert('Lecture recorded and attendance updated successfully!');
       setCurrentView('batch-details');
     } catch (err) {
       console.error('Failed to save lecture:', err);
@@ -224,7 +220,6 @@ export const FacultyBatchesPage: React.FC = () => {
     }
   };
 
-  // Dynamic counts for cards
   const totalBatchesCount = batches.length;
   const ongoingBatches = batches.filter((b) => (b.students?.length || 0) > 0);
   const upcomingBatches = batches.filter((b) => (b.students?.length || 0) === 0);
@@ -236,14 +231,11 @@ export const FacultyBatchesPage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] space-y-6 pb-12">
-      {/* ─────────────────────────────────────────────────────────────────
-          VIEW 1: BATCH MANAGEMENT (MAIN TABLE)
-      ───────────────────────────────────────────────────────────────── */}
+      {/* VIEW 1: BATCH MANAGEMENT LIST */}
       {currentView === 'list' && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold text-[#050720] font-['Sora']">Batch Management</h1>
 
-          {/* KPI Stat Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
               <span className="text-xs font-semibold text-[#050720]/80">Total Batches</span>
@@ -275,7 +267,6 @@ export const FacultyBatchesPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Batches Table Card */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
             <div className="flex items-center gap-2 mb-6">
               <span className="text-xs text-[#050720]/60 font-medium">Sort by:</span>
@@ -315,15 +306,11 @@ export const FacultyBatchesPage: React.FC = () => {
                 <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
                   {filteredBatches.map((row, index) => (
                     <tr key={row.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                      <td className="py-3.5 text-[#050720]/70">
-                        {String(index + 1).padStart(2, '0')}
-                      </td>
+                      <td className="py-3.5 text-[#050720]/70">{String(index + 1).padStart(2, '0')}</td>
                       <td className="py-3.5 font-medium">{row.batchCode}</td>
                       <td className="py-3.5 text-[#050720]/70">{row.startDate}</td>
                       <td className="py-3.5 text-[#050720]/70">{row.course}</td>
-                      <td className="py-3.5 text-[#050720]/70">
-                        {String(row.students?.length || 0).padStart(2, '0')}
-                      </td>
+                      <td className="py-3.5 text-[#050720]/70">{String(row.students?.length || 0).padStart(2, '0')}</td>
                       <td className="py-3.5 text-right">
                         <button
                           onClick={() => {
@@ -345,9 +332,7 @@ export const FacultyBatchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─────────────────────────────────────────────────────────────────
-          VIEW 2: BATCH DETAILS (STUDENTS & PAST LECTURES)
-      ───────────────────────────────────────────────────────────────── */}
+      {/* VIEW 2: BATCH DETAILS */}
       {currentView === 'batch-details' && selectedBatch && (
         <div className="space-y-6">
           <div className="flex items-center gap-2">
@@ -360,7 +345,6 @@ export const FacultyBatchesPage: React.FC = () => {
             <h1 className="text-2xl font-bold text-[#050720] font-['Sora']">Batch Details</h1>
           </div>
 
-          {/* KPI Mini-Cards */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
               <span className="text-xs font-semibold text-[#050720]/80">Completed Lectures</span>
@@ -378,7 +362,6 @@ export const FacultyBatchesPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Batch Overview Meta */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
             <h3 className="text-sm font-bold text-[#050720] font-['Sora'] mb-4">Batch Overview</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 text-xs">
@@ -411,7 +394,6 @@ export const FacultyBatchesPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Table: Student Details */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
             <h3 className="text-sm font-bold text-[#050720] font-['Sora'] mb-4">Student Details</h3>
             {(!selectedBatch.students || selectedBatch.students.length === 0) ? (
@@ -433,6 +415,22 @@ export const FacultyBatchesPage: React.FC = () => {
                   {selectedBatch.students.map((st: any, idx: number) => {
                     const displayName =
                       st.name || `${st.firstName || ''} ${st.lastName || ''}`.trim() || 'Student';
+                    const targetName = displayName.toLowerCase();
+
+                    // Derive attendance ratio dynamically
+                    const lecs = selectedBatch.lectures || [];
+                    let attended = 0;
+                    lecs.forEach((lec) => {
+                      const match = (lec.studentsList || []).find(
+                        (s: any) => (s.name || '').trim().toLowerCase() === targetName
+                      );
+                      if (match && (match.isPresent ?? match.present)) attended++;
+                    });
+
+                    const attRatio = lecs.length > 0
+                      ? `${String(attended).padStart(2, '0')}/${String(lecs.length).padStart(2, '0')}`
+                      : (st.attendanceRatio || '00/00');
+                    const isGood = lecs.length > 0 ? (attended / lecs.length >= 0.75) : true;
 
                     return (
                       <tr key={idx} className="hover:bg-[#FFB908]/5">
@@ -440,8 +438,10 @@ export const FacultyBatchesPage: React.FC = () => {
                         <td className="py-3 font-medium text-[#050720]">{displayName}</td>
                         <td className="py-3 text-[#050720]/70">{st.startDate}</td>
                         <td className="py-3 text-[#050720]/70">{st.contact}</td>
-                        <td className="py-3 font-semibold text-[#10B981]">
-                          {st.attendance || st.attendanceRatio || '100%'}
+                        <td className="py-3 font-semibold">
+                          <span className={isGood ? 'text-[#10B981]' : 'text-[#EF4444]'}>
+                            {attRatio}
+                          </span>
                         </td>
                         <td className="py-3 text-[#050720]/70">{st.remark || 'Active'}</td>
                         <td className="py-3 text-right">
@@ -453,7 +453,7 @@ export const FacultyBatchesPage: React.FC = () => {
                                 name: displayName,
                                 startDate: st.startDate,
                                 contact: st.contact,
-                                attendanceRatio: st.attendance || st.attendanceRatio || '100%',
+                                attendanceRatio: attRatio,
                                 remark: st.remark || 'Active',
                                 course: selectedBatch.course,
                                 batchCode: selectedBatch.batchCode,
@@ -474,7 +474,6 @@ export const FacultyBatchesPage: React.FC = () => {
             )}
           </div>
 
-          {/* Table: Lectures List */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-sm font-bold text-[#050720] font-['Sora']">Lectures</h3>
@@ -548,9 +547,7 @@ export const FacultyBatchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─────────────────────────────────────────────────────────────────
-          VIEW 3a: LECTURE VIEW (READ-ONLY DETAILS & ROSTER)
-      ───────────────────────────────────────────────────────────────── */}
+      {/* VIEW 3a: LECTURE VIEW */}
       {currentView === 'lecture-view' && selectedLecture && (
         <div className="space-y-6">
           <div className="flex items-center gap-2">
@@ -600,7 +597,6 @@ export const FacultyBatchesPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Attendance Breakdown */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-[#050720] font-['Sora']">Attendance</h3>
             <div className="flex gap-12 text-xs">
@@ -633,12 +629,18 @@ export const FacultyBatchesPage: React.FC = () => {
                 {(selectedBatch?.students || []).map((st: any, idx: number) => {
                   const displayName =
                     st.name || `${st.firstName || ''} ${st.lastName || ''}`.trim() || 'Student';
+                  const match = (selectedBatch?.lectures?.find(l => (l.id || l.title) === selectedLecture.id)?.studentsList || []).find(
+                    (sl: any) => (sl.name || '').trim().toLowerCase() === displayName.toLowerCase()
+                  );
+                  const isPresent = match ? Boolean(match.isPresent ?? match.present) : false;
 
                   return (
                     <tr key={idx}>
                       <td className="py-3">
-                        <div className="w-4 h-4 rounded border border-[#050720]/30 flex items-center justify-center bg-[#050720] text-white">
-                          <Check className="w-3 h-3" />
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                          isPresent ? 'bg-[#050720] border-[#050720] text-white' : 'border-[#050720]/30 bg-white'
+                        }`}>
+                          {isPresent && <Check className="w-3 h-3" />}
                         </div>
                       </td>
                       <td className="py-3 text-[#050720]/70">{String(idx + 1).padStart(2, '0')}</td>
@@ -655,9 +657,7 @@ export const FacultyBatchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─────────────────────────────────────────────────────────────────
-          VIEW 3b: ADD NEW LECTURE (FORM + CHECKLIST ATTENDANCE)
-      ───────────────────────────────────────────────────────────────── */}
+      {/* VIEW 3b: ADD NEW LECTURE */}
       {currentView === 'add-lecture' && (
         <div className="space-y-6">
           <div className="flex items-center gap-2">
@@ -724,7 +724,6 @@ export const FacultyBatchesPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Roll Call Checkbox Table */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-[#050720] font-['Sora']">Attendance</h3>
             <div className="flex gap-12 text-xs">
@@ -788,7 +787,6 @@ export const FacultyBatchesPage: React.FC = () => {
             )}
           </div>
 
-          {/* Submit Action Buttons */}
           <div className="flex gap-4">
             <button
               onClick={() => setCurrentView('batch-details')}
@@ -806,10 +804,8 @@ export const FacultyBatchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─────────────────────────────────────────────────────────────────
-          VIEW 3c: STUDENT DETAILS (ATTENDANCE BARS & HISTORY)
-      ───────────────────────────────────────────────────────────────── */}
-      {currentView === 'student-details' && selectedStudent && (
+      {/* VIEW 3c: STUDENT DETAILS (DYNAMIC LOGS & METRICS) */}
+      {currentView === 'student-details' && selectedStudent && selectedBatch && (
         <div className="space-y-6">
           <div className="flex items-center gap-2">
             <button
@@ -821,7 +817,6 @@ export const FacultyBatchesPage: React.FC = () => {
             <h1 className="text-2xl font-bold text-[#050720] font-['Sora']">Student Details</h1>
           </div>
 
-          {/* Student Overview */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-[#050720] font-['Sora']">Student Overview</h3>
             <div className="grid grid-cols-2 gap-y-4 text-xs">
@@ -838,13 +833,13 @@ export const FacultyBatchesPage: React.FC = () => {
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Batch</span>
                 <span className="font-semibold text-[#050720]">
-                  {selectedStudent.batchCode || selectedBatch?.batchCode}
+                  {selectedStudent.batchCode || selectedBatch.batchCode}
                 </span>
               </div>
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Course</span>
                 <span className="font-semibold text-[#050720]">
-                  {selectedStudent.course || selectedBatch?.course}
+                  {selectedStudent.course || selectedBatch.course}
                 </span>
               </div>
               <div>
@@ -861,7 +856,6 @@ export const FacultyBatchesPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Editable Remark */}
             <div className="pt-2">
               <label className="text-[11px] text-[#050720]/60 block mb-1">Add remark</label>
               <input
@@ -872,49 +866,78 @@ export const FacultyBatchesPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Attendance Stats Cards with Progress Bars */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-[#050720] font-['Sora']">Attendance</h3>
-            <div className="grid grid-cols-3 gap-4 text-center">
-              {[
-                { label: 'This Month', percent: 100 },
-                { label: 'Last Month', percent: 100 },
-                { label: 'Average', percent: 100 },
-              ].map((stat, i) => (
-                <div key={i} className="border border-[#050720]/10 rounded-xl p-4 shadow-2xs">
-                  <div className="text-xl font-bold text-[#050720] font-['Sora']">{stat.percent}%</div>
-                  <div className="w-full bg-[#050720]/10 h-1.5 rounded-full my-2 overflow-hidden">
-                    <div
-                      className="bg-[#10B981] h-full rounded-full"
-                      style={{ width: `${stat.percent}%` }}
-                    />
-                  </div>
-                  <span className="text-[11px] text-[#050720]/50">{stat.label}</span>
-                </div>
-              ))}
-            </div>
+            {(() => {
+              const studentName = selectedStudent.name.trim().toLowerCase();
+              const lecs = selectedBatch.lectures || [];
+              let attended = 0;
 
-            {/* Attendance Session Logs */}
-            <div className="space-y-3 pt-4">
-              {(selectedBatch?.lectures || []).length === 0 ? (
-                <p className="text-xs text-[#050720]/40 italic">No lecture attendance logs yet.</p>
-              ) : (
-                selectedBatch?.lectures.map((lec: any, idx: number) => (
-                  <div
-                    key={idx}
-                    className="border border-[#050720]/10 rounded-xl p-3.5 flex justify-between items-center text-xs"
-                  >
-                    <span className="font-medium text-[#050720]">
-                      {lec.title || lec.topic || 'Lecture Session'}
-                    </span>
-                    <div className="text-right">
-                      <span className="text-[#10B981] font-semibold block text-[11px]">Present</span>
-                      <span className="text-[#050720]/40 text-[10px]">{lec.date}</span>
-                    </div>
+              const logs = lecs.map((lec, idx) => {
+                const match = (lec.studentsList || []).find(
+                  (sl: any) => (sl.name || '').trim().toLowerCase() === studentName
+                );
+                const isPresent = match ? Boolean(match.isPresent ?? match.present) : false;
+                if (isPresent) attended++;
+
+                return {
+                  id: lec.id || `lec-${idx}`,
+                  title: lec.title || lec.topic || 'Lecture Session',
+                  date: lec.date,
+                  status: isPresent ? 'Present' : 'Absent',
+                };
+              });
+
+              const dynamicPercent = lecs.length > 0 ? Math.round((attended / lecs.length) * 100) : 0;
+
+              return (
+                <>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    {[
+                      { label: 'This Month', percent: dynamicPercent },
+                      { label: 'Last Month', percent: dynamicPercent },
+                      { label: 'Average', percent: dynamicPercent },
+                    ].map((stat, i) => (
+                      <div key={i} className="border border-[#050720]/10 rounded-xl p-4 shadow-2xs">
+                        <div className="text-xl font-bold text-[#050720] font-['Sora']">{stat.percent}%</div>
+                        <div className="w-full bg-[#050720]/10 h-1.5 rounded-full my-2 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              stat.percent >= 75 ? 'bg-[#10B981]' : 'bg-[#EF4444]'
+                            }`}
+                            style={{ width: `${stat.percent}%` }}
+                          />
+                        </div>
+                        <span className="text-[11px] text-[#050720]/50">{stat.label}</span>
+                      </div>
+                    ))}
                   </div>
-                ))
-              )}
-            </div>
+
+                  <div className="space-y-3 pt-4">
+                    {logs.length === 0 ? (
+                      <p className="text-xs text-[#050720]/40 italic">No lecture attendance logs yet.</p>
+                    ) : (
+                      logs.map((log) => (
+                        <div
+                          key={log.id}
+                          className="border border-[#050720]/10 rounded-xl p-3.5 flex justify-between items-center text-xs"
+                        >
+                          <span className="font-medium text-[#050720]">{log.title}</span>
+                          <div className="text-right">
+                            <span className={`font-semibold block text-[11px] ${
+                              log.status === 'Present' ? 'text-[#10B981]' : 'text-[#EF4444]'
+                            }`}>
+                              {log.status}
+                            </span>
+                            <span className="text-[#050720]/40 text-[10px]">{log.date}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

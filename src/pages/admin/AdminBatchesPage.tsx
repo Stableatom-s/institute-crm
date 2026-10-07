@@ -15,7 +15,6 @@ export const AdminBatchPage: React.FC = () => {
   const [courseFilter, setCourseFilter] = useState('Course');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // Fetch batches from MongoDB backend
   const loadBatches = async () => {
     try {
       setIsLoading(true);
@@ -35,7 +34,6 @@ export const AdminBatchPage: React.FC = () => {
     loadBatches();
   }, []);
 
-  // Dynamic calculations for master cards
   const totalBatchesCount = batches.length;
   const ongoingBatches = batches.filter((b) => (b.students?.length || 0) > 0);
   const upcomingBatches = batches.filter((b) => (b.students?.length || 0) === 0);
@@ -48,15 +46,11 @@ export const AdminBatchPage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-
-      {/* ========================================================= */}
-      {/* 1. MASTER BATCH MANAGEMENT ROSTER                         */}
-      {/* ========================================================= */}
+      {/* 1. MASTER BATCH MANAGEMENT ROSTER */}
       {currentView === 'roster' && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold font-['Sora']">Batch Management</h1>
 
-          {/* 4 Metric Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
               <span className="text-[11px] font-semibold text-[#050720] block">Total Batches</span>
@@ -88,7 +82,6 @@ export const AdminBatchPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Batches Table Card */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-3 relative z-10 pt-1">
               <span className="text-xs text-[#050720]/70 font-medium">Sort by:</span>
@@ -170,7 +163,6 @@ export const AdminBatchPage: React.FC = () => {
               </table>
             )}
 
-            {/* Pagination */}
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#050720]/5 text-xs text-[#050720]/70">
               <span className="text-[11px]">Jump to</span>
               <input
@@ -188,9 +180,7 @@ export const AdminBatchPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. BATCH DETAILS VIEW                                     */}
-      {/* ========================================================= */}
+      {/* 2. BATCH DETAILS VIEW */}
       {currentView === 'batch-details' && selectedBatch && (
         <div className="space-y-6">
           <button
@@ -201,7 +191,6 @@ export const AdminBatchPage: React.FC = () => {
             <span>Batch Details</span>
           </button>
 
-          {/* 2 Metric Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
               <span className="text-[11px] font-semibold text-[#050720] block">Completed Lectures</span>
@@ -219,7 +208,6 @@ export const AdminBatchPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Batch Overview */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Batch Overview</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-y-4 text-xs">
@@ -252,7 +240,6 @@ export const AdminBatchPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Student Details Card */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Student Details</h3>
             {(!selectedBatch.students || selectedBatch.students.length === 0) ? (
@@ -273,7 +260,25 @@ export const AdminBatchPage: React.FC = () => {
                 <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
                   {selectedBatch.students.map((student, idx) => {
                     const fullName = student.name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || 'Student';
-                    const att = student.attendanceRatio || student.attendance || '02/02';
+                    const targetName = fullName.toLowerCase();
+
+                    // Calculate live attendance ratio from actual batch lectures
+                    const lecs = selectedBatch.lectures || [];
+                    let attended = 0;
+                    lecs.forEach((lec) => {
+                      const match = (lec.studentsList || []).find(
+                        (s: any) => (s.name || '').trim().toLowerCase() === targetName
+                      );
+                      if (match && (match.isPresent ?? match.present)) {
+                        attended++;
+                      }
+                    });
+
+                    const attRatio = lecs.length > 0 
+                      ? `${String(attended).padStart(2, '0')}/${String(lecs.length).padStart(2, '0')}`
+                      : (student.attendanceRatio || '00/00');
+
+                    const isGood = lecs.length > 0 ? (attended / lecs.length >= 0.75) : true;
 
                     return (
                       <tr key={student.id || idx} className="hover:bg-[#FFB908]/5 transition-colors">
@@ -282,10 +287,8 @@ export const AdminBatchPage: React.FC = () => {
                         <td className="py-3.5 text-[#050720]/70">{student.startDate || selectedBatch.startDate}</td>
                         <td className="py-3.5 text-[#050720]/70">{student.contact}</td>
                         <td className="py-3.5">
-                          <span className={`font-semibold ${
-                            att.startsWith('02') || att.includes('100') ? 'text-[#10B981]' : 'text-[#EF4444]'
-                          }`}>
-                            {att}
+                          <span className={`font-semibold ${isGood ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+                            {attRatio}
                           </span>
                         </td>
                         <td className="py-3.5 text-[#050720]/70">{student.remark || 'Regular Attendance'}</td>
@@ -308,7 +311,6 @@ export const AdminBatchPage: React.FC = () => {
             )}
           </div>
 
-          {/* Lectures Card */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Lectures</h3>
             {(!selectedBatch.lectures || selectedBatch.lectures.length === 0) ? (
@@ -362,9 +364,7 @@ export const AdminBatchPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 3. STUDENT DETAILS DRILLDOWN VIEW                         */}
-      {/* ========================================================= */}
+      {/* 3. STUDENT DETAILS DRILLDOWN VIEW */}
       {currentView === 'student-details' && selectedStudent && selectedBatch && (
         <div className="space-y-6">
           <button
@@ -417,57 +417,88 @@ export const AdminBatchPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Attendance Section */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-6">
             <h3 className="text-sm font-bold font-['Sora']">Attendance</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="border border-[#050720]/10 rounded-xl p-5 text-center flex flex-col items-center">
-                <span className="text-xl font-bold font-['Sora']">50%</span>
-                <div className="w-32 h-1.5 bg-[#E2E8F0] rounded-full mt-3 overflow-hidden">
-                  <div className="h-full bg-[#10B981] rounded-full" style={{ width: '50%' }} />
-                </div>
-                <span className="text-[10px] text-[#050720]/50 mt-2 font-medium">This Month</span>
-              </div>
-              <div className="border border-[#050720]/10 rounded-xl p-5 text-center flex flex-col items-center">
-                <span className="text-xl font-bold font-['Sora']">50%</span>
-                <div className="w-32 h-1.5 bg-[#E2E8F0] rounded-full mt-3 overflow-hidden">
-                  <div className="h-full bg-[#10B981] rounded-full" style={{ width: '50%' }} />
-                </div>
-                <span className="text-[10px] text-[#050720]/50 mt-2 font-medium">Last Month</span>
-              </div>
-              <div className="border border-[#050720]/10 rounded-xl p-5 text-center flex flex-col items-center">
-                <span className="text-xl font-bold font-['Sora']">50%</span>
-                <div className="w-32 h-1.5 bg-[#E2E8F0] rounded-full mt-3 overflow-hidden">
-                  <div className="h-full bg-[#10B981] rounded-full" style={{ width: '50%' }} />
-                </div>
-                <span className="text-[10px] text-[#050720]/50 mt-2 font-medium">Average</span>
-              </div>
-            </div>
+            
+            {(() => {
+              const studentFullName = (
+                selectedStudent.name || 
+                `${selectedStudent.firstName || ''} ${selectedStudent.lastName || ''}`
+              ).trim().toLowerCase();
 
-            <div className="space-y-3 pt-2">
-              {(selectedBatch.lectures || []).length === 0 ? (
-                <p className="text-xs text-[#050720]/40 italic py-2">No lecture attendance logs yet.</p>
-              ) : (
-                selectedBatch.lectures.map((lec, idx) => (
-                  <div key={idx} className="border border-[#050720]/10 rounded-xl px-5 py-4 flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#050720]">{lec.title || lec.topic || 'Lecture Session'}</span>
-                    <div className="text-right">
-                      <span className="text-xs font-semibold block text-[#10B981]">
-                        Present
-                      </span>
-                      <span className="text-[10px] text-[#050720]/50 block mt-0.5">{lec.date}</span>
-                    </div>
+              const lecs = selectedBatch.lectures || [];
+              let attendedCount = 0;
+              const logs = lecs.map((lec, idx) => {
+                const matchedRecord = (lec.studentsList || []).find((sl: any) => 
+                  (sl.name || '').trim().toLowerCase() === studentFullName
+                );
+                // Strict check: if no explicit record or false, student is Absent
+                const isStudentPresent = matchedRecord 
+                  ? Boolean(matchedRecord.isPresent ?? matchedRecord.present) 
+                  : false;
+
+                if (isStudentPresent) attendedCount++;
+
+                return {
+                  id: lec.id || `lec-${idx}`,
+                  topic: lec.lectureTopic || lec.title || lec.topic || 'Lecture Session',
+                  date: lec.date,
+                  status: isStudentPresent ? 'Present' : 'Absent',
+                };
+              });
+
+              const dynamicPercent = lecs.length > 0 ? Math.round((attendedCount / lecs.length) * 100) : 0;
+
+              return (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { label: 'This Month', percent: dynamicPercent },
+                      { label: 'Last Month', percent: dynamicPercent },
+                      { label: 'Average', percent: dynamicPercent },
+                    ].map((stat, i) => (
+                      <div key={i} className="border border-[#050720]/10 rounded-xl p-5 text-center flex flex-col items-center">
+                        <span className="text-xl font-bold font-['Sora']">{stat.percent}%</span>
+                        <div className="w-32 h-1.5 bg-[#E2E8F0] rounded-full mt-3 overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              stat.percent >= 75 ? 'bg-[#10B981]' : 'bg-[#EF4444]'
+                            }`} 
+                            style={{ width: `${stat.percent}%` }} 
+                          />
+                        </div>
+                        <span className="text-[10px] text-[#050720]/50 mt-2 font-medium">{stat.label}</span>
+                      </div>
+                    ))}
                   </div>
-                ))
-              )}
-            </div>
+
+                  <div className="space-y-3 pt-2">
+                    {logs.length === 0 ? (
+                      <p className="text-xs text-[#050720]/40 italic py-2">No lecture attendance logs yet.</p>
+                    ) : (
+                      logs.map((log) => (
+                        <div key={log.id} className="border border-[#050720]/10 rounded-xl px-5 py-4 flex items-center justify-between">
+                          <span className="text-xs font-bold text-[#050720]">{log.topic}</span>
+                          <div className="text-right">
+                            <span className={`text-xs font-semibold block ${
+                              log.status === 'Present' ? 'text-[#10B981]' : 'text-[#EF4444]'
+                            }`}>
+                              {log.status}
+                            </span>
+                            <span className="text-[10px] text-[#050720]/50 block mt-0.5">{log.date}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
-
-      {/* ========================================================= */}
-      {/* 4. LECTURE DETAILS VIEW                                   */}
-      {/* ========================================================= */}
+      
+      {/* 4. LECTURE DETAILS VIEW */}
       {currentView === 'lecture-details' && selectedLecture && selectedBatch && (
         <div className="space-y-6">
           <button
@@ -478,7 +509,6 @@ export const AdminBatchPage: React.FC = () => {
             <span>Lectures</span>
           </button>
 
-          {/* Lecture Metadata */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-5">
             <h3 className="text-sm font-bold font-['Sora']">Lecture Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 text-xs">
@@ -502,7 +532,6 @@ export const AdminBatchPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Topics Covered & Homework */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block mb-1">Topics Covered</span>
@@ -521,7 +550,6 @@ export const AdminBatchPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Student Lecture Attendance Checklist */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Attendance</h3>
             <div className="flex gap-8 text-xs font-semibold pb-2">
@@ -555,26 +583,35 @@ export const AdminBatchPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {(selectedBatch.students || []).map((st, idx) => (
-                  <tr key={st.id || idx} className="hover:bg-[#FFB908]/5 transition-colors">
-                    <td className="py-3.5">
-                      <div className="w-4 h-4 rounded border border-[#050720]/30 flex items-center justify-center bg-white">
-                        <Check className="w-3 h-3 text-[#050720]" />
-                      </div>
-                    </td>
-                    <td className="py-3.5 text-[#050720]/70">{String(idx + 1).padStart(2, '0')}</td>
-                    <td className="py-3.5 font-medium">{st.name || `${st.firstName || ''} ${st.lastName || ''}`}</td>
-                    <td className="py-3.5 text-[#050720]/70">{st.startDate || selectedBatch.startDate}</td>
-                    <td className="py-3.5 text-[#050720]/70">{st.contact}</td>
-                    <td className="py-3.5 text-[#050720]/70">{st.remark || 'Assignment done'}</td>
-                  </tr>
-                ))}
+                {(selectedBatch.students || []).map((st, idx) => {
+                  const studentName = (st.name || `${st.firstName || ''} ${st.lastName || ''}`).trim().toLowerCase();
+                  const match = (selectedLecture.studentsList || []).find(
+                    (sl: any) => (sl.name || '').trim().toLowerCase() === studentName
+                  );
+                  const isPresent = match ? Boolean(match.isPresent ?? match.present) : false;
+
+                  return (
+                    <tr key={st.id || idx} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5">
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                          isPresent ? 'bg-[#050720] text-white' : 'border-[#050720]/30 bg-white'
+                        }`}>
+                          {isPresent && <Check className="w-3 h-3" />}
+                        </div>
+                      </td>
+                      <td className="py-3.5 text-[#050720]/70">{String(idx + 1).padStart(2, '0')}</td>
+                      <td className="py-3.5 font-medium">{st.name || `${st.firstName || ''} ${st.lastName || ''}`}</td>
+                      <td className="py-3.5 text-[#050720]/70">{st.startDate || selectedBatch.startDate}</td>
+                      <td className="py-3.5 text-[#050720]/70">{st.contact}</td>
+                      <td className="py-3.5 text-[#050720]/70">{st.remark || 'Regular'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
-
     </div>
   );
 };

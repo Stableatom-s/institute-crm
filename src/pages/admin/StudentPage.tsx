@@ -29,7 +29,7 @@ interface StudentRecord {
   lectures: AttendanceLecture[];
 }
 
-const COURSES = ['UI/UX Design', 'No Code', 'Full-Stack', 'Portfolio'];
+const COURSES = ['UI/UX Design', 'No Code', 'Full Stack', 'Portfolio'];
 
 export const AdminStudentPage: React.FC = () => {
   const [view, setView] = useState<'list' | 'details'>('list');
@@ -39,7 +39,6 @@ export const AdminStudentPage: React.FC = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Fetch batches & aggregate enrolled students from MongoDB
   const fetchStudents = async () => {
     try {
       setIsLoading(true);
@@ -53,18 +52,42 @@ export const AdminStudentPage: React.FC = () => {
           const fName = st.firstName || nameParts[0] || 'Student';
           const lName = st.lastName || nameParts.slice(1).join(' ') || '—';
 
-          // Map student lectures based on batch lectures roll-call
+          // Extract roll-call presence dynamically from each lecture
           const studentLectures: AttendanceLecture[] = (batch.lectures || []).map((lec: any, lIdx: number) => {
-            const hasRecord = lec.studentsList?.find(
-              (s: any) => s.name?.toLowerCase() === rawName.toLowerCase()
+            const hasRecord = (lec.studentsList || []).find(
+              (s: any) => (s.name || '').trim().toLowerCase() === rawName.toLowerCase()
             );
+
+            const isPresent = hasRecord
+              ? (hasRecord.isPresent ?? hasRecord.present ?? false)
+              : false;
+
             return {
               id: lec.id || `lec-${lIdx}`,
-              topic: lec.title || lec.topic || 'Lecture Session',
+              topic: lec.lectureTopic || lec.title || lec.topic || 'Lecture Session',
               date: lec.date || batch.startDate,
-              status: hasRecord ? (hasRecord.present || hasRecord.isPresent ? 'Present' : 'Absent') : 'Present',
+              status: isPresent ? 'Present' : 'Absent',
             };
           });
+
+          // Accurate calculation: Attended / Total lectures
+          const totalLecs = studentLectures.length;
+          const attendedLecs = studentLectures.filter((l) => l.status === 'Present').length;
+
+          let dynamicPercent = 0;
+          let ratioStr = '00/00';
+
+          if (totalLecs > 0) {
+            dynamicPercent = Math.round((attendedLecs / totalLecs) * 100);
+            ratioStr = `${String(attendedLecs).padStart(2, '0')}/${String(totalLecs).padStart(2, '0')}`;
+          } else if (st.attendanceRatio && st.attendanceRatio.includes('/')) {
+            const [att, tot] = st.attendanceRatio.split('/').map((n: string) => parseInt(n, 10));
+            dynamicPercent = tot > 0 ? Math.round((att / tot) * 100) : 0;
+            ratioStr = st.attendanceRatio;
+          } else if (st.attendance && st.attendance.includes('%')) {
+            dynamicPercent = parseInt(st.attendance.replace('%', ''), 10) || 0;
+            ratioStr = st.attendance;
+          }
 
           studentMap.push({
             id: st.id || st._id || `${batch.id}-st-${idx}`,
@@ -76,12 +99,12 @@ export const AdminStudentPage: React.FC = () => {
             course: batch.course || 'UI/UX Design',
             batch: batch.batchCode || '—',
             address: st.address || 'Pune',
-            attendanceRatio: st.attendance || st.attendanceRatio || '02/02',
-            remark: st.remark || 'Regular Attendance',
+            attendanceRatio: ratioStr,
+            remark: st.remark || (dynamicPercent >= 75 ? 'Regular Attendance' : 'Irregular Attendance'),
             metrics: {
-              thisMonth: 50,
-              lastMonth: 50,
-              average: 50,
+              thisMonth: dynamicPercent,
+              lastMonth: dynamicPercent,
+              average: dynamicPercent,
             },
             lectures: studentLectures,
           });
@@ -109,9 +132,6 @@ export const AdminStudentPage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-      {/* ========================================================= */}
-      {/* 1. STUDENT MANAGEMENT DIRECTORY (LIST VIEW)               */}
-      {/* ========================================================= */}
       {view === 'list' && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold font-['Sora']">Student Management</h1>
@@ -119,7 +139,6 @@ export const AdminStudentPage: React.FC = () => {
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
             <h2 className="text-sm font-bold font-['Sora']">Student List</h2>
 
-            {/* Course Filter Dropdown */}
             <div className="flex items-center gap-3 relative z-10 pt-1">
               <span className="text-xs text-[#050720]/70 font-medium">Sort by:</span>
               <div className="relative">
@@ -128,11 +147,7 @@ export const AdminStudentPage: React.FC = () => {
                   className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[130px] cursor-pointer"
                 >
                   <span>{courseFilter}</span>
-                  {isDropdownOpen ? (
-                    <ChevronUp className="w-3.5 h-3.5" />
-                  ) : (
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  )}
+                  {isDropdownOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
 
                 {isDropdownOpen && (
@@ -154,7 +169,6 @@ export const AdminStudentPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Students Table */}
             {isLoading ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
                 Loading students from database...
@@ -177,46 +191,47 @@ export const AdminStudentPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                  {filteredStudents.map((std, index) => (
-                    <tr key={std.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                      <td className="py-3.5 text-[#050720]/70">
-                        {String(index + 1).padStart(2, '0')}
-                      </td>
-                      <td className="py-3.5 font-medium">
-                        {std.firstName} {std.lastName}
-                      </td>
-                      <td className="py-3.5 text-[#050720]/70">{std.startDate}</td>
-                      <td className="py-3.5 text-[#050720]/70">{std.contact}</td>
-                      <td className="py-3.5">
-                        <span
-                          className={`font-semibold ${
-                            std.attendanceRatio === '02/02' || std.attendanceRatio.includes('100')
-                              ? 'text-[#10B981]'
-                              : 'text-[#EF4444]'
-                          }`}
-                        >
-                          {std.attendanceRatio}
-                        </span>
-                      </td>
-                      <td className="py-3.5 text-[#050720]/70">{std.remark}</td>
-                      <td className="py-3.5 text-right">
-                        <button
-                          onClick={() => {
-                            setSelectedStudent(std);
-                            setView('details');
-                          }}
-                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredStudents.map((std, index) => {
+                    const isGoodAttendance = std.metrics.average >= 75;
+
+                    return (
+                      <tr key={std.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                        <td className="py-3.5 text-[#050720]/70">
+                          {String(index + 1).padStart(2, '0')}
+                        </td>
+                        <td className="py-3.5 font-medium">
+                          {std.firstName} {std.lastName}
+                        </td>
+                        <td className="py-3.5 text-[#050720]/70">{std.startDate}</td>
+                        <td className="py-3.5 text-[#050720]/70">{std.contact}</td>
+                        <td className="py-3.5">
+                          <span
+                            className={`font-semibold ${
+                              isGoodAttendance ? 'text-[#10B981]' : 'text-[#EF4444]'
+                            }`}
+                          >
+                            {std.attendanceRatio}
+                          </span>
+                        </td>
+                        <td className="py-3.5 text-[#050720]/70">{std.remark}</td>
+                        <td className="py-3.5 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedStudent(std);
+                              setView('details');
+                            }}
+                            className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
 
-            {/* Pagination */}
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#050720]/5 text-xs text-[#050720]/70">
               <span className="text-[11px]">Jump to</span>
               <input
@@ -238,9 +253,6 @@ export const AdminStudentPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. DETAILED STUDENT ATTENDANCE PROFILE (DETAILS VIEW)      */}
-      {/* ========================================================= */}
       {view === 'details' && selectedStudent && (
         <div className="space-y-6">
           <button
@@ -251,7 +263,6 @@ export const AdminStudentPage: React.FC = () => {
             <span>Student Details</span>
           </button>
 
-          {/* Student Overview Card */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Student Overview</h3>
 
@@ -291,59 +302,49 @@ export const AdminStudentPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Attendance Section */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-6">
             <h3 className="text-sm font-bold font-['Sora']">Attendance</h3>
 
-            {/* Attendance Progress Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* This Month */}
-              <div className="border border-[#050720]/10 rounded-xl p-5 text-center flex flex-col items-center">
-                <span className="text-xl font-bold font-['Sora']">
-                  {selectedStudent.metrics.thisMonth}%
-                </span>
-                <div className="w-32 h-1.5 bg-[#E2E8F0] rounded-full mt-3 overflow-hidden">
-                  <div
-                    className="h-full bg-[#10B981] rounded-full"
-                    style={{ width: `${selectedStudent.metrics.thisMonth}%` }}
-                  />
+              {[
+                { label: 'This Month', percent: selectedStudent.metrics.thisMonth },
+                { label: 'Last Month', percent: selectedStudent.metrics.lastMonth },
+                { label: 'Average', percent: selectedStudent.metrics.average },
+              ].map((stat, i) => (
+                <div key={i} className="border border-[#050720]/10 rounded-xl p-5 text-center flex flex-col items-center">
+                  <span className="text-2xl font-extrabold font-['Sora']">
+                    {stat.percent}%
+                  </span>
+                  <div className="w-32 h-1.5 bg-[#E2E8F0] rounded-full mt-3 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        stat.percent >= 75 ? 'bg-[#10B981]' : 'bg-[#EF4444]'
+                      }`}
+                      style={{ width: `${stat.percent}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-[#050720]/50 mt-2 font-medium">{stat.label}</span>
                 </div>
-                <span className="text-[10px] text-[#050720]/50 mt-2 font-medium">This Month</span>
-              </div>
-
-              {/* Last Month */}
-              <div className="border border-[#050720]/10 rounded-xl p-5 text-center flex flex-col items-center">
-                <span className="text-xl font-bold font-['Sora']">
-                  {selectedStudent.metrics.lastMonth}%
-                </span>
-                <div className="w-32 h-1.5 bg-[#E2E8F0] rounded-full mt-3 overflow-hidden">
-                  <div
-                    className="h-full bg-[#10B981] rounded-full"
-                    style={{ width: `${selectedStudent.metrics.lastMonth}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-[#050720]/50 mt-2 font-medium">Last Month</span>
-              </div>
-
-              {/* Average */}
-              <div className="border border-[#050720]/10 rounded-xl p-5 text-center flex flex-col items-center">
-                <span className="text-xl font-bold font-['Sora']">
-                  {selectedStudent.metrics.average}%
-                </span>
-                <div className="w-32 h-1.5 bg-[#E2E8F0] rounded-full mt-3 overflow-hidden">
-                  <div
-                    className="h-full bg-[#10B981] rounded-full"
-                    style={{ width: `${selectedStudent.metrics.average}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-[#050720]/50 mt-2 font-medium">Average</span>
-              </div>
+              ))}
             </div>
 
-            {/* Lecture Log Cards */}
             <div className="space-y-3 pt-2">
               {selectedStudent.lectures.length === 0 ? (
-                <p className="text-xs text-[#050720]/40 italic py-2">No lecture records found for this student.</p>
+                <div className="border border-[#050720]/10 rounded-xl px-5 py-4 flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#050720]">Lecture 1</span>
+                  <div className="text-right">
+                    <span
+                      className={`text-xs font-semibold block ${
+                        selectedStudent.metrics.average > 0 ? 'text-[#10B981]' : 'text-[#EF4444]'
+                      }`}
+                    >
+                      {selectedStudent.metrics.average > 0 ? 'Present' : 'Absent'}
+                    </span>
+                    <span className="text-[10px] text-[#050720]/50 block mt-0.5">
+                      {selectedStudent.startDate}
+                    </span>
+                  </div>
+                </div>
               ) : (
                 selectedStudent.lectures.map((lec) => (
                   <div
