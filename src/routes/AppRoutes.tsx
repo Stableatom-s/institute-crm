@@ -38,8 +38,10 @@ import { FacultyAttendancePage } from '../pages/faculty/FacultyAttendancePage';
 const RootRedirect = () => {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role === 'SALES') return <Navigate to="/sales" replace />;
-  if (user.role === 'FACULTY') return <Navigate to="/faculty/dashboard" replace />;
+
+  const normalizedRole = user.role?.toLowerCase();
+  if (normalizedRole === 'sales') return <Navigate to="/sales" replace />;
+  if (normalizedRole === 'faculty') return <Navigate to="/faculty/dashboard" replace />;
   return <Navigate to="/admin" replace />;
 };
 
@@ -58,7 +60,7 @@ export const AppRoutes = () => {
         <Route path="notifications" element={<NotificationsPage />} />
 
         {/* ─── ADMIN ROUTES ─── */}
-        <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+        <Route element={<ProtectedRoute allowedRoles={['admin', 'ADMIN']} />}>
           <Route path="admin" element={<AdminDashboard />} />
           <Route path="admin/dashboard" element={<AdminDashboard />} />
           <Route path="admin/leads" element={<AdminLeadsPage />} />
@@ -76,7 +78,7 @@ export const AppRoutes = () => {
         </Route>
 
         {/* ─── SALES ROUTES ─── */}
-        <Route element={<ProtectedRoute allowedRoles={['SALES', 'ADMIN']} />}>
+        <Route element={<ProtectedRoute allowedRoles={['sales', 'SALES', 'admin', 'ADMIN']} />}>
           <Route path="sales" element={<SalesDashboard />} />
           <Route path="sales/dashboard" element={<SalesDashboard />} />
           <Route path="sales/leads" element={<SalesLeadsPage />} />
@@ -93,7 +95,7 @@ export const AppRoutes = () => {
         </Route>
 
         {/* ─── FACULTY ROUTES ─── */}
-        <Route element={<ProtectedRoute allowedRoles={['FACULTY', 'ADMIN']} />}>
+        <Route element={<ProtectedRoute allowedRoles={['faculty', 'FACULTY', 'admin', 'ADMIN']} />}>
           <Route path="faculty" element={<FacultyDashboardPage />} />
           <Route path="faculty/dashboard" element={<FacultyDashboardPage />} />
           <Route path="faculty/batches" element={<FacultyBatchesPage />} />

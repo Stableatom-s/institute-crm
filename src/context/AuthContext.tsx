@@ -1,68 +1,93 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole } from '../types';
 
-interface AuthContextType {
-  user: User | null;
+export type UserRole = 'admin' | 'faculty' | 'sales';
+
+export interface UserSession {
+  id: string;
+  name: string;
+  email: string;
   role: UserRole;
-  isAuthenticated: boolean;
-  setRole: (role: UserRole) => void;
-  logout: () => void;
 }
 
-const defaultUsers: Record<UserRole, User> = {
-  SALES: {
-    id: 'u-sales-1',
-    name: 'Shantanu (Sales)',
-    email: 'sales@radiquolab.com',
-    role: 'SALES',
-    inTime: '09:30 AM',
-  },
-  FACULTY: {
-    id: 'u-fac-1',
-    name: 'Ajinkya Veer (Faculty)',
-    email: 'faculty@radiquolab.com',
-    role: 'FACULTY',
-    inTime: '09:30 AM',
-  },
-  ADMIN: {
-    id: 'u-admin-1',
-    name: 'Tanmay Kalbhor (Admin)',
-    email: 'admin@radiquolab.com',
-    role: 'ADMIN',
-    inTime: '09:15 AM',
-  },
-};
+interface AuthContextType {
+  user: UserSession | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (token: string, user: UserSession) => void;
+  logout: () => void;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentRole, setCurrentRole] = useState<UserRole>(() => {
-    const saved = localStorage.getItem('crm_active_role') as UserRole;
-    return saved && defaultUsers[saved] ? saved : 'ADMIN';
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('crm_token'));
+  const [user, setUser] = useState<UserSession | null>(() => {
+    const saved = localStorage.getItem('crm_user');
+    return saved ? JSON.parse(saved) : null;
   });
-
-  const [user, setUser] = useState<User>(() => defaultUsers[currentRole]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    setUser(defaultUsers[currentRole]);
-    localStorage.setItem('crm_active_role', currentRole);
-  }, [currentRole]);
+    const verifyToken = async () => {
+      const activeToken = localStorage.getItem('crm_token');
+      if (!activeToken) {
+        setIsLoading(false);
+        return;
+      }
 
-  const setRole = (role: UserRole) => {
-    setCurrentRole(role);
+      try {
+        const res = await fetch('http://localhost:5000/api/auth/me', {
+          headers: {
+            Authorization: `Bearer ${activeToken}`,
+          },
+        });
+
+        if (res.ok) {
+          const profile = await res.json();
+          const sessionUser: UserSession = {
+            id: profile._id || profile.id,
+            name: profile.name,
+            email: profile.email,
+            role: profile.role,
+          };
+          setUser(sessionUser);
+          localStorage.setItem('crm_user', JSON.stringify(sessionUser));
+        } else {
+          logout();
+        }
+      } catch (err) {
+        console.error('Failed to verify token:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    verifyToken();
+  }, []);
+
+  const login = (newToken: string, newUser: UserSession) => {
+    setToken(newToken);
+    setUser(newUser);
+    localStorage.setItem('crm_token', newToken);
+    localStorage.setItem('crm_user', JSON.stringify(newUser));
   };
 
   const logout = () => {
-    console.log('Logged out');
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('crm_token');
+    localStorage.removeItem('crm_user');
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        role: currentRole,
-        isAuthenticated: !!user,
-        setRole,
+        token,
+        isAuthenticated: !!token && !!user,
+        isLoading,
+        login,
         logout,
       }}
     >

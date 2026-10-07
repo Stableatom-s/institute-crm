@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutGrid, 
   CalendarCheck2, 
@@ -11,16 +11,21 @@ import {
   Receipt,
   UserCheck,
   CalendarX,
-  Users
+  Users,
+  LogOut
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { UserRole } from '../../types';
 
 export const Sidebar: React.FC = () => {
-  const { user, setRole } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
   if (!user) return null;
 
-  // 1. Sales Navigation (Your Section)
+  // Normalize role check (case-insensitive)
+  const normalizedRole = (user.role || '').toLowerCase();
+
+  // 1. Sales Navigation
   const salesLinks = [
     { name: 'Dashboard', path: '/sales', icon: LayoutGrid },
     { name: 'My attendance', path: '/sales/attendance', icon: CalendarCheck2 },
@@ -32,9 +37,9 @@ export const Sidebar: React.FC = () => {
     { name: 'Invoices', path: '/sales/invoices', icon: Receipt },
   ];
 
-  // 2. Faculty Navigation (Your Friend's Section)
+  // 2. Faculty Navigation
   const facultyLinks = [
-    { name: 'Dashboard', path: '/faculty', icon: LayoutGrid },
+    { name: 'Dashboard', path: '/faculty/dashboard', icon: LayoutGrid },
     { name: 'My attendance', path: '/faculty/attendance', icon: CalendarCheck2 },
     { name: 'Demo Management', path: '/faculty/demos', icon: UserSquare2 },
     { name: 'Batch', path: '/faculty/batches', icon: Layers },
@@ -55,11 +60,21 @@ export const Sidebar: React.FC = () => {
   ];
 
   // Select list based on active role
-  const menuItems = user.role === 'ADMIN' 
+  const menuItems = normalizedRole === 'admin' 
     ? adminLinks 
-    : user.role === 'FACULTY' 
+    : normalizedRole === 'faculty' 
     ? facultyLinks 
     : salesLinks;
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  // Safe initial character extraction
+  const avatarInitial = (user.name && user.name.trim().length > 0) 
+    ? user.name.trim().charAt(0).toUpperCase() 
+    : (user.email ? user.email.charAt(0).toUpperCase() : 'U');
 
   return (
     <aside className="w-60 bg-white border-r border-[#050720]/10 flex flex-col justify-between shrink-0 h-screen select-none">
@@ -84,7 +99,7 @@ export const Sidebar: React.FC = () => {
               <NavLink
                 key={item.path}
                 to={item.path}
-                end={item.path === '/sales' || item.path === '/faculty' || item.path === '/admin'}
+                end={item.path === '/sales' || item.path === '/faculty' || item.path === '/faculty/dashboard' || item.path === '/admin'}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all ${
                     isActive
@@ -101,32 +116,35 @@ export const Sidebar: React.FC = () => {
         </nav>
       </div>
 
-      {/* Footer Profile & Role Switcher */}
-      <div className="p-4 border-t border-[#050720]/10 bg-white">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-md bg-[#E2E8F0] overflow-hidden flex items-center justify-center font-bold text-xs text-[#050720]">
-            {user.name.charAt(0)}
+      {/* Footer Profile & Logout (Secured - Bypass Removed) */}
+      <div className="p-4 border-t border-[#050720]/10 bg-white space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-md bg-[#FFB908]/20 text-[#050720] overflow-hidden flex items-center justify-center font-bold text-xs shrink-0 font-['Sora']">
+            {avatarInitial}
           </div>
-          <div className="overflow-hidden">
-            <h4 className="text-xs font-bold text-[#050720] truncate font-['Sora']">{user.name}</h4>
-            <p className="text-[11px] text-[#050720]/50 truncate font-['Onest']">{user.email}</p>
+          <div className="overflow-hidden min-w-0 flex-1">
+            <h4 className="text-xs font-bold text-[#050720] truncate font-['Sora']">
+              {user.name || 'User'}
+            </h4>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase px-1.5 py-0.2 bg-[#050720]/5 rounded text-[#050720]/70">
+                {user.role}
+              </span>
+              <p className="text-[10px] text-[#050720]/50 truncate font-['Onest']">
+                {user.email}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Role Toggle Bar */}
-        <div className="grid grid-cols-3 gap-1 bg-[#F8FAFC] p-1 rounded-md border border-[#050720]/10">
-          {(['SALES', 'FACULTY', 'ADMIN'] as UserRole[]).map((r) => (
-            <button
-              key={r}
-              onClick={() => setRole(r)}
-              className={`py-1 text-[9px] font-bold rounded uppercase transition-colors ${
-                user.role === r ? 'bg-[#FFB908] text-[#050720]' : 'text-[#050720]/50 hover:text-[#050720]'
-              }`}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
+        {/* Real Logout Button */}
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 border border-[#050720]/15 hover:border-[#EF4444]/40 hover:bg-[#EF4444]/5 hover:text-[#EF4444] rounded-lg text-xs font-semibold text-[#050720]/70 transition-colors cursor-pointer"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span>Sign out</span>
+        </button>
       </div>
     </aside>
   );

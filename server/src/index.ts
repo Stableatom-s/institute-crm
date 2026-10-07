@@ -10,6 +10,8 @@ import { invoiceRoutes } from './routes/invoices';
 import { attendanceRoutes } from './routes/attendance';
 import leaveRoutes from './routes/leaves';
 import teamRoutes from './routes/team';
+import authRoutes from './routes/auth';
+
 dotenv.config();
 
 const app = express();
@@ -31,6 +33,7 @@ app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/demos', demoRoutes);
 app.use('/api/batches', batchRoutes);
