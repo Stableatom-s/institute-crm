@@ -7,14 +7,26 @@ import { DetailedLead } from './SalesLeadsPage';
 export const FollowUpPage: React.FC = () => {
   const navigate = useNavigate();
   const auth = useAuth() as any;
-  const currentSalesName = (auth?.user?.name || '').trim().toLowerCase();
+
+  const getActiveUser = () => {
+    if (auth?.user?.name) return auth.user;
+    try {
+      const stored = localStorage.getItem('crm_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const activeUser = getActiveUser();
+  const currentSalesName = (activeUser?.name || '').trim().toLowerCase();
+  const userRole = (activeUser?.role || '').trim().toLowerCase();
 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [leads, setLeads] = useState<DetailedLead[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Fetch leads and filter strictly by this logged-in salesperson
   useEffect(() => {
     const fetchFollowUps = async () => {
       try {
@@ -22,11 +34,18 @@ export const FollowUpPage: React.FC = () => {
         const data = await leadService.getAllLeads();
 
         const userLeads = data.filter((lead: any) => {
+          if (userRole === 'admin' || userRole === 'super admin') return true;
+
           const assigned = (lead.assignedTo || '').trim().toLowerCase();
+          if (!currentSalesName) return true;
+
           return (
             assigned === currentSalesName ||
             (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
-            (assigned.length > 0 && currentSalesName.includes(assigned))
+            (assigned.length > 0 && currentSalesName.includes(assigned)) ||
+            assigned === '' ||
+            assigned === 'unassigned' ||
+            assigned === 'sales'
           );
         });
 
@@ -38,10 +57,8 @@ export const FollowUpPage: React.FC = () => {
       }
     };
 
-    if (currentSalesName) {
-      fetchFollowUps();
-    }
-  }, [currentSalesName]);
+    fetchFollowUps();
+  }, [currentSalesName, userRole]);
 
   const handleViewLead = (leadId: string) => {
     navigate(`/sales/leads?leadId=${leadId}`);

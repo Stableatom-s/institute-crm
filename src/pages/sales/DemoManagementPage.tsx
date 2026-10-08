@@ -8,8 +8,7 @@ import {
   ChevronUp, 
   ChevronLeft, 
   ChevronRight, 
-  Search,
-  Video
+  Search 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { demoService, DemoItem, DemoTab } from '../../services/demoService';
@@ -21,7 +20,21 @@ const TIME_SLOTS = ['11:00 - 12:00', '01:00 - 02:00', '03:00 - 04:00', '05:00 - 
 export const DemoManagementPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const auth = useAuth() as any;
-  const currentSalesName = (auth?.user?.name || '').trim().toLowerCase();
+
+  // Resilient user extraction
+  const getActiveUser = () => {
+    if (auth?.user?.name) return auth.user;
+    try {
+      const stored = localStorage.getItem('crm_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const activeUser = getActiveUser();
+  const currentSalesName = (activeUser?.name || '').trim().toLowerCase();
+  const userRole = (activeUser?.role || '').trim().toLowerCase();
 
   // Navigation views: 'table' | 'schedule-form' | 'reschedule-form' | 'details'
   const [view, setView] = useState<'table' | 'schedule-form' | 'reschedule-form' | 'details'>('table');
@@ -31,6 +44,7 @@ export const DemoManagementPage: React.FC = () => {
   // Master lists
   const [allDemos, setAllDemos] = useState<DemoItem[]>([]);
   const [dynamicFaculties, setDynamicFaculties] = useState<string[]>([]);
+  const [cachedLeads, setCachedLeads] = useState<any[]>([]);
 
   // Active item in detail / reschedule view
   const [selectedDemo, setSelectedDemo] = useState<DemoItem | null>(null);
@@ -108,7 +122,8 @@ export const DemoManagementPage: React.FC = () => {
 
   const handleOpenScheduleForm = () => {
     setLeadSearchQuery('');
-    setMatchingLeads([]);
+    // Preload available leads into dropdown on open
+    setMatchingLeads(cachedLeads.slice(0, 8));
     setIsSearchDropdownOpen(false);
     setSelectedLeadData(null);
     setFormCourse('');
@@ -125,7 +140,7 @@ export const DemoManagementPage: React.FC = () => {
     setView('schedule-form');
   };
 
-  // Load demos scoped strictly to leads assigned to this salesperson
+  // Load demos scoped to this salesperson
   const loadDemos = async () => {
     try {
       setIsLoading(true);
@@ -134,20 +149,28 @@ export const DemoManagementPage: React.FC = () => {
         leadService.getAllLeads(),
       ]);
 
+      const myLeads = userLeads.filter((l: any) => {
+        if (userRole === 'admin' || userRole === 'super admin') return true;
+        const assigned = (l.assignedTo || '').trim().toLowerCase();
+        if (!currentSalesName) return true;
+        return (
+          assigned === currentSalesName ||
+          (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
+          (assigned.length > 0 && currentSalesName.includes(assigned)) ||
+          assigned === '' ||
+          assigned === 'unassigned' ||
+          assigned === 'sales'
+        );
+      });
+
+      setCachedLeads(myLeads);
+
       const assignedLeadNames = new Set(
-        userLeads
-          .filter((l: any) => {
-            const assigned = (l.assignedTo || '').trim().toLowerCase();
-            return (
-              assigned === currentSalesName ||
-              (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
-              (assigned.length > 0 && currentSalesName.includes(assigned))
-            );
-          })
-          .map((l: any) => `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase())
+        myLeads.map((l: any) => `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase())
       );
 
-      const scopedDemos = demosData.filter((d) => {
+      const scopedDemos = demosData.filter((d: any) => {
+        if (userRole === 'admin' || userRole === 'super admin') return true;
         const studentFullName = `${d.name || ''} ${d.lastName || ''}`.trim().toLowerCase();
         return assignedLeadNames.has(studentFullName);
       });
@@ -166,11 +189,9 @@ export const DemoManagementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (currentSalesName) {
-      loadDemos();
-      loadFaculties();
-    }
-  }, [currentSalesName]);
+    loadDemos();
+    loadFaculties();
+  }, [currentSalesName, userRole]);
 
   // Deep linking: if opened with ?scheduleLeadId=xyz
   useEffect(() => {
@@ -211,39 +232,26 @@ export const DemoManagementPage: React.FC = () => {
     return matchMode && matchCourse;
   });
 
-  // Search only through leads assigned to this salesperson
-  const handleLeadSearchChange = async (val: string) => {
+  // Dynamic search handler using cached leads (instant & reliable)
+  const handleLeadSearchChange = (val: string) => {
     setLeadSearchQuery(val);
     setSelectedLeadData(null);
-    if (!val.trim()) {
-      setMatchingLeads([]);
-      setIsSearchDropdownOpen(false);
+
+    const query = val.toLowerCase().trim();
+    if (!query) {
+      setMatchingLeads(cachedLeads.slice(0, 8));
+      setIsSearchDropdownOpen(cachedLeads.length > 0);
       return;
     }
 
-    try {
-      const allLeads = await leadService.getAllLeads();
-      const query = val.toLowerCase().trim();
+    const matches = cachedLeads.filter((l) => {
+      const fullName = `${l.firstName || ''} ${l.lastName || ''}`.toLowerCase();
+      const phone = (l.contactNo || '').toLowerCase();
+      return fullName.includes(query) || phone.includes(query);
+    });
 
-      const matches = allLeads
-        .filter((l: any) => {
-          const assigned = (l.assignedTo || '').trim().toLowerCase();
-          return (
-            assigned === currentSalesName ||
-            (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
-            (assigned.length > 0 && currentSalesName.includes(assigned))
-          );
-        })
-        .filter((l) => {
-          const fullName = `${l.firstName} ${l.lastName || ''}`.toLowerCase();
-          return fullName.includes(query) || (l.contactNo && l.contactNo.includes(query));
-        });
-
-      setMatchingLeads(matches);
-      setIsSearchDropdownOpen(matches.length > 0);
-    } catch (err) {
-      console.error('Lead search error:', err);
-    }
+    setMatchingLeads(matches);
+    setIsSearchDropdownOpen(true);
   };
 
   const handleSelectLead = (lead: any) => {
@@ -629,6 +637,12 @@ export const DemoManagementPage: React.FC = () => {
               <input
                 type="text"
                 value={leadSearchQuery}
+                onFocus={() => {
+                  if (cachedLeads.length > 0) {
+                    setMatchingLeads(cachedLeads.slice(0, 8));
+                    setIsSearchDropdownOpen(true);
+                  }
+                }}
                 placeholder="Search leads by name or contact..."
                 onChange={(e) => handleLeadSearchChange(e.target.value)}
                 className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 pr-10 rounded-lg border ${
@@ -658,7 +672,7 @@ export const DemoManagementPage: React.FC = () => {
             </div>
             {leadError && (
               <span className="text-[10px] font-semibold text-rose-500 block">
-                Please search and select an assigned lead before scheduling*
+                Please search and select a lead before scheduling*
               </span>
             )}
 

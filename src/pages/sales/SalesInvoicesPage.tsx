@@ -40,14 +40,26 @@ interface InvoiceItem {
 
 export const SalesInvoicesPage: React.FC = () => {
   const auth = useAuth() as any;
-  const currentSalesName = (auth?.user?.name || '').trim().toLowerCase();
+
+  const getActiveUser = () => {
+    if (auth?.user?.name) return auth.user;
+    try {
+      const stored = localStorage.getItem('crm_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const activeUser = getActiveUser();
+  const currentSalesName = (activeUser?.name || '').trim().toLowerCase();
+  const userRole = (activeUser?.role || '').trim().toLowerCase();
 
   const [view, setView] = useState<'list' | 'details'>('list');
   const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceItem | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Load only invoices and enrolled students belonging to this salesperson
   const loadInvoices = async () => {
     try {
       setIsLoading(true);
@@ -57,11 +69,18 @@ export const SalesInvoicesPage: React.FC = () => {
       ]);
 
       const myLeads = leads.filter((l: any) => {
+        if (userRole === 'admin' || userRole === 'super admin') return true;
+
         const assigned = (l.assignedTo || '').trim().toLowerCase();
+        if (!currentSalesName) return true;
+
         return (
           assigned === currentSalesName ||
           (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
-          (assigned.length > 0 && currentSalesName.includes(assigned))
+          (assigned.length > 0 && currentSalesName.includes(assigned)) ||
+          assigned === '' ||
+          assigned === 'unassigned' ||
+          assigned === 'sales'
         );
       });
 
@@ -100,7 +119,10 @@ export const SalesInvoicesPage: React.FC = () => {
         });
 
       const mappedInvoices: InvoiceItem[] = dbInvoices
-        .filter((inv) => myLeadNames.has(inv.studentName.trim().toLowerCase()))
+        .filter((inv) => {
+          if (userRole === 'admin' || userRole === 'super admin') return true;
+          return myLeadNames.has(inv.studentName.trim().toLowerCase());
+        })
         .map((inv, index) => {
           const isApproved = inv.approvalStatus === 'Approved';
           const effectivePaid = isApproved ? (inv.paidFees || 0) : 0;
@@ -163,10 +185,8 @@ export const SalesInvoicesPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (currentSalesName) {
-      loadInvoices();
-    }
-  }, [currentSalesName]);
+    loadInvoices();
+  }, [currentSalesName, userRole]);
 
   const handleDownloadPDF = (inv: InvoiceItem, installmentTitle?: string, amount?: string) => {
     if (inv.approvalStatus !== 'Approved') {
@@ -260,7 +280,6 @@ export const SalesInvoicesPage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-      {/* 1. INVOICE TABLE DIRECTORY VIEW */}
       {view === 'list' && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold font-['Sora']">Invoice</h1>
@@ -351,7 +370,6 @@ export const SalesInvoicesPage: React.FC = () => {
         </div>
       )}
 
-      {/* 2. INVOICE DETAILS DRILLDOWN VIEW */}
       {view === 'details' && selectedInvoice && (
         <div className="space-y-6">
           <button

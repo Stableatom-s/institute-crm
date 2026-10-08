@@ -41,7 +41,20 @@ export interface FeeStudent {
 
 export const FeesManagementPage: React.FC = () => {
   const auth = useAuth() as any;
-  const currentSalesName = (auth?.user?.name || '').trim().toLowerCase();
+
+  const getActiveUser = () => {
+    if (auth?.user?.name) return auth.user;
+    try {
+      const stored = localStorage.getItem('crm_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const activeUser = getActiveUser();
+  const currentSalesName = (activeUser?.name || '').trim().toLowerCase();
+  const userRole = (activeUser?.role || '').trim().toLowerCase();
 
   const [view, setView] = useState<'list' | 'details'>('list');
   const [students, setStudents] = useState<FeeStudent[]>([]);
@@ -60,7 +73,6 @@ export const FeesManagementPage: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [remarkDescription, setRemarkDescription] = useState('');
 
-  // Load only students assigned to this salesperson
   const loadFeeData = async () => {
     try {
       setIsLoading(true);
@@ -70,11 +82,18 @@ export const FeesManagementPage: React.FC = () => {
       ]);
 
       const myLeads = leads.filter((l: any) => {
+        if (userRole === 'admin' || userRole === 'super admin') return true;
+
         const assigned = (l.assignedTo || '').trim().toLowerCase();
+        if (!currentSalesName) return true;
+
         return (
           assigned === currentSalesName ||
           (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
-          (assigned.length > 0 && currentSalesName.includes(assigned))
+          (assigned.length > 0 && currentSalesName.includes(assigned)) ||
+          assigned === '' ||
+          assigned === 'unassigned' ||
+          assigned === 'sales'
         );
       });
 
@@ -109,7 +128,10 @@ export const FeesManagementPage: React.FC = () => {
         });
 
       const mappedInvoices: FeeStudent[] = invoices
-        .filter((inv) => myLeadNames.has(inv.studentName.trim().toLowerCase()))
+        .filter((inv) => {
+          if (userRole === 'admin' || userRole === 'super admin') return true;
+          return myLeadNames.has(inv.studentName.trim().toLowerCase());
+        })
         .map((inv, index) => {
           const isApproved = inv.approvalStatus === 'Approved';
           const rawPaid = inv.paidFees || 0;
@@ -156,10 +178,8 @@ export const FeesManagementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (currentSalesName) {
-      loadFeeData();
-    }
-  }, [currentSalesName]);
+    loadFeeData();
+  }, [currentSalesName, userRole]);
 
   const totalCollected = students.reduce((acc, curr) => acc + curr.paidFees, 0);
   const totalOutstanding = students.reduce((acc, curr) => acc + (curr.totalFees - curr.paidFees), 0);

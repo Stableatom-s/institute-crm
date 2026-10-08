@@ -10,18 +10,29 @@ import { DetailedLead } from './SalesLeadsPage';
 export const SalesDashboard: React.FC = () => {
   const navigate = useNavigate();
   const auth = useAuth() as any;
-  const currentSalesName = (auth?.user?.name || '').trim().toLowerCase();
+
+  // Resilient user extraction across page refreshes
+  const getActiveUser = () => {
+    if (auth?.user?.name) return auth.user;
+    try {
+      const stored = localStorage.getItem('crm_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const activeUser = getActiveUser();
+  const currentSalesName = (activeUser?.name || '').trim().toLowerCase();
+  const userRole = (activeUser?.role || '').trim().toLowerCase();
 
   const [leads, setLeads] = useState<DetailedLead[]>([]);
   const [demos, setDemos] = useState<DemoItem[]>([]);
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Scoped calculation: Filter leads, demos, follow-ups, and invoices by logged-in salesperson
   useEffect(() => {
     const fetchDashboardData = async () => {
-      if (!currentSalesName) return;
-
       try {
         setIsLoading(true);
         const [leadsData, demosData, invoicesData] = await Promise.all([
@@ -30,12 +41,20 @@ export const SalesDashboard: React.FC = () => {
           financeService.getAllInvoices().catch(() => []),
         ]);
 
+        // Filter leads for this salesperson or unassigned ones
         const userLeads = leadsData.filter((l: any) => {
+          if (userRole === 'admin' || userRole === 'super admin') return true;
+
           const assigned = (l.assignedTo || '').trim().toLowerCase();
+          if (!currentSalesName) return true; // Don't wipe stats if auth is still synchronizing
+
           return (
             assigned === currentSalesName ||
             (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
-            (assigned.length > 0 && currentSalesName.includes(assigned))
+            (assigned.length > 0 && currentSalesName.includes(assigned)) ||
+            assigned === '' ||
+            assigned === 'unassigned' ||
+            assigned === 'sales'
           );
         });
 
@@ -43,13 +62,19 @@ export const SalesDashboard: React.FC = () => {
           userLeads.map((l: any) => `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase())
         );
 
-        const userDemos = demosData.filter((d) => {
+        // Filter demos matching this salesperson's leads
+        const userDemos = demosData.filter((d: any) => {
+          if (userRole === 'admin' || userRole === 'super admin') return true;
           const studentFullName = `${d.name || ''} ${d.lastName || ''}`.trim().toLowerCase();
           return myLeadNames.has(studentFullName);
         });
 
+        // Filter invoices matching this salesperson's leads
         const pendingInv = invoicesData
-          .filter((inv: any) => myLeadNames.has((inv.studentName || '').trim().toLowerCase()))
+          .filter((inv: any) => {
+            if (userRole === 'admin' || userRole === 'super admin') return true;
+            return myLeadNames.has((inv.studentName || '').trim().toLowerCase());
+          })
           .filter(
             (inv: any) =>
               (inv.status || inv.paymentStatus) === 'Partially Paid' ||
@@ -67,7 +92,7 @@ export const SalesDashboard: React.FC = () => {
     };
 
     fetchDashboardData();
-  }, [currentSalesName]);
+  }, [currentSalesName, userRole]);
 
   const totalLeadsCount = leads.length;
   const contactedCount = leads.filter((l) => l.status === 'Contacted').length;
