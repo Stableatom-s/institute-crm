@@ -3,6 +3,6 @@ dist
 dist-ssr
 *.local
 .env
-.env*.local
+.env*
 server/.env
 **/.env

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -11,11 +11,11 @@ export const SalesDashboard: React.FC = () => {
   const navigate = useNavigate();
   const auth = useAuth() as any;
 
-  // Resilient user extraction across page refreshes
+  // Safe resolver for salesperson profile that survives browser reloads
   const getActiveUser = () => {
     if (auth?.user?.name) return auth.user;
     try {
-      const stored = localStorage.getItem('crm_user');
+      const stored = localStorage.getItem('crm_user') || localStorage.getItem('user');
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -31,68 +31,65 @@ export const SalesDashboard: React.FC = () => {
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setIsLoading(true);
-        const [leadsData, demosData, invoicesData] = await Promise.all([
-          leadService.getAllLeads(),
-          demoService.getAllDemos(),
-          financeService.getAllInvoices().catch(() => []),
-        ]);
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const [leadsData, demosData, invoicesData] = await Promise.all([
+        leadService.getAllLeads(),
+        demoService.getAllDemos(),
+        financeService.getAllInvoices().catch(() => []),
+      ]);
 
-        // Filter leads for this salesperson or unassigned ones
-        const userLeads = leadsData.filter((l: any) => {
-          if (userRole === 'admin' || userRole === 'super admin') return true;
+      // Strict salesperson filtering for leads
+      const userLeads = leadsData.filter((l: any) => {
+        if (userRole === 'admin' || userRole === 'super admin') return true;
 
-          const assigned = (l.assignedTo || '').trim().toLowerCase();
-          if (!currentSalesName) return true; // Don't wipe stats if auth is still synchronizing
+        const assigned = (l.assignedTo || '').trim().toLowerCase();
+        if (!currentSalesName) return false;
 
-          return (
-            assigned === currentSalesName ||
-            (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
-            (assigned.length > 0 && currentSalesName.includes(assigned)) ||
-            assigned === '' ||
-            assigned === 'unassigned' ||
-            assigned === 'sales'
-          );
-        });
-
-        const myLeadNames = new Set(
-          userLeads.map((l: any) => `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase())
+        return (
+          assigned === currentSalesName ||
+          (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
+          (assigned.length > 0 && currentSalesName.includes(assigned))
         );
+      });
 
-        // Filter demos matching this salesperson's leads
-        const userDemos = demosData.filter((d: any) => {
+      const myLeadNames = new Set(
+        userLeads.map((l: any) => `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase())
+      );
+
+      // Strict salesperson filtering for demos matching their leads
+      const userDemos = demosData.filter((d: any) => {
+        if (userRole === 'admin' || userRole === 'super admin') return true;
+        const studentFullName = `${d.name || ''} ${d.lastName || ''}`.trim().toLowerCase();
+        return myLeadNames.has(studentFullName);
+      });
+
+      // Strict salesperson filtering for payment follow-ups
+      const pendingInv = invoicesData
+        .filter((inv: any) => {
           if (userRole === 'admin' || userRole === 'super admin') return true;
-          const studentFullName = `${d.name || ''} ${d.lastName || ''}`.trim().toLowerCase();
-          return myLeadNames.has(studentFullName);
-        });
+          return myLeadNames.has((inv.studentName || '').trim().toLowerCase());
+        })
+        .filter(
+          (inv: any) =>
+            (inv.status || inv.paymentStatus) === 'Partially Paid' ||
+            (inv.status || inv.paymentStatus) === 'Overdue'
+        ).length;
 
-        // Filter invoices matching this salesperson's leads
-        const pendingInv = invoicesData
-          .filter((inv: any) => {
-            if (userRole === 'admin' || userRole === 'super admin') return true;
-            return myLeadNames.has((inv.studentName || '').trim().toLowerCase());
-          })
-          .filter(
-            (inv: any) =>
-              (inv.status || inv.paymentStatus) === 'Partially Paid' ||
-              (inv.status || inv.paymentStatus) === 'Overdue'
-          ).length;
-
-        setLeads(userLeads);
-        setDemos(userDemos);
-        setPendingInvoicesCount(pendingInv);
-      } catch (err) {
-        console.error('Failed to load sales dashboard data:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchDashboardData();
+      setLeads(userLeads);
+      setDemos(userDemos);
+      setPendingInvoicesCount(pendingInv);
+    } catch (err) {
+      console.error('Failed to load sales dashboard data:', err);
+    } finally {
+      setIsLoading(false);
+    }
   }, [currentSalesName, userRole]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const totalLeadsCount = leads.length;
   const contactedCount = leads.filter((l) => l.status === 'Contacted').length;
@@ -141,6 +138,7 @@ export const SalesDashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Sales Action Overview */}
         <div className="bg-white rounded-xl border border-[#050720]/10 p-5 shadow-xs relative overflow-hidden">
           <div className="absolute left-0 top-6 bottom-6 w-1 bg-[#FFB908] rounded-r" />
           <div className="pl-3">
@@ -176,6 +174,7 @@ export const SalesDashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Lead Pipeline Snapshot */}
         <div className="bg-white rounded-xl border border-[#050720]/10 p-5 shadow-xs relative overflow-hidden">
           <div className="absolute left-0 top-6 bottom-6 w-1 bg-[#FFB908] rounded-r" />
           <div className="pl-3">
@@ -218,6 +217,7 @@ export const SalesDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Follow-ups Table */}
       <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-sm font-bold font-['Sora']">Follow-ups</h3>
@@ -284,6 +284,7 @@ export const SalesDashboard: React.FC = () => {
         )}
       </div>
 
+      {/* Scheduled Demos Table */}
       <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-sm font-bold font-['Sora']">Scheduled Demos</h3>

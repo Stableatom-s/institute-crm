@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -8,7 +8,8 @@ import {
   ChevronUp, 
   ChevronLeft, 
   ChevronRight, 
-  Search 
+  Search,
+  Video
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { demoService, DemoItem, DemoTab } from '../../services/demoService';
@@ -21,11 +22,11 @@ export const DemoManagementPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const auth = useAuth() as any;
 
-  // Resilient user extraction
+  // Safe resolver for salesperson profile that survives browser reloads
   const getActiveUser = () => {
     if (auth?.user?.name) return auth.user;
     try {
-      const stored = localStorage.getItem('crm_user');
+      const stored = localStorage.getItem('crm_user') || localStorage.getItem('user');
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -122,7 +123,6 @@ export const DemoManagementPage: React.FC = () => {
 
   const handleOpenScheduleForm = () => {
     setLeadSearchQuery('');
-    // Preload available leads into dropdown on open
     setMatchingLeads(cachedLeads.slice(0, 8));
     setIsSearchDropdownOpen(false);
     setSelectedLeadData(null);
@@ -140,8 +140,8 @@ export const DemoManagementPage: React.FC = () => {
     setView('schedule-form');
   };
 
-  // Load demos scoped to this salesperson
-  const loadDemos = async () => {
+  // Load demos scoped strictly to this salesperson's assigned leads
+  const loadDemos = useCallback(async () => {
     try {
       setIsLoading(true);
       const [demosData, userLeads] = await Promise.all([
@@ -152,14 +152,11 @@ export const DemoManagementPage: React.FC = () => {
       const myLeads = userLeads.filter((l: any) => {
         if (userRole === 'admin' || userRole === 'super admin') return true;
         const assigned = (l.assignedTo || '').trim().toLowerCase();
-        if (!currentSalesName) return true;
+        if (!currentSalesName) return false;
         return (
           assigned === currentSalesName ||
           (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
-          (assigned.length > 0 && currentSalesName.includes(assigned)) ||
-          assigned === '' ||
-          assigned === 'unassigned' ||
-          assigned === 'sales'
+          (assigned.length > 0 && currentSalesName.includes(assigned))
         );
       });
 
@@ -186,12 +183,12 @@ export const DemoManagementPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentSalesName, userRole, selectedDemo]);
 
   useEffect(() => {
     loadDemos();
     loadFaculties();
-  }, [currentSalesName, userRole]);
+  }, [loadDemos]);
 
   // Deep linking: if opened with ?scheduleLeadId=xyz
   useEffect(() => {
@@ -232,7 +229,6 @@ export const DemoManagementPage: React.FC = () => {
     return matchMode && matchCourse;
   });
 
-  // Dynamic search handler using cached leads (instant & reliable)
   const handleLeadSearchChange = (val: string) => {
     setLeadSearchQuery(val);
     setSelectedLeadData(null);

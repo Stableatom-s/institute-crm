@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ArrowLeft, 
   ChevronLeft, 
@@ -42,10 +42,11 @@ export interface FeeStudent {
 export const FeesManagementPage: React.FC = () => {
   const auth = useAuth() as any;
 
+  // Safe resolver for salesperson profile that survives browser reloads
   const getActiveUser = () => {
     if (auth?.user?.name) return auth.user;
     try {
-      const stored = localStorage.getItem('crm_user');
+      const stored = localStorage.getItem('crm_user') || localStorage.getItem('user');
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -73,7 +74,7 @@ export const FeesManagementPage: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [remarkDescription, setRemarkDescription] = useState('');
 
-  const loadFeeData = async () => {
+  const loadFeeData = useCallback(async () => {
     try {
       setIsLoading(true);
       const [invoices, leads] = await Promise.all([
@@ -85,15 +86,12 @@ export const FeesManagementPage: React.FC = () => {
         if (userRole === 'admin' || userRole === 'super admin') return true;
 
         const assigned = (l.assignedTo || '').trim().toLowerCase();
-        if (!currentSalesName) return true;
+        if (!currentSalesName) return false;
 
         return (
           assigned === currentSalesName ||
           (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
-          (assigned.length > 0 && currentSalesName.includes(assigned)) ||
-          assigned === '' ||
-          assigned === 'unassigned' ||
-          assigned === 'sales'
+          (assigned.length > 0 && currentSalesName.includes(assigned))
         );
       });
 
@@ -175,11 +173,11 @@ export const FeesManagementPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentSalesName, userRole, selectedStudent]);
 
   useEffect(() => {
     loadFeeData();
-  }, [currentSalesName, userRole]);
+  }, [loadFeeData]);
 
   const totalCollected = students.reduce((acc, curr) => acc + curr.paidFees, 0);
   const totalOutstanding = students.reduce((acc, curr) => acc + (curr.totalFees - curr.paidFees), 0);

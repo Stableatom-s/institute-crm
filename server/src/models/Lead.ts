@@ -22,6 +22,7 @@ export interface ILead extends Document {
   occupation: string;
   leadSource: string;
   address: string;
+  assignedTo: string; // <-- 1. ADD THIS TO INTERFACE
   offeredFees: string;
   finalFees: string;
   referral: 'Yes' | 'No';
@@ -59,6 +60,7 @@ const leadSchema = new Schema<ILead>(
     occupation: { type: String, default: 'College Student' },
     leadSource: { type: String, default: 'Instagram' },
     address: { type: String, default: 'Pune' },
+    assignedTo: { type: String, default: 'Unassigned' }, // <-- 2. ADD THIS TO SCHEMA
     offeredFees: { type: String, default: '₹35,000' },
     finalFees: { type: String, default: '₹35,000' },
     referral: { type: String, enum: ['Yes', 'No'], default: 'No' },

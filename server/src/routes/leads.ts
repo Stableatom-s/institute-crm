@@ -25,7 +25,7 @@ router.post('/', async (req: Request, res: Response) => {
     const newLead = new Lead({
       ...req.body,
       srNo: String(count + 1).padStart(2, '0'),
-      assignedTo: req.body.assignedTo || 'Unassigned',
+      assignedTo: req.body.assignedTo || 'Unassigned', 
     });
     const saved = await newLead.save();
     res.status(201).json(saved);

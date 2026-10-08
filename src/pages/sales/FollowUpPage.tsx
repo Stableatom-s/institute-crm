@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { leadService } from '../../services/leadService';
@@ -8,10 +8,11 @@ export const FollowUpPage: React.FC = () => {
   const navigate = useNavigate();
   const auth = useAuth() as any;
 
+  // Safe resolver for salesperson profile that survives browser reloads
   const getActiveUser = () => {
     if (auth?.user?.name) return auth.user;
     try {
-      const stored = localStorage.getItem('crm_user');
+      const stored = localStorage.getItem('crm_user') || localStorage.getItem('user');
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -27,38 +28,35 @@ export const FollowUpPage: React.FC = () => {
   const [leads, setLeads] = useState<DetailedLead[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  useEffect(() => {
-    const fetchFollowUps = async () => {
-      try {
-        setIsLoading(true);
-        const data = await leadService.getAllLeads();
+  const fetchFollowUps = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const data = await leadService.getAllLeads();
 
-        const userLeads = data.filter((lead: any) => {
-          if (userRole === 'admin' || userRole === 'super admin') return true;
+      const userLeads = data.filter((lead: any) => {
+        if (userRole === 'admin' || userRole === 'super admin') return true;
 
-          const assigned = (lead.assignedTo || '').trim().toLowerCase();
-          if (!currentSalesName) return true;
+        const assigned = (lead.assignedTo || '').trim().toLowerCase();
+        if (!currentSalesName) return false;
 
-          return (
-            assigned === currentSalesName ||
-            (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
-            (assigned.length > 0 && currentSalesName.includes(assigned)) ||
-            assigned === '' ||
-            assigned === 'unassigned' ||
-            assigned === 'sales'
-          );
-        });
+        return (
+          assigned === currentSalesName ||
+          (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
+          (assigned.length > 0 && currentSalesName.includes(assigned))
+        );
+      });
 
-        setLeads(userLeads);
-      } catch (error) {
-        console.error('Failed to fetch follow-ups from backend:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchFollowUps();
+      setLeads(userLeads);
+    } catch (error) {
+      console.error('Failed to fetch follow-ups from backend:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }, [currentSalesName, userRole]);
+
+  useEffect(() => {
+    fetchFollowUps();
+  }, [fetchFollowUps]);
 
   const handleViewLead = (leadId: string) => {
     navigate(`/sales/leads?leadId=${leadId}`);
@@ -66,6 +64,8 @@ export const FollowUpPage: React.FC = () => {
 
   const filteredFollowUps = leads.filter((lead) => {
     if (!fromDate && !toDate) return true;
+    const leadDateStr = lead.followUp || lead.enquiryDate;
+    if (!leadDateStr) return true;
     return true;
   });
 
