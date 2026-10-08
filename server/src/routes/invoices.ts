@@ -13,14 +13,26 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-// POST create or request invoice (From Sales Fees or Admin)
+// Helper: Calculate total approved paid amount from an installments array
+function calculatePaidFromInstallments(installments: any[] = [], defaultPaid = 0): number {
+  if (!installments || installments.length === 0) return defaultPaid;
+  return installments
+    .filter((inst) => inst.status === 'Paid')
+    .reduce((sum, inst) => {
+      const amt = typeof inst.amount === 'string'
+        ? parseInt(inst.amount.replace(/[^0-9]/g, ''), 10) || 0
+        : Number(inst.amount) || 0;
+      return sum + amt;
+    }, 0);
+}
+
+// POST create or request invoice
 router.post('/', async (req: Request, res: Response) => {
   try {
     const count = await Invoice.countDocuments();
     const totalFees = Number(req.body.totalFees) || 0;
+    const requestedPaidFees = Number(req.body.paidFees) || 0;
     const isApproved = req.body.approvalStatus === 'Approved';
-    const amountToCredit = isApproved ? (Number(req.body.paidFees) || 0) : 0;
-    const remainingFees = Math.max(0, totalFees - amountToCredit);
     const invoiceCode = req.body.invoiceCode || `GST/${String(count + 1).padStart(3, '0')}`;
 
     let existing = null;
@@ -32,29 +44,56 @@ router.post('/', async (req: Request, res: Response) => {
 
     if (existing) {
       existing.approvalStatus = req.body.approvalStatus || 'Requests';
-      if (req.body.installments && req.body.installments.length > 0) {
-        existing.installments = req.body.installments;
+      
+      // Update installments list if provided
+      if (req.body.timeline && req.body.timeline.length > 0) {
+        existing.installments = req.body.timeline.map((t: any) => ({
+          id: t.id || `inst-${Date.now()}`,
+          installmentTitle: t.installmentTitle || t.title,
+          dueDate: t.dueDate,
+          paidDate: t.paidDate,
+          amount: typeof t.amount === 'string' ? parseInt(t.amount.replace(/[^0-9]/g, ''), 10) || 0 : Number(t.amount) || 0,
+          amountLeft: typeof t.amountLeft === 'string' ? parseInt(t.amountLeft.replace(/[^0-9]/g, ''), 10) || 0 : Number(t.amountLeft) || 0,
+          status: isApproved ? 'Paid' : (t.status || 'Pending'),
+        }));
       }
+
+      // DO NOT ACCUMULATE BLINDLY. Set paid fees to exact target or sum of approved installments
       if (isApproved) {
-        existing.paidFees += amountToCredit;
-        existing.remainingFees = Math.max(0, existing.totalFees - existing.paidFees);
-        existing.paymentStatus = existing.remainingFees === 0 ? 'Paid' : 'Partially Paid';
+        const approvedSum = calculatePaidFromInstallments(existing.installments, requestedPaidFees);
+        existing.paidFees = Math.min(existing.totalFees, approvedSum > 0 ? approvedSum : requestedPaidFees);
       }
+      
+      existing.remainingFees = Math.max(0, existing.totalFees - existing.paidFees);
+      existing.paymentStatus = existing.remainingFees === 0 ? 'Paid' : 'Partially Paid';
+      
       const saved = await existing.save();
       return res.status(200).json(saved);
     }
+
+    // New invoice
+    const initialPaid = isApproved ? requestedPaidFees : 0;
+    const remainingFees = Math.max(0, totalFees - initialPaid);
 
     const newInvoice = new Invoice({
       ...req.body,
       srNo: String(count + 1).padStart(2, '0'),
       invoiceCode,
       totalFees,
-      paidFees: amountToCredit, // Only credited if generated directly as Approved by Admin
+      paidFees: initialPaid,
       remainingFees,
-      paymentStatus: amountToCredit >= totalFees && totalFees > 0 ? 'Paid' : 'Partially Paid',
+      paymentStatus: initialPaid >= totalFees && totalFees > 0 ? 'Paid' : 'Partially Paid',
       approvalStatus: req.body.approvalStatus || 'Requests',
       approvedOn: isApproved ? new Date().toLocaleDateString('en-GB').replace(/\//g, '-') : '-',
-      installments: req.body.installments || [],
+      installments: (req.body.timeline || req.body.installments || []).map((t: any) => ({
+        id: t.id || `inst-${Date.now()}`,
+        installmentTitle: t.installmentTitle || t.title,
+        dueDate: t.dueDate,
+        paidDate: t.paidDate,
+        amount: typeof t.amount === 'string' ? parseInt(t.amount.replace(/[^0-9]/g, ''), 10) || 0 : Number(t.amount) || 0,
+        amountLeft: typeof t.amountLeft === 'string' ? parseInt(t.amountLeft.replace(/[^0-9]/g, ''), 10) || 0 : Number(t.amountLeft) || 0,
+        status: isApproved ? 'Paid' : (t.status || 'Pending'),
+      })),
     });
 
     const saved = await newInvoice.save();
@@ -64,16 +103,14 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// PATCH record installment request (Pending admin approval)
+// PATCH record installment request
 router.patch('/:id/installment', async (req: Request, res: Response) => {
   try {
     const { amount, installmentRecord } = req.body;
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
 
-    const payAmt = Number(amount) || 0;
-
-    // Do NOT add to paidFees here! Kept as pending until Admin approves.
+    const payAmt = typeof amount === 'string' ? parseInt(amount.replace(/[^0-9]/g, ''), 10) || 0 : Number(amount) || 0;
     invoice.approvalStatus = 'Requests';
 
     if (installmentRecord) {
@@ -84,7 +121,7 @@ router.patch('/:id/installment', async (req: Request, res: Response) => {
         paidDate: installmentRecord.paidDate || new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
         amount: payAmt,
         amountLeft: Math.max(0, invoice.totalFees - invoice.paidFees - payAmt),
-        status: 'Pending', // Pending until approval
+        status: 'Pending',
       });
     }
 
@@ -95,7 +132,7 @@ router.patch('/:id/installment', async (req: Request, res: Response) => {
   }
 });
 
-// PATCH approve invoice: credits the amount to paidFees
+// PATCH approve invoice: accurately recalculate paidFees
 router.patch('/:id/approve', async (req: Request, res: Response) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
@@ -104,16 +141,18 @@ router.patch('/:id/approve', async (req: Request, res: Response) => {
     invoice.approvalStatus = 'Approved';
     invoice.approvedOn = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
 
-    // Calculate total approved fees from installments or credit pending installment
-    let totalApproved = 0;
     if (invoice.installments && invoice.installments.length > 0) {
+      let approvedSum = 0;
       invoice.installments.forEach((inst: any) => {
         inst.status = 'Paid';
-        totalApproved += Number(inst.amount) || 0;
+        const num = typeof inst.amount === 'string' ? parseInt(inst.amount.replace(/[^0-9]/g, ''), 10) || 0 : Number(inst.amount) || 0;
+        approvedSum += num;
       });
-      invoice.paidFees = Math.min(invoice.totalFees, totalApproved);
+      // Cap at total fees, never allow exceeding total
+      invoice.paidFees = Math.min(invoice.totalFees, approvedSum);
     } else {
-      invoice.paidFees = invoice.totalFees;
+      // If no installment breakdowns were specified, only mark what was recorded, capped at total
+      invoice.paidFees = Math.min(invoice.totalFees, invoice.paidFees > 0 ? invoice.paidFees : invoice.totalFees);
     }
 
     invoice.remainingFees = Math.max(0, invoice.totalFees - invoice.paidFees);
@@ -126,7 +165,7 @@ router.patch('/:id/approve', async (req: Request, res: Response) => {
   }
 });
 
-// PATCH reject invoice: no fees added, status marked Cancelled
+// PATCH reject invoice
 router.patch('/:id/reject', async (req: Request, res: Response) => {
   try {
     const { reason } = req.body;
@@ -136,7 +175,6 @@ router.patch('/:id/reject', async (req: Request, res: Response) => {
     invoice.approvalStatus = 'Cancelled';
     invoice.rejectedReason = reason || 'Rejected by administrator';
 
-    // Mark pending installments as Cancelled/Rejected without touching paidFees
     if (invoice.installments) {
       invoice.installments.forEach((inst: any) => {
         if (inst.status === 'Pending') {

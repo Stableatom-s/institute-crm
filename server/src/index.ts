@@ -11,6 +11,7 @@ import { attendanceRoutes } from './routes/attendance';
 import leaveRoutes from './routes/leaves';
 import teamRoutes from './routes/team';
 import authRoutes from './routes/auth';
+import notificationRoutes from './routes/notifications';
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leaves', leaveRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
 });
