@@ -26,20 +26,42 @@ router.get('/my-records', async (req: Request, res: Response) => {
   }
 });
 
+// Helper for dynamic local time string (e.g., "12:06 PM")
+function getCurrentTimeString(): string {
+  return new Date().toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
 // POST clock-in
 router.post('/clock-in', async (req: Request, res: Response) => {
   try {
     const { inTime, date, userName, userRole, userId } = req.body;
     const today = date || new Date().toISOString().split('T')[0];
+    const realInTime = inTime || getCurrentTimeString();
+
+    // Standardize role display: 'Faculty', 'Salesperson', or 'Admin'
+    let normalizedRole = 'Faculty';
+    if (userRole) {
+      const lower = userRole.toLowerCase();
+      if (lower.includes('sales')) normalizedRole = 'Salesperson';
+      else if (lower.includes('admin')) normalizedRole = 'Admin';
+      else normalizedRole = 'Faculty';
+    }
+
+    const resolvedUserName = userName && userName !== 'User' ? userName : 'Staff Member';
 
     let record = await Attendance.findOne({
       date: today,
-      ...(userName ? { userName: { $regex: new RegExp(`^${userName.trim()}$`, 'i') } } : {})
+      userName: { $regex: new RegExp(`^${resolvedUserName.trim()}$`, 'i') }
     });
 
     if (record) {
-      if (!record.inTime || record.inTime === '-') {
-        record.inTime = inTime;
+      if (!record.inTime || record.inTime === '-' || record.inTime === '09:30 AM') {
+        record.inTime = realInTime;
+        record.userRole = normalizedRole;
         await record.save();
       }
       return res.json(record);
@@ -47,10 +69,10 @@ router.post('/clock-in', async (req: Request, res: Response) => {
 
     record = new Attendance({
       userId: userId || 'user-1',
-      userName: userName || 'User',
-      userRole: userRole || 'Faculty',
+      userName: resolvedUserName,
+      userRole: normalizedRole,
       date: today,
-      inTime,
+      inTime: realInTime,
       outTime: 'Yet to checkout',
       workingHours: '00:00',
       activities: []
@@ -68,9 +90,10 @@ router.post('/clock-out', async (req: Request, res: Response) => {
   try {
     const { outTime, activities, workingHours, date, userName } = req.body;
     const today = date || new Date().toISOString().split('T')[0];
+    const realOutTime = outTime || getCurrentTimeString();
 
     const filter: any = { date: today };
-    if (userName) {
+    if (userName && userName !== 'User') {
       filter.userName = { $regex: new RegExp(`^${userName.trim()}$`, 'i') };
     }
 
@@ -79,13 +102,15 @@ router.post('/clock-out', async (req: Request, res: Response) => {
     if (!record) {
       record = new Attendance({
         date: today,
+        userName: userName || 'Staff Member',
+        userRole: 'Faculty',
         inTime: '09:30 AM',
-        outTime: outTime || 'Yet to checkout',
+        outTime: realOutTime,
         workingHours: workingHours || '00:00',
         activities: activities || []
       });
     } else {
-      record.outTime = outTime;
+      record.outTime = realOutTime;
       if (activities && activities.length > 0) {
         record.activities = activities;
       }
@@ -113,12 +138,12 @@ router.get('/my-leaves', async (req: Request, res: Response) => {
   }
 });
 
-// POST apply leave (compat with attendanceService)
+// POST apply leave
 router.post('/apply-leave', async (req: Request, res: Response) => {
   try {
     const newLeave = new Leave({
       userId: req.body.userId || 'user-1',
-      userName: req.body.userName || 'User',
+      userName: req.body.userName || 'Staff Member',
       userRole: req.body.userRole || 'Faculty',
       leaveType: req.body.leaveType || 'Casual',
       leaveDate: req.body.leaveDate || req.body.startDate,

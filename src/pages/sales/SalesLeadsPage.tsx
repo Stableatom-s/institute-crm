@@ -11,6 +11,7 @@ import {
   Save,
   Check,
 } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 import { leadService } from "../../services/leadService";
 
 // --- TYPES ---
@@ -44,6 +45,7 @@ export interface DetailedLead {
   occupation: string;
   leadSource: string;
   address: string;
+  assignedTo?: string;
   offeredFees?: string;
   finalFees?: string;
   referral?: "Yes" | "No";
@@ -71,6 +73,8 @@ const STATUSES = [
 export const SalesLeadsPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const auth = useAuth() as any;
+  const currentSalesName = (auth?.user?.name || "").trim().toLowerCase();
 
   // Navigation states: 'list' | 'details' | 'add'
   const [view, setView] = useState<"list" | "details" | "add">("list");
@@ -92,7 +96,7 @@ export const SalesLeadsPage: React.FC = () => {
   const [isDirty, setIsDirty] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
 
-  // Add Lead Form State - All blank with no hardcoded examples
+  // Add Lead Form State
   const [formFirstName, setFormFirstName] = useState("");
   const [formLastName, setFormLastName] = useState("");
   const [formMobile, setFormMobile] = useState("");
@@ -112,15 +116,27 @@ export const SalesLeadsPage: React.FC = () => {
   const [formStudentMobile, setFormStudentMobile] = useState("");
   const [formError, setFormError] = useState(false);
 
-  // Fetch leads from MongoDB Backend on mount
+  // Fetch leads and filter strictly by this logged-in salesperson
   const fetchLeads = async () => {
     try {
       setIsLoading(true);
       const data = await leadService.getAllLeads();
-      setLeads(data);
-      if (data.length > 0 && !selectedLead) {
-        setSelectedLead(data[0]);
-        setCurrentLeadStatus(data[0].status);
+
+      const userLeads = data.filter((lead: any) => {
+        const assigned = (lead.assignedTo || "").trim().toLowerCase();
+        return (
+          assigned === currentSalesName ||
+          (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
+          (assigned.length > 0 && currentSalesName.includes(assigned))
+        );
+      });
+
+      setLeads(userLeads);
+      if (userLeads.length > 0 && !selectedLead) {
+        setSelectedLead(userLeads[0]);
+        setCurrentLeadStatus(userLeads[0].status);
+      } else if (userLeads.length === 0) {
+        setSelectedLead(null);
       }
     } catch (error) {
       console.error("Failed to fetch leads from server:", error);
@@ -130,8 +146,10 @@ export const SalesLeadsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchLeads();
-  }, []);
+    if (currentSalesName) {
+      fetchLeads();
+    }
+  }, [currentSalesName]);
 
   // Deep linking listener: Opens lead directly if URL has `?leadId=...`
   useEffect(() => {
@@ -157,7 +175,6 @@ export const SalesLeadsPage: React.FC = () => {
     return matchStatus && matchCourse;
   });
 
-  // Handle open lead details
   const handleOpenLead = (lead: DetailedLead) => {
     setSelectedLead(lead);
     setCurrentLeadStatus(lead.status);
@@ -167,7 +184,6 @@ export const SalesLeadsPage: React.FC = () => {
     setView("details");
   };
 
-  // Back from details check
   const handleBackFromDetails = () => {
     if (isDirty) {
       setShowUnsavedModal(true);
@@ -177,7 +193,6 @@ export const SalesLeadsPage: React.FC = () => {
     }
   };
 
-  // Save changes on Lead Details directly to MongoDB
   const handleSaveLeadChanges = async () => {
     if (!selectedLead) return;
 
@@ -200,7 +215,7 @@ export const SalesLeadsPage: React.FC = () => {
         title: `Lead Remark - ${remarkTitle}`,
         description: remarkDescription.trim(),
       };
-      updatedTimeline.push(newEntry);
+      updatedTimeline.unshift(newEntry);
     }
 
     try {
@@ -230,14 +245,12 @@ export const SalesLeadsPage: React.FC = () => {
     }
   };
 
-  // Toggle course checkbox in Add Form
   const toggleCourseCheckbox = (c: string) => {
     setFormCourses((prev) =>
       prev.includes(c) ? prev.filter((item) => item !== c) : [...prev, c]
     );
   };
 
-  // Submit Add Lead Form directly to MongoDB
   const handleCreateLead = async () => {
     if (!formFirstName.trim()) {
       setFormError(true);
@@ -256,10 +269,11 @@ export const SalesLeadsPage: React.FC = () => {
       followUp: "01-01-2026",
       remark: "Newly Added",
       occupation: formOccupation,
-      leadSource: formLeadSource,
-      address: formAddress,
-      offeredFees: formOfferedFees,
-      finalFees: formFinalFees,
+      leadSource: formLeadSource || "Walk-in",
+      address: formAddress || "Pune",
+      assignedTo: auth?.user?.name || "Sales",
+      offeredFees: formOfferedFees || "₹35,000",
+      finalFees: formFinalFees || "₹35,000",
       referral: formReferral,
       enquiringFor: formEnquiringFor,
       timeline: [
@@ -268,7 +282,7 @@ export const SalesLeadsPage: React.FC = () => {
           timestamp: `${formEnquiryDate || new Date().toISOString().split("T")[0]}, 10:00 AM`,
           status: "Interested",
           title: "Lead Remark",
-          description: "Lead created via CRM manual entry",
+          description: `Lead created and assigned to ${auth?.user?.name || "Sales"}`,
         },
       ],
     };
@@ -286,9 +300,7 @@ export const SalesLeadsPage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-      {/* ========================================================= */}
-      {/* 1. LEADS DIRECTORY LISTING                                */}
-      {/* ========================================================= */}
+      {/* 1. LEADS DIRECTORY LISTING */}
       {view === "list" && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold font-['Sora']">Leads</h1>
@@ -301,7 +313,7 @@ export const SalesLeadsPage: React.FC = () => {
                 {leads.length}
               </span>
               <span className="text-[11px] text-[#050720]/50 font-medium">
-                All time
+                Assigned to you
               </span>
             </div>
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
@@ -309,7 +321,7 @@ export const SalesLeadsPage: React.FC = () => {
                 Leads created today
               </span>
               <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
-                {leads.filter(l => l.remark === 'Newly Added').length}
+                {leads.filter((l) => l.remark === "Newly Added").length}
               </span>
               <span className="text-[11px] text-[#050720]/50 font-medium">
                 Recent entries
@@ -318,10 +330,10 @@ export const SalesLeadsPage: React.FC = () => {
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Enrolled</span>
               <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
-                {leads.filter(l => l.status === 'Enrolled').length}
+                {leads.filter((l) => l.status === "Enrolled").length}
               </span>
               <span className="text-[11px] text-[#050720]/50 font-medium">
-                Leads converted to students
+                Converted to students
               </span>
             </div>
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
@@ -329,7 +341,7 @@ export const SalesLeadsPage: React.FC = () => {
                 Follow-ups Due Today
               </span>
               <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
-                {leads.filter(l => l.status === 'Interested').length}
+                {leads.filter((l) => l.status === "Interested").length}
               </span>
               <span className="text-[11px] text-[#050720]/50 font-medium">
                 Action required
@@ -337,7 +349,7 @@ export const SalesLeadsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Action Header: Sort Filters + Add Lead Button */}
+          {/* Action Header */}
           <div className="flex justify-between items-center relative z-10 pt-2">
             <div className="flex items-center gap-3">
               <span className="text-xs text-[#050720]/70 font-medium">
@@ -351,7 +363,7 @@ export const SalesLeadsPage: React.FC = () => {
                     setIsStatusDropdownOpen(!isStatusDropdownOpen);
                     setIsCourseDropdownOpen(false);
                   }}
-                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[100px]"
+                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[100px] cursor-pointer"
                 >
                   <span>
                     {statusFilter === "All" ? "Status" : statusFilter}
@@ -371,7 +383,7 @@ export const SalesLeadsPage: React.FC = () => {
                           setStatusFilter(st);
                           setIsStatusDropdownOpen(false);
                         }}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720]"
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720] cursor-pointer"
                       >
                         {st}
                       </button>
@@ -387,7 +399,7 @@ export const SalesLeadsPage: React.FC = () => {
                     setIsCourseDropdownOpen(!isCourseDropdownOpen);
                     setIsStatusDropdownOpen(false);
                   }}
-                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[100px]"
+                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[100px] cursor-pointer"
                 >
                   <span>
                     {courseFilter === "All" ? "Course" : courseFilter}
@@ -407,7 +419,7 @@ export const SalesLeadsPage: React.FC = () => {
                           setCourseFilter(c);
                           setIsCourseDropdownOpen(false);
                         }}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720]"
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720] cursor-pointer"
                       >
                         {c}
                       </button>
@@ -437,7 +449,7 @@ export const SalesLeadsPage: React.FC = () => {
                 setFormError(false);
                 setView("add");
               }}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Add new lead</span>
@@ -448,11 +460,11 @@ export const SalesLeadsPage: React.FC = () => {
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
             {isLoading ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
-                Loading leads from database...
+                Loading your leads from database...
               </div>
             ) : filteredLeads.length === 0 ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
-                No leads found.
+                No leads assigned to you yet. Click "Add new lead" to add one.
               </div>
             ) : (
               <table className="w-full text-left text-xs">
@@ -491,7 +503,7 @@ export const SalesLeadsPage: React.FC = () => {
                       <td className="py-3.5">
                         <span
                           className={`font-semibold ${
-                            lead.status === "Interested"
+                            lead.status === "Interested" || lead.status === "Enrolled"
                               ? "text-[#10B981]"
                               : "text-[#EF4444]"
                           }`}
@@ -506,7 +518,7 @@ export const SalesLeadsPage: React.FC = () => {
                       <td className="py-3.5 text-right">
                         <button
                           onClick={() => handleOpenLead(lead)}
-                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
                         >
                           View
                         </button>
@@ -526,13 +538,13 @@ export const SalesLeadsPage: React.FC = () => {
                 className="w-8 h-7 text-center border border-[#050720]/20 rounded text-xs text-[#050720] font-semibold"
               />
               <div className="flex items-center gap-1.5 ml-2">
-                <button className="p-1 hover:text-[#050720]">
+                <button className="p-1 hover:text-[#050720] cursor-pointer">
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
                 <span className="text-[11px] font-semibold text-[#050720]">
                   01 of 10
                 </span>
-                <button className="p-1 hover:text-[#050720]">
+                <button className="p-1 hover:text-[#050720] cursor-pointer">
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -541,16 +553,13 @@ export const SalesLeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. VIEW LEAD DETAILS PAGE                                 */}
-      {/* ========================================================= */}
+      {/* 2. VIEW LEAD DETAILS PAGE */}
       {view === "details" && selectedLead && (
         <div className="space-y-6">
-          {/* Header Action Bar */}
           <div className="flex justify-between items-center">
             <button
               onClick={handleBackFromDetails}
-              className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
             >
               <ArrowLeft className="w-6 h-6 text-[#050720]" />
               <span>Lead Details</span>
@@ -560,14 +569,14 @@ export const SalesLeadsPage: React.FC = () => {
                 onClick={() =>
                   navigate(`/sales/demos?scheduleLeadId=${selectedLead.id}`)
                 }
-                className="flex items-center gap-2 px-4 py-2 border border-[#050720] rounded-lg text-xs font-bold text-[#050720] hover:bg-[#050720]/5 transition-colors bg-white shadow-xs"
+                className="flex items-center gap-2 px-4 py-2 border border-[#050720] rounded-lg text-xs font-bold text-[#050720] hover:bg-[#050720]/5 transition-colors bg-white shadow-xs cursor-pointer"
               >
                 <Calendar className="w-4 h-4" />
                 <span>Schedule Demo</span>
               </button>
               <button
                 onClick={handleSaveLeadChanges}
-                className="flex items-center gap-1.5 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 <Save className="w-4 h-4" />
                 <span>Save Changes</span>
@@ -575,11 +584,8 @@ export const SalesLeadsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Grid Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left 2 Columns: Overview & Timeline */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Student Overview Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">
                   Student Overview
@@ -652,7 +658,6 @@ export const SalesLeadsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Timeline Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Timeline</h3>
                 <div className="space-y-3">
@@ -668,7 +673,7 @@ export const SalesLeadsPage: React.FC = () => {
                           </span>
                           <span
                             className={`text-[11px] font-semibold ${
-                              entry.status === "Interested"
+                              entry.status === "Interested" || entry.status === "Enrolled"
                                 ? "text-[#10B981]"
                                 : "text-[#0066FF]"
                             }`}
@@ -693,9 +698,7 @@ export const SalesLeadsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Right Column: Status & Remark Editors */}
             <div className="space-y-6">
-              {/* Current Status Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
                 <h3 className="text-sm font-bold font-['Sora']">
                   Current Status
@@ -711,7 +714,7 @@ export const SalesLeadsPage: React.FC = () => {
                         setCurrentLeadStatus(e.target.value as LeadStatus);
                         setIsDirty(true);
                       }}
-                      className="w-full bg-[#F8FAFC] text-xs font-semibold text-[#10B981] px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                      className="w-full bg-[#F8FAFC] text-xs font-semibold text-[#10B981] px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                     >
                       <option value="Interested" className="text-[#10B981]">
                         Interested
@@ -731,7 +734,6 @@ export const SalesLeadsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Add Remark Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Add Remark</h3>
                 <div>
@@ -742,7 +744,7 @@ export const SalesLeadsPage: React.FC = () => {
                         setRemarkTitle(e.target.value);
                         setIsDirty(true);
                       }}
-                      className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                      className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                     >
                       <option value="Demo">Demo</option>
                       <option value="Follow-up Call">Follow-up Call</option>
@@ -774,9 +776,7 @@ export const SalesLeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 3. UNSAVED CHANGES MODAL                                  */}
-      {/* ========================================================= */}
+      {/* 3. UNSAVED CHANGES MODAL */}
       {showUnsavedModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -796,7 +796,7 @@ export const SalesLeadsPage: React.FC = () => {
                   setSearchParams({});
                   setView("list");
                 }}
-                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
               >
                 Discard Changes
               </button>
@@ -807,7 +807,7 @@ export const SalesLeadsPage: React.FC = () => {
                   setSearchParams({});
                   setView("list");
                 }}
-                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 Save Changes
               </button>
@@ -816,20 +816,17 @@ export const SalesLeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 4. ADD NEW LEADS VIEW                                     */}
-      {/* ========================================================= */}
+      {/* 4. ADD NEW LEADS VIEW */}
       {view === "add" && (
         <div className="space-y-6 max-w-4xl">
           <button
             onClick={() => setView("list")}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Add Leads</span>
           </button>
 
-          {/* Section 1: Student Details */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Student Details</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -885,7 +882,7 @@ export const SalesLeadsPage: React.FC = () => {
                 <select
                   value={formOccupation}
                   onChange={(e) => setFormOccupation(e.target.value)}
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                 >
                   <option value="College Student">College Student</option>
                   <option value="Working">Working</option>
@@ -939,7 +936,7 @@ export const SalesLeadsPage: React.FC = () => {
                 >
                   <div
                     onClick={() => toggleCourseCheckbox(c)}
-                    className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                    className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${
                       formCourses.includes(c)
                         ? "bg-[#050720] border-[#050720] text-white"
                         : "border-[#050720]/30"
@@ -1020,7 +1017,7 @@ export const SalesLeadsPage: React.FC = () => {
                   onChange={(e) =>
                     setFormEnquiringFor(e.target.value as "Self" | "Other")
                   }
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                 >
                   <option value="Self">Self</option>
                   <option value="Other">Other</option>
@@ -1054,13 +1051,13 @@ export const SalesLeadsPage: React.FC = () => {
           <div className="flex gap-4">
             <button
               onClick={() => setView("list")}
-              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={handleCreateLead}
-              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               Create Lead
             </button>

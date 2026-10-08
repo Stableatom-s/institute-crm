@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
   ChevronDown, 
   ChevronUp, 
   ChevronLeft, 
   ChevronRight, 
-  
   Check 
 } from 'lucide-react';
+import { leadService } from '../../services/leadService';
+import { teamService } from '../../services/teamService';
 
-// --- TYPES ---
 export type LeadStatus = 'Interested' | 'Not Interested' | 'Demo Scheduled' | 'Enrolled' | 'Contacted';
 
 export interface TimelineEntry {
@@ -35,133 +35,25 @@ export interface DetailedLead {
   occupation: string;
   leadSource: string;
   address: string;
-  assignedTo: string;
+  assignedTo?: string; // <-- Change to optional
   offeredFees?: string;
   finalFees?: string;
   referral?: 'Yes' | 'No';
-  enquiringFor?: string;
+  enquiringFor?: 'Self' | 'Other'; // <-- Restrict to exact literal union
   timeline: TimelineEntry[];
 }
 
-// --- INITIAL SEED DATA (SCREENSHOT 1 & 2) ---
-const INITIAL_LEADS: DetailedLead[] = [
-  {
-    id: 'lead-1',
-    srNo: '01',
-    firstName: 'Aanya',
-    lastName: 'Shah',
-    contactNo: '9078675645',
-    email: 'aanya@gmail.com',
-    enquiryDate: '15-11-2025',
-    course: 'UI/UX Design',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Needs Time',
-    occupation: 'Working',
-    leadSource: 'Instagram',
-    address: 'Pune',
-    assignedTo: 'Sejal',
-    offeredFees: '₹35,000',
-    finalFees: '₹35,000',
-    referral: 'No',
-    enquiringFor: 'Self',
-    timeline: [
-      { id: 't1', timestamp: '15-11-2025, 10:05 AM', status: 'Interested', title: 'Lead Remark', description: 'Lead created via inquiry form' },
-      { id: 't2', timestamp: '16-11-2025, 10:10 AM', status: 'Interested', title: 'Lead Remark', description: 'Student requested a demo session' },
-      { id: 't3', timestamp: '17-11-2025, 10:10 AM', status: 'Demo Scheduled', title: 'Lead Remark', description: 'Demo scheduled at 12:00 PM' },
-    ]
-  },
-  {
-    id: 'lead-2',
-    srNo: '02',
-    firstName: 'Rohan',
-    lastName: 'Mehta',
-    contactNo: '9123456565',
-    email: 'rohan.m@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'No Code',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Needs Time',
-    occupation: 'College Student',
-    leadSource: 'Google Search',
-    address: 'Mumbai',
-    assignedTo: 'Sejal',
-    timeline: [
-      { id: 't4', timestamp: '21-12-2025, 11:00 AM', status: 'Interested', title: 'Lead Remark', description: 'Initial contact via website' }
-    ]
-  },
-  {
-    id: 'lead-3',
-    srNo: '03',
-    firstName: 'Neha',
-    lastName: 'Patel',
-    contactNo: '9767564995',
-    email: 'neha.patel@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'UI/UX Design',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Joining Soon',
-    occupation: 'Working',
-    leadSource: 'LinkedIn',
-    address: 'Pune',
-    assignedTo: 'Sejal',
-    timeline: [
-      { id: 't5', timestamp: '21-12-2025, 02:30 PM', status: 'Interested', title: 'Lead Remark', description: 'Interested in weekend batch' }
-    ]
-  },
-  {
-    id: 'lead-4',
-    srNo: '04',
-    firstName: 'Aman',
-    lastName: 'Verma',
-    contactNo: '9876694837',
-    email: 'aman.v@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'Portfolio',
-    status: 'Not Interested',
-    followUp: '01-01-2026',
-    remark: 'Call Back',
-    occupation: 'College Student',
-    leadSource: 'Walk-in',
-    address: 'Pune',
-    assignedTo: 'Salesperson 1',
-    timeline: [
-      { id: 't6', timestamp: '21-12-2025, 04:15 PM', status: 'Not Interested', title: 'Lead Remark', description: 'Requested call back next month' }
-    ]
-  },
-  {
-    id: 'lead-5',
-    srNo: '05',
-    firstName: 'Siddhi',
-    lastName: 'Shah',
-    contactNo: '9456578342',
-    email: 'siddhi.s@gmail.com',
-    enquiryDate: '21-12-2025',
-    course: 'Full-Stack',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Joining Soon',
-    occupation: 'Working',
-    leadSource: 'Friend Referral',
-    address: 'Pune',
-    assignedTo: 'Salesperson 2',
-    timeline: [
-      { id: 't7', timestamp: '21-12-2025, 05:00 PM', status: 'Interested', title: 'Lead Remark', description: 'Wants placement assistance details' }
-    ]
-  },
-];
-
 const COURSES = ['Course', 'UI/UX Design', 'No Code', 'Portfolio', 'Full-Stack', 'React Native'];
 const STATUSES = ['Status', 'Interested', 'Not Interested', 'Demo Scheduled', 'Enrolled'];
-const SALESPERSONS = ['Salesperson 1', 'Salesperson 2', 'Sejal Singh', 'Rahul Deshmukh'];
 
 export const AdminLeadsPage: React.FC = () => {
-  // Navigation states: 'list' | 'details' | 'add'
   const [view, setView] = useState<'list' | 'details' | 'add'>('list');
-  const [leads, setLeads] = useState<DetailedLead[]>(INITIAL_LEADS);
-  const [selectedLead, setSelectedLead] = useState<DetailedLead>(INITIAL_LEADS[0]);
+  const [leads, setLeads] = useState<DetailedLead[]>([]);
+  const [selectedLead, setSelectedLead] = useState<DetailedLead | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Dynamic Sales Team List
+  const [salesPersons, setSalesPersons] = useState<string[]>([]);
 
   // Directory Filters
   const [statusFilter, setStatusFilter] = useState('Status');
@@ -183,21 +75,57 @@ export const AdminLeadsPage: React.FC = () => {
   const [formEmail, setFormEmail] = useState('');
   const [formOccupation, setFormOccupation] = useState('College Student');
   const [formLeadSource, setFormLeadSource] = useState('');
-  const [formEnquiryDate, setFormEnquiryDate] = useState('15-11-2025');
+  const [formEnquiryDate, setFormEnquiryDate] = useState(new Date().toLocaleDateString('en-GB').replace(/\//g, '-'));
   const [formAddress, setFormAddress] = useState('');
   const [formCourses, setFormCourses] = useState<string[]>([]);
   const [formReferral, setFormReferral] = useState<'Yes' | 'No'>('No');
   const [formOfferedFees, setFormOfferedFees] = useState('');
   const [formFinalFees, setFormFinalFees] = useState('');
   const [formEnquiringFor, setFormEnquiringFor] = useState('Self');
-  const [formStudentName, setFormStudentName] = useState('');
-  const [formStudentMobile, setFormStudentMobile] = useState('');
-  const [formAssignTo, setFormAssignTo] = useState('Salesperson 1');
+  const [formAssignTo, setFormAssignTo] = useState('');
   const [formError, setFormError] = useState(false);
 
   // Confirmation Modals
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showAssignedAlert, setShowAssignedAlert] = useState(false);
+
+  // Load real leads and sales team
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const [leadsData, teamData] = await Promise.all([
+        leadService.getAllLeads(),
+        teamService.getAllMembers(),
+      ]);
+
+      setLeads(leadsData);
+      if (leadsData.length > 0 && !selectedLead) {
+        setSelectedLead(leadsData[0]);
+      }
+
+      // Filter only members whose role is sales
+      const salesMembers = teamData
+        .filter((m) => {
+          const role = (m.role || '').toLowerCase();
+          return role.includes('sales');
+        })
+        .map((m) => m.name || `${m.firstName || ''} ${m.lastName || ''}`.trim())
+        .filter(Boolean);
+
+      setSalesPersons(salesMembers.length > 0 ? Array.from(new Set(salesMembers)) : ['Sales Team']);
+      if (salesMembers.length > 0) {
+        setFormAssignTo(salesMembers[0]);
+      }
+    } catch (err) {
+      console.error('Failed to load leads from database:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   // Filtered Leads
   const filteredLeads = leads.filter((l) => {
@@ -206,7 +134,6 @@ export const AdminLeadsPage: React.FC = () => {
     return matchStatus && matchCourse;
   });
 
-  // Open lead details
   const handleOpenLead = (lead: DetailedLead) => {
     setSelectedLead(lead);
     setCurrentLeadStatus(lead.status);
@@ -216,7 +143,6 @@ export const AdminLeadsPage: React.FC = () => {
     setView('details');
   };
 
-  // Back from details check
   const handleBackFromDetails = () => {
     if (isDirty) {
       setShowUnsavedModal(true);
@@ -225,44 +151,58 @@ export const AdminLeadsPage: React.FC = () => {
     }
   };
 
-  // Save changes on Lead Details
-  const handleSaveLeadChanges = () => {
+  const handleSaveLeadChanges = async () => {
+    if (!selectedLead) return;
+
     let updatedTimeline = [...selectedLead.timeline];
+    let newEntry: any = null;
+
     if (remarkDescription.trim()) {
       const now = new Date();
       const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-      updatedTimeline.push({
+      newEntry = {
         id: `t-${Date.now()}`,
         timestamp: dateStr,
         status: currentLeadStatus,
         title: `Lead Remark - ${remarkTitle}`,
         description: remarkDescription,
-      });
+      };
+      updatedTimeline.unshift(newEntry);
     }
 
-    const updated: DetailedLead = {
-      ...selectedLead,
-      status: currentLeadStatus,
-      timeline: updatedTimeline,
-    };
+    try {
+      await leadService.updateStatus(
+        selectedLead.id,
+        currentLeadStatus,
+        remarkDescription.trim() || undefined,
+        newEntry || undefined
+      );
 
-    setLeads(leads.map((l) => (l.id === updated.id ? updated : l)));
-    setSelectedLead(updated);
-    setRemarkDescription('');
-    setIsDirty(false);
-    alert('Lead details saved successfully!');
+      const updated: DetailedLead = {
+        ...selectedLead,
+        status: currentLeadStatus,
+        timeline: updatedTimeline,
+      };
+
+      setLeads(leads.map((l) => (l.id === updated.id ? updated : l)));
+      setSelectedLead(updated);
+      setRemarkDescription('');
+      setIsDirty(false);
+      alert('Lead details saved successfully!');
+    } catch (err) {
+      console.error('Failed to save lead:', err);
+      alert('Error updating lead on database.');
+    }
   };
 
-  // Toggle course checkbox in Add Form
   const toggleCourseCheckbox = (c: string) => {
     setFormCourses((prev) =>
       prev.includes(c) ? prev.filter((item) => item !== c) : [...prev, c]
     );
   };
 
-  // Validate and prompt Assign Lead confirmation
   const handlePreAssign = () => {
-    if (!formFirstName.trim()) {
+    if (!formFirstName.trim() || !formMobile.trim()) {
       setFormError(true);
       return;
     }
@@ -270,54 +210,54 @@ export const AdminLeadsPage: React.FC = () => {
     setShowAssignModal(true);
   };
 
-  // Confirm Assign Lead
-  const handleConfirmAssign = () => {
-    const newLead: DetailedLead = {
-      id: `lead-${Date.now()}`,
-      srNo: String(leads.length + 1).padStart(2, '0'),
-      firstName: formFirstName,
-      lastName: formLastName || 'Doe',
-      contactNo: formMobile || '9876543210',
-      email: formEmail || 'lead@example.com',
-      enquiryDate: formEnquiryDate,
-      course: formCourses[0] || 'UI/UX Design',
-      status: 'Interested',
-      followUp: '01-01-2026',
-      remark: 'Newly Added',
-      occupation: formOccupation,
-      leadSource: formLeadSource || 'Walk-in',
-      address: formAddress || 'Pune',
-      assignedTo: formAssignTo,
-      offeredFees: formOfferedFees,
-      finalFees: formFinalFees,
-      referral: formReferral,
-      enquiringFor: formEnquiringFor,
-      timeline: [
-        {
-          id: `t-${Date.now()}`,
-          timestamp: `${formEnquiryDate}, 10:00 AM`,
-          status: 'Interested',
-          title: 'Lead Remark',
-          description: `Lead created by Admin and assigned to ${formAssignTo}`,
-        },
-      ],
-    };
+  const handleConfirmAssign = async () => {
+  const payload: any = {
+    firstName: formFirstName,
+    lastName: formLastName,
+    contactNo: formMobile,
+    email: formEmail,
+    enquiryDate: formEnquiryDate,
+    course: formCourses[0] || 'UI/UX Design',
+    status: 'Interested',
+    followUp: '01-01-2026',
+    remark: 'Newly Added',
+    occupation: formOccupation,
+    leadSource: formLeadSource || 'Walk-in',
+    address: formAddress || 'Pune',
+    assignedTo: formAssignTo || 'Sales',
+    offeredFees: formOfferedFees || '₹35,000',
+    finalFees: formFinalFees || '₹35,000',
+    referral: formReferral,
+    enquiringFor: formEnquiringFor,
+    timeline: [
+      {
+        id: `t-${Date.now()}`,
+        timestamp: `${formEnquiryDate}, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        status: 'Interested',
+        title: 'Lead Remark',
+        description: `Lead created by Admin and assigned to ${formAssignTo}`,
+      },
+    ],
+  };
 
-    setLeads([newLead, ...leads]);
+  try {
+    const created: any = await leadService.createLead(payload);
+    setLeads([created, ...leads]);
+    setSelectedLead(created);
     setShowAssignModal(false);
     setShowAssignedAlert(true);
     setTimeout(() => {
       setShowAssignedAlert(false);
       setView('list');
     }, 1500);
-  };
-
+  } catch (err) {
+    console.error('Failed to create lead:', err);
+    alert('Error saving lead to database.');
+  }
+};
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-
-      {/* ========================================================= */}
-      {/* 1. LEADS DIRECTORY LISTING (SCREENSHOT 1)                  */}
-      {/* ========================================================= */}
+      {/* 1. LEADS DIRECTORY LISTING */}
       {view === 'list' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
@@ -330,62 +270,69 @@ export const AdminLeadsPage: React.FC = () => {
                 setFormEmail('');
                 setFormOccupation('College Student');
                 setFormLeadSource('');
-                setFormEnquiryDate('15-11-2025');
+                setFormEnquiryDate(new Date().toLocaleDateString('en-GB').replace(/\//g, '-'));
                 setFormAddress('');
                 setFormCourses([]);
                 setFormReferral('No');
                 setFormOfferedFees('');
                 setFormFinalFees('');
                 setFormEnquiringFor('Self');
-                setFormStudentName('');
-                setFormStudentMobile('');
-                setFormAssignTo('Salesperson 1');
+                setFormAssignTo(salesPersons[0] || 'Salesperson');
                 setFormError(false);
                 setView('add');
               }}
-              className="px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               Add new lead
             </button>
           </div>
 
-          {/* KPI Stat Cards */}
+          {/* KPI Stat Cards (Dynamically computed) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Total Leads</span>
-              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">150</span>
+              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
+                {String(leads.length).padStart(2, '0')}
+              </span>
               <span className="text-[11px] text-[#050720]/50 font-medium">All time</span>
             </div>
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Leads created today</span>
-              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">20</span>
-              <span className="text-[11px] text-[#050720]/50 font-medium">+8 Since Yesterday</span>
+              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
+                {String(
+                  leads.filter((l) => l.enquiryDate === new Date().toLocaleDateString('en-GB').replace(/\//g, '-')).length
+                ).padStart(2, '0')}
+              </span>
+              <span className="text-[11px] text-[#050720]/50 font-medium">Recorded today</span>
             </div>
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Enrolled</span>
-              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">30</span>
+              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
+                {String(leads.filter((l) => l.status === 'Enrolled').length).padStart(2, '0')}
+              </span>
               <span className="text-[11px] text-[#050720]/50 font-medium">Leads converted to students</span>
             </div>
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Follow-ups Due Today</span>
-              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">05</span>
+              <span className="text-3xl font-extrabold font-['Sora'] mt-1 block">
+                {String(leads.filter((l) => l.status === 'Interested').length).padStart(2, '0')}
+              </span>
               <span className="text-[11px] text-[#050720]/50 font-medium">Action required</span>
             </div>
           </div>
 
-          {/* Filter Bar & Table Container */}
+          {/* Filter Bar & Table */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-3 relative z-10">
               <span className="text-xs text-[#050720]/70 font-medium">Sort by:</span>
 
-              {/* Status Filter */}
               <div className="relative">
                 <button
                   onClick={() => {
                     setIsStatusDropdownOpen(!isStatusDropdownOpen);
                     setIsCourseDropdownOpen(false);
                   }}
-                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[100px]"
+                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[100px] cursor-pointer"
                 >
                   <span>{statusFilter}</span>
                   {isStatusDropdownOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -399,7 +346,7 @@ export const AdminLeadsPage: React.FC = () => {
                           setStatusFilter(st);
                           setIsStatusDropdownOpen(false);
                         }}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720]"
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720] cursor-pointer"
                       >
                         {st}
                       </button>
@@ -408,14 +355,13 @@ export const AdminLeadsPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Course Filter */}
               <div className="relative">
                 <button
                   onClick={() => {
                     setIsCourseDropdownOpen(!isCourseDropdownOpen);
                     setIsStatusDropdownOpen(false);
                   }}
-                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[100px]"
+                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[100px] cursor-pointer"
                 >
                   <span>{courseFilter}</span>
                   {isCourseDropdownOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -429,7 +375,7 @@ export const AdminLeadsPage: React.FC = () => {
                           setCourseFilter(c);
                           setIsCourseDropdownOpen(false);
                         }}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720]"
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720] cursor-pointer"
                       >
                         {c}
                       </button>
@@ -439,50 +385,58 @@ export const AdminLeadsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Table */}
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
-                  <th className="pb-3.5 font-semibold">Sr. No.</th>
-                  <th className="pb-3.5 font-semibold">Name</th>
-                  <th className="pb-3.5 font-semibold">Contact No.</th>
-                  <th className="pb-3.5 font-semibold">Enquiry Date</th>
-                  <th className="pb-3.5 font-semibold">Course</th>
-                  <th className="pb-3.5 font-semibold">Status</th>
-                  <th className="pb-3.5 font-semibold">Follow-up</th>
-                  <th className="pb-3.5 font-semibold">Remark</th>
-                  <th className="pb-3.5 text-right font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                    <td className="py-3.5 text-[#050720]/70">{lead.srNo}</td>
-                    <td className="py-3.5 font-medium">{lead.firstName} {lead.lastName}</td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.contactNo}</td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.enquiryDate}</td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.course}</td>
-                    <td className="py-3.5">
-                      <span className={`font-semibold ${lead.status === 'Interested' ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                        {lead.status}
-                      </span>
-                    </td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.followUp}</td>
-                    <td className="py-3.5 text-[#050720]/70">{lead.remark}</td>
-                    <td className="py-3.5 text-right">
-                      <button
-                        onClick={() => handleOpenLead(lead)}
-                        className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
-                      >
-                        View
-                      </button>
-                    </td>
+            {isLoading ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                Loading leads from database...
+              </div>
+            ) : filteredLeads.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#050720]/50">
+                No leads recorded yet. Click "Add new lead" to add one.
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
+                    <th className="pb-3.5 font-semibold">Sr. No.</th>
+                    <th className="pb-3.5 font-semibold">Name</th>
+                    <th className="pb-3.5 font-semibold">Contact No.</th>
+                    <th className="pb-3.5 font-semibold">Enquiry Date</th>
+                    <th className="pb-3.5 font-semibold">Course</th>
+                    <th className="pb-3.5 font-semibold">Status</th>
+                    <th className="pb-3.5 font-semibold">Follow-up</th>
+                    <th className="pb-3.5 font-semibold">Remark</th>
+                    <th className="pb-3.5 text-right font-semibold">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
+                  {filteredLeads.map((lead, idx) => (
+                    <tr key={lead.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                      <td className="py-3.5 text-[#050720]/70">{String(idx + 1).padStart(2, '0')}</td>
+                      <td className="py-3.5 font-medium">{lead.firstName} {lead.lastName}</td>
+                      <td className="py-3.5 text-[#050720]/70">{lead.contactNo}</td>
+                      <td className="py-3.5 text-[#050720]/70">{lead.enquiryDate}</td>
+                      <td className="py-3.5 text-[#050720]/70">{lead.course}</td>
+                      <td className="py-3.5">
+                        <span className={`font-semibold ${lead.status === 'Interested' || lead.status === 'Enrolled' ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+                          {lead.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 text-[#050720]/70">{lead.followUp}</td>
+                      <td className="py-3.5 text-[#050720]/70">{lead.remark}</td>
+                      <td className="py-3.5 text-right">
+                        <button
+                          onClick={() => handleOpenLead(lead)}
+                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
-            {/* Pagination Footer */}
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#050720]/5 text-xs text-[#050720]/70">
               <span className="text-[11px]">Jump to</span>
               <input
@@ -491,40 +445,36 @@ export const AdminLeadsPage: React.FC = () => {
                 className="w-8 h-7 text-center border border-[#050720]/20 rounded text-xs text-[#050720] font-semibold"
               />
               <div className="flex items-center gap-1.5 ml-2">
-                <button className="p-1 hover:text-[#050720]"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" /></button>
                 <span className="text-[11px] font-semibold text-[#050720]">01 of 10</span>
-                <button className="p-1 hover:text-[#050720]"><ChevronRight className="w-3.5 h-3.5" /></button>
+                <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronRight className="w-3.5 h-3.5" /></button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. VIEW LEAD DETAILS (SCREENSHOT 2 & 3)                    */}
-      {/* ========================================================= */}
+      {/* 2. VIEW LEAD DETAILS */}
       {view === 'details' && selectedLead && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <button
               onClick={handleBackFromDetails}
-              className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
             >
               <ArrowLeft className="w-6 h-6 text-[#050720]" />
               <span>Lead Details</span>
             </button>
             <button
               onClick={handleSaveLeadChanges}
-              className="px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               Save Changes
             </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left 2 Columns: Overview & Timeline */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Student Overview Card with Assigned To (Screenshot 2) */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Student Overview</h3>
                 <div className="grid grid-cols-2 gap-y-4 text-xs">
@@ -534,7 +484,7 @@ export const AdminLeadsPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Last Name</span>
-                    <span className="font-semibold text-sm">{selectedLead.lastName}</span>
+                    <span className="font-semibold text-sm">{selectedLead.lastName || '—'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Mobile</span>
@@ -542,15 +492,15 @@ export const AdminLeadsPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Email</span>
-                    <span className="font-semibold text-sm">{selectedLead.email}</span>
+                    <span className="font-semibold text-sm">{selectedLead.email || '—'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Occupation</span>
-                    <span className="font-semibold text-sm">{selectedLead.occupation}</span>
+                    <span className="font-semibold text-sm">{selectedLead.occupation || 'Student'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Lead Source</span>
-                    <span className="font-semibold text-sm">{selectedLead.leadSource}</span>
+                    <span className="font-semibold text-sm">{selectedLead.leadSource || 'Direct'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Enquiry Date</span>
@@ -558,38 +508,39 @@ export const AdminLeadsPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Address</span>
-                    <span className="font-semibold text-sm">{selectedLead.address}</span>
+                    <span className="font-semibold text-sm">{selectedLead.address || 'Pune'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Assigned to</span>
-                    <span className="font-semibold text-sm">{selectedLead.assignedTo}</span>
+                    <span className="font-semibold text-sm">{selectedLead.assignedTo || 'Sales'}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Timeline Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Timeline</h3>
-                <div className="space-y-3">
-                  {selectedLead.timeline.map((entry) => (
-                    <div key={entry.id} className="border border-[#050720]/10 rounded-xl p-4">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-bold text-[#050720]">{entry.timestamp}</span>
-                        <span className={`text-[11px] font-semibold ${entry.status === 'Interested' ? 'text-[#10B981]' : 'text-[#0066FF]'}`}>
-                          {entry.status}
-                        </span>
+                {(!selectedLead.timeline || selectedLead.timeline.length === 0) ? (
+                  <p className="text-xs text-[#050720]/40 italic py-2">No timeline remarks added yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {selectedLead.timeline.map((entry) => (
+                      <div key={entry.id} className="border border-[#050720]/10 rounded-xl p-4">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-bold text-[#050720]">{entry.timestamp}</span>
+                          <span className={`text-[11px] font-semibold ${entry.status === 'Interested' || entry.status === 'Enrolled' ? 'text-[#10B981]' : 'text-[#0066FF]'}`}>
+                            {entry.status}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-[#050720]/50 block font-medium">{entry.title}</span>
+                        <p className="text-xs text-[#050720]/80 mt-0.5">{entry.description}</p>
                       </div>
-                      <span className="text-[10px] text-[#050720]/50 block font-medium">{entry.title}</span>
-                      <p className="text-xs text-[#050720]/80 mt-0.5">{entry.description}</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Right Column: Status & Remark Editors */}
             <div className="space-y-6">
-              {/* Current Status Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
                 <h3 className="text-sm font-bold font-['Sora']">Current Status</h3>
                 <div>
@@ -601,7 +552,7 @@ export const AdminLeadsPage: React.FC = () => {
                         setCurrentLeadStatus(e.target.value as LeadStatus);
                         setIsDirty(true);
                       }}
-                      className="w-full bg-[#F8FAFC] text-xs font-semibold text-[#10B981] px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                      className="w-full bg-[#F8FAFC] text-xs font-semibold text-[#10B981] px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                     >
                       <option value="Interested" className="text-[#10B981]">Interested</option>
                       <option value="Not Interested" className="text-[#EF4444]">Not Interested</option>
@@ -613,7 +564,6 @@ export const AdminLeadsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Add Remark Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Add Remark</h3>
                 <div>
@@ -624,7 +574,7 @@ export const AdminLeadsPage: React.FC = () => {
                         setRemarkTitle(e.target.value);
                         setIsDirty(true);
                       }}
-                      className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                      className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                     >
                       <option value="Demo">Demo</option>
                       <option value="Follow-up Call">Follow-up Call</option>
@@ -654,9 +604,7 @@ export const AdminLeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 3. LEAVE WITHOUT SAVING MODAL (SCREENSHOT 3)              */}
-      {/* ========================================================= */}
+      {/* 3. UNSAVED CHANGES MODAL */}
       {showUnsavedModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -671,7 +619,7 @@ export const AdminLeadsPage: React.FC = () => {
                   setIsDirty(false);
                   setView('list');
                 }}
-                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
               >
                 Discard Changes
               </button>
@@ -681,7 +629,7 @@ export const AdminLeadsPage: React.FC = () => {
                   handleSaveLeadChanges();
                   setView('list');
                 }}
-                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 Save Changes
               </button>
@@ -690,14 +638,12 @@ export const AdminLeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 4. ADD NEW LEADS VIEW (SCREENSHOT 4 & 7)                  */}
-      {/* ========================================================= */}
+      {/* 4. ADD NEW LEAD VIEW */}
       {view === 'add' && (
         <div className="space-y-6 max-w-4xl">
           <button
             onClick={() => setView('list')}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Add Leads</span>
@@ -717,17 +663,17 @@ export const AdminLeadsPage: React.FC = () => {
                     if (e.target.value) setFormError(false);
                   }}
                   className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border ${
-                    formError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
+                    formError && !formFirstName ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
                   } focus:outline-none`}
                 />
-                {formError && (
-                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">This field is required*</span>
+                {formError && !formFirstName && (
+                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">First Name is required*</span>
                 )}
               </div>
               <div>
                 <input
                   type="text"
-                  placeholder="Last Name*"
+                  placeholder="Last Name"
                   value={formLastName}
                   onChange={(e) => setFormLastName(e.target.value)}
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
@@ -739,13 +685,18 @@ export const AdminLeadsPage: React.FC = () => {
                   placeholder="Mobile*"
                   value={formMobile}
                   onChange={(e) => setFormMobile(e.target.value)}
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
+                  className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border ${
+                    formError && !formMobile ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
+                  } focus:outline-none`}
                 />
+                {formError && !formMobile && (
+                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">Mobile is required*</span>
+                )}
               </div>
               <div>
                 <input
                   type="email"
-                  placeholder="Email*"
+                  placeholder="Email"
                   value={formEmail}
                   onChange={(e) => setFormEmail(e.target.value)}
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
@@ -755,7 +706,7 @@ export const AdminLeadsPage: React.FC = () => {
                 <select
                   value={formOccupation}
                   onChange={(e) => setFormOccupation(e.target.value)}
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                 >
                   <option value="College Student">College Student</option>
                   <option value="Working">Working</option>
@@ -766,7 +717,7 @@ export const AdminLeadsPage: React.FC = () => {
               <div>
                 <input
                   type="text"
-                  placeholder="Lead Source*"
+                  placeholder="Lead Source (e.g. Instagram, Referral)"
                   value={formLeadSource}
                   onChange={(e) => setFormLeadSource(e.target.value)}
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
@@ -784,7 +735,7 @@ export const AdminLeadsPage: React.FC = () => {
               <div>
                 <input
                   type="text"
-                  placeholder="Address*"
+                  placeholder="Address"
                   value={formAddress}
                   onChange={(e) => setFormAddress(e.target.value)}
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
@@ -801,7 +752,7 @@ export const AdminLeadsPage: React.FC = () => {
                 <label key={c} className="flex items-center gap-2 cursor-pointer">
                   <div
                     onClick={() => toggleCourseCheckbox(c)}
-                    className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                    className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${
                       formCourses.includes(c) ? 'bg-[#050720] border-[#050720] text-white' : 'border-[#050720]/30'
                     }`}
                   >
@@ -847,7 +798,7 @@ export const AdminLeadsPage: React.FC = () => {
               <div>
                 <input
                   type="text"
-                  placeholder="Offered Fees*"
+                  placeholder="Offered Fees (e.g. ₹35,000)"
                   value={formOfferedFees}
                   onChange={(e) => setFormOfferedFees(e.target.value)}
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
@@ -856,7 +807,7 @@ export const AdminLeadsPage: React.FC = () => {
               <div>
                 <input
                   type="text"
-                  placeholder="Final Fees*"
+                  placeholder="Final Fees (e.g. ₹35,000)"
                   value={formFinalFees}
                   onChange={(e) => setFormFinalFees(e.target.value)}
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
@@ -868,44 +819,22 @@ export const AdminLeadsPage: React.FC = () => {
           {/* Section 5: Enquiring For */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Enquiring for</h3>
-            <div className="space-y-4">
-              <div className="relative">
-                <span className="text-[10px] text-[#050720]/50 block mb-1">Enquiring for</span>
-                <select
-                  value={formEnquiringFor}
-                  onChange={(e) => setFormEnquiringFor(e.target.value)}
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
-                >
-                  <option value="Self">Self</option>
-                  <option value="Family">Family</option>
-                  <option value="Other">Other</option>
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 bottom-3 pointer-events-none" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Student *"
-                    value={formStudentName}
-                    onChange={(e) => setFormStudentName(e.target.value)}
-                    className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Mobile*"
-                    value={formStudentMobile}
-                    onChange={(e) => setFormStudentMobile(e.target.value)}
-                    className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
-                  />
-                </div>
-              </div>
+            <div className="relative">
+              <span className="text-[10px] text-[#050720]/50 block mb-1">Enquiring for</span>
+              <select
+                value={formEnquiringFor}
+                onChange={(e) => setFormEnquiringFor(e.target.value)}
+                className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
+              >
+                <option value="Self">Self</option>
+                <option value="Family">Family</option>
+                <option value="Other">Other</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 bottom-3 pointer-events-none" />
             </div>
           </div>
 
-          {/* Section 6: Assign To (Admin-exclusive) */}
+          {/* Section 6: Assign To (DYNAMIC SALES TEAM MEMBERS) */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
             <h3 className="text-sm font-bold font-['Sora']">Assign to</h3>
             <div className="relative">
@@ -913,9 +842,9 @@ export const AdminLeadsPage: React.FC = () => {
               <select
                 value={formAssignTo}
                 onChange={(e) => setFormAssignTo(e.target.value)}
-                className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
               >
-                {SALESPERSONS.map((sp) => (
+                {salesPersons.map((sp) => (
                   <option key={sp} value={sp}>{sp}</option>
                 ))}
               </select>
@@ -927,13 +856,13 @@ export const AdminLeadsPage: React.FC = () => {
           <div className="flex gap-4">
             <button
               onClick={() => setView('list')}
-              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={handlePreAssign}
-              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               Assign Lead
             </button>
@@ -941,26 +870,26 @@ export const AdminLeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 5. ASSIGN LEAD CONFIRMATION MODAL (SCREENSHOT 5)          */}
-      {/* ========================================================= */}
+      {/* 5. CONFIRM ASSIGN MODAL */}
       {showAssignModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-7 max-w-sm w-full text-center space-y-4 shadow-2xl">
             <div>
               <h2 className="text-base font-bold font-['Sora'] text-[#050720]">Assign Lead?</h2>
-              <p className="text-xs text-[#050720]/60 mt-1.5">Lead will be assigned to the salesperson.</p>
+              <p className="text-xs text-[#050720]/60 mt-1.5">
+                Lead will be assigned to {formAssignTo || 'the salesperson'}.
+              </p>
             </div>
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setShowAssignModal(false)}
-                className="flex-1 py-2 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                className="flex-1 py-2 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
               >
                 Discard Changes
               </button>
               <button
                 onClick={handleConfirmAssign}
-                className="flex-1 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 Assign Lead
               </button>
@@ -969,18 +898,15 @@ export const AdminLeadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 6. LEAD ASSIGNED NOTIFICATION (SCREENSHOT 6)              */}
-      {/* ========================================================= */}
+      {/* 6. SUCCESS ALERT */}
       {showAssignedAlert && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-7 max-w-sm w-full text-center space-y-1.5 shadow-2xl">
             <h3 className="text-base font-bold font-['Sora'] text-[#050720]">Lead assigned!</h3>
-            <p className="text-xs text-[#050720]/60">Lead has been assigned to the salesperson.</p>
+            <p className="text-xs text-[#050720]/60">Lead has been saved and assigned to {formAssignTo}.</p>
           </div>
         </div>
       )}
-
     </div>
   );
 };

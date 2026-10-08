@@ -4,10 +4,11 @@ import {
   ChevronLeft, 
   ChevronRight, 
   ChevronDown, 
-  Plus,
-  Calendar as CalendarIcon,
-  Download
+  Plus, 
+  Calendar as CalendarIcon, 
+  Download 
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { financeService } from '../../services/financeService';
 import { leadService } from '../../services/leadService';
 
@@ -39,6 +40,9 @@ export interface FeeStudent {
 }
 
 export const FeesManagementPage: React.FC = () => {
+  const auth = useAuth() as any;
+  const currentSalesName = (auth?.user?.name || '').trim().toLowerCase();
+
   const [view, setView] = useState<'list' | 'details'>('list');
   const [students, setStudents] = useState<FeeStudent[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<FeeStudent | null>(null);
@@ -56,15 +60,31 @@ export const FeesManagementPage: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [remarkDescription, setRemarkDescription] = useState('');
 
+  // Load only students assigned to this salesperson
   const loadFeeData = async () => {
     try {
       setIsLoading(true);
-      const invoices = await financeService.getAllInvoices();
-      const leads = await leadService.getAllLeads();
+      const [invoices, leads] = await Promise.all([
+        financeService.getAllInvoices(),
+        leadService.getAllLeads(),
+      ]);
+
+      const myLeads = leads.filter((l: any) => {
+        const assigned = (l.assignedTo || '').trim().toLowerCase();
+        return (
+          assigned === currentSalesName ||
+          (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
+          (assigned.length > 0 && currentSalesName.includes(assigned))
+        );
+      });
+
+      const myLeadNames = new Set(
+        myLeads.map((l: any) => `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase())
+      );
 
       const invoiceNames = new Set(invoices.map((inv) => inv.studentName.trim().toLowerCase()));
 
-      const enrolledLeads: FeeStudent[] = leads
+      const enrolledLeads: FeeStudent[] = myLeads
         .filter(
           (l) =>
             l.status === 'Enrolled' &&
@@ -88,45 +108,45 @@ export const FeesManagementPage: React.FC = () => {
           };
         });
 
-const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
-        const isApproved = inv.approvalStatus === 'Approved';
-        
-        // Ensure paidFees never exceeds totalFees
-        const rawPaid = inv.paidFees || 0;
-        const boundedPaid = isApproved 
-          ? Math.min(inv.totalFees || 0, rawPaid) 
-          : 0;
+      const mappedInvoices: FeeStudent[] = invoices
+        .filter((inv) => myLeadNames.has(inv.studentName.trim().toLowerCase()))
+        .map((inv, index) => {
+          const isApproved = inv.approvalStatus === 'Approved';
+          const rawPaid = inv.paidFees || 0;
+          const boundedPaid = isApproved ? Math.min(inv.totalFees || 0, rawPaid) : 0;
 
-        return {
-          id: inv.id,
-          srNo: String(index + 1).padStart(2, '0'),
-          name: inv.studentName,
-          firstName: inv.firstName || inv.studentName.split(' ')[0] || '',
-          lastName: inv.lastName || inv.studentName.split(' ').slice(1).join(' ') || '',
-          course: inv.course,
-          totalFees: inv.totalFees || 0,
-          paidFees: boundedPaid,
-          lastFollowUp: inv.lastFollowUp || '—',
-          remarks: boundedPaid >= inv.totalFees && inv.totalFees > 0 ? 'Paid' : (inv.paymentStatus || 'Partially Paid'),
-          approvalStatus: inv.approvalStatus || 'None',
-          invoiceId: inv.invoiceCode,
-          timeline: (inv.timeline || []).map((t: any) => ({
-            id: t.id,
-            title: t.installmentTitle || t.title,
-            dueDate: t.dueDate,
-            paidDate: t.paidDate,
-            amount: t.amount,
-            amountLeft: t.amountLeft,
-            status: isApproved ? 'Paid' : 'Pending',
-            invoiceRequested: inv.approvalStatus === 'Requests',
-          })),
-        };
-      });
+          return {
+            id: inv.id,
+            srNo: String(index + 1).padStart(2, '0'),
+            name: inv.studentName,
+            firstName: inv.firstName || inv.studentName.split(' ')[0] || '',
+            lastName: inv.lastName || inv.studentName.split(' ').slice(1).join(' ') || '',
+            course: inv.course,
+            totalFees: inv.totalFees || 0,
+            paidFees: boundedPaid,
+            lastFollowUp: inv.lastFollowUp || '—',
+            remarks: boundedPaid >= inv.totalFees && inv.totalFees > 0 ? 'Paid' : (inv.paymentStatus || 'Partially Paid'),
+            approvalStatus: inv.approvalStatus || 'None',
+            invoiceId: inv.invoiceCode,
+            timeline: (inv.timeline || []).map((t: any) => ({
+              id: t.id,
+              title: t.installmentTitle || t.title,
+              dueDate: t.dueDate,
+              paidDate: t.paidDate,
+              amount: t.amount,
+              amountLeft: t.amountLeft,
+              status: isApproved ? 'Paid' : 'Pending',
+              invoiceRequested: inv.approvalStatus === 'Requests',
+            })),
+          };
+        });
 
       const combined = [...mappedInvoices, ...enrolledLeads];
       setStudents(combined);
       if (combined.length > 0 && !selectedStudent) {
         setSelectedStudent(combined[0]);
+      } else if (combined.length === 0) {
+        setSelectedStudent(null);
       }
     } catch (err) {
       console.error('Failed to load fee data:', err);
@@ -136,8 +156,10 @@ const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
   };
 
   useEffect(() => {
-    loadFeeData();
-  }, []);
+    if (currentSalesName) {
+      loadFeeData();
+    }
+  }, [currentSalesName]);
 
   const totalCollected = students.reduce((acc, curr) => acc + curr.paidFees, 0);
   const totalOutstanding = students.reduce((acc, curr) => acc + (curr.totalFees - curr.paidFees), 0);
@@ -317,7 +339,7 @@ const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
               <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
                 ₹{totalCollected.toLocaleString()}
               </span>
-              <span className="text-[11px] text-[#050720]/50 font-medium">All time</span>
+              <span className="text-[11px] text-[#050720]/50 font-medium">Your students</span>
             </div>
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Outstanding Amount</span>
@@ -338,7 +360,7 @@ const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
               <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
                 {String(students.length).padStart(2, '0')}
               </span>
-              <span className="text-[11px] text-[#050720]/50 font-medium">Enrolled in courses</span>
+              <span className="text-[11px] text-[#050720]/50 font-medium">Assigned to you</span>
             </div>
           </div>
 
@@ -349,7 +371,7 @@ const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
               </div>
             ) : students.length === 0 ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
-                No fee records found.
+                No fee records found for your assigned students.
               </div>
             ) : (
               <table className="w-full text-left text-xs">
@@ -426,7 +448,6 @@ const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
-              {/* Fees Breakdown Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Fees Breakdown</h3>
                 <div className="grid grid-cols-3 gap-4 text-xs">
@@ -464,7 +485,6 @@ const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
                 </div>
               </div>
 
-              {/* Student Overview Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Student Overview</h3>
                 <div className="grid grid-cols-2 gap-y-4 text-xs">
@@ -491,7 +511,6 @@ const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
                 </div>
               </div>
 
-              {/* Timeline Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Timeline</h3>
                 {selectedStudent.timeline.length === 0 ? (
@@ -530,7 +549,6 @@ const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
                             </div>
                           </div>
 
-                          {/* Action Button: Matches Images 1 & 2 */}
                           <div className="flex justify-end pt-2">
                             {isApproved ? (
                               <button 
@@ -570,7 +588,6 @@ const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
                 )}
               </div>
 
-              {/* Installment Payment Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-5">
                 <h3 className="text-base font-bold font-['Sora'] text-[#050720]">Installment Payment</h3>
                 
@@ -639,7 +656,6 @@ const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
               </div>
             </div>
 
-            {/* Right Column: Follow-up Calendar & Remarks */}
             <div className="space-y-6">
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora'] text-[#050720]">Add Remark</h3>

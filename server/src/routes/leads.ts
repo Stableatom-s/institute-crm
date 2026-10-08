@@ -3,10 +3,15 @@ import { Lead } from '../models/Lead';
 
 const router = Router();
 
-// GET all leads
-router.get('/', async (_req: Request, res: Response) => {
+// GET all leads (supports ?assignedTo=Name)
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const leads = await Lead.find().sort({ createdAt: -1 });
+    const { assignedTo } = req.query;
+    const filter: any = {};
+    if (assignedTo && typeof assignedTo === 'string' && assignedTo.trim() !== '') {
+      filter.assignedTo = { $regex: new RegExp(`^${assignedTo.trim()}$`, 'i') };
+    }
+    const leads = await Lead.find(filter).sort({ createdAt: -1 });
     res.json(leads);
   } catch (error) {
     res.status(500).json({ message: 'Error retrieving leads', error });
@@ -50,3 +55,4 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
 });
 
 export const leadRoutes = router;
+export default router;

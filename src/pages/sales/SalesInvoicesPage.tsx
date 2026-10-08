@@ -7,6 +7,7 @@ import {
   Clock,
   Ban
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { financeService } from '../../services/financeService';
 import { leadService } from '../../services/leadService';
 
@@ -38,22 +39,41 @@ interface InvoiceItem {
 }
 
 export const SalesInvoicesPage: React.FC = () => {
+  const auth = useAuth() as any;
+  const currentSalesName = (auth?.user?.name || '').trim().toLowerCase();
+
   const [view, setView] = useState<'list' | 'details'>('list');
   const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceItem | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Load only invoices and enrolled students belonging to this salesperson
   const loadInvoices = async () => {
     try {
       setIsLoading(true);
-      const dbInvoices = await financeService.getAllInvoices();
-      const leads = await leadService.getAllLeads();
+      const [dbInvoices, leads] = await Promise.all([
+        financeService.getAllInvoices(),
+        leadService.getAllLeads(),
+      ]);
+
+      const myLeads = leads.filter((l: any) => {
+        const assigned = (l.assignedTo || '').trim().toLowerCase();
+        return (
+          assigned === currentSalesName ||
+          (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
+          (assigned.length > 0 && currentSalesName.includes(assigned))
+        );
+      });
+
+      const myLeadNames = new Set(
+        myLeads.map((l: any) => `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase())
+      );
 
       const existingNames = new Set(
         dbInvoices.map((i) => i.studentName.trim().toLowerCase())
       );
 
-      const enrolledInvoices: InvoiceItem[] = leads
+      const enrolledInvoices: InvoiceItem[] = myLeads
         .filter(
           (l) =>
             l.status === 'Enrolled' &&
@@ -79,58 +99,61 @@ export const SalesInvoicesPage: React.FC = () => {
           };
         });
 
-      const mappedInvoices: InvoiceItem[] = dbInvoices.map((inv, index) => {
-        const isApproved = inv.approvalStatus === 'Approved';
-        const effectivePaid = isApproved ? (inv.paidFees || 0) : 0;
+      const mappedInvoices: InvoiceItem[] = dbInvoices
+        .filter((inv) => myLeadNames.has(inv.studentName.trim().toLowerCase()))
+        .map((inv, index) => {
+          const isApproved = inv.approvalStatus === 'Approved';
+          const effectivePaid = isApproved ? (inv.paidFees || 0) : 0;
 
-        // Populate timeline from installments or construct from approved invoice details
-        let timelineItems: TimelineItem[] = (inv.timeline || []).map((t: any, tIdx: number) => ({
-          id: t.id || `t-${tIdx}`,
-          installmentTitle: t.installmentTitle || `Installment #${tIdx + 1}`,
-          dueDate: t.dueDate || inv.dueDate || '01-12-2025',
-          paidDate: t.paidDate || inv.approvedOn || '01-12-2025',
-          amount: t.amount || `₹${(effectivePaid || inv.totalFees || 35000).toLocaleString()}`,
-          amountLeft: t.amountLeft || (inv.remainingFees === 0 ? 'Nil' : `₹${(inv.remainingFees || 0).toLocaleString()}`),
-          status: isApproved ? 'Paid' : 'Pending',
-        }));
+          let timelineItems: TimelineItem[] = (inv.timeline || []).map((t: any, tIdx: number) => ({
+            id: t.id || `t-${tIdx}`,
+            installmentTitle: t.installmentTitle || `Installment #${tIdx + 1}`,
+            dueDate: t.dueDate || inv.dueDate || '01-12-2025',
+            paidDate: t.paidDate || inv.approvedOn || '01-12-2025',
+            amount: t.amount || `₹${(effectivePaid || inv.totalFees || 35000).toLocaleString()}`,
+            amountLeft: t.amountLeft || (inv.remainingFees === 0 ? 'Nil' : `₹${(inv.remainingFees || 0).toLocaleString()}`),
+            status: isApproved ? 'Paid' : 'Pending',
+          }));
 
-        if (timelineItems.length === 0 && effectivePaid > 0) {
-          timelineItems = [
-            {
-              id: `inst-1-${inv.id}`,
-              installmentTitle: 'Installment #1',
-              dueDate: inv.dueDate || '01-12-2025',
-              paidDate: inv.approvedOn || inv.dueDate || '01-12-2025',
-              amount: `₹${effectivePaid.toLocaleString()}`,
-              amountLeft: inv.remainingFees === 0 ? 'Nil' : `₹${(inv.remainingFees || 0).toLocaleString()}`,
-              status: 'Paid',
-            },
-          ];
-        }
+          if (timelineItems.length === 0 && effectivePaid > 0) {
+            timelineItems = [
+              {
+                id: `inst-1-${inv.id}`,
+                installmentTitle: 'Installment #1',
+                dueDate: inv.dueDate || '01-12-2025',
+                paidDate: inv.approvedOn || inv.dueDate || '01-12-2025',
+                amount: `₹${effectivePaid.toLocaleString()}`,
+                amountLeft: inv.remainingFees === 0 ? 'Nil' : `₹${(inv.remainingFees || 0).toLocaleString()}`,
+                status: 'Paid',
+              },
+            ];
+          }
 
-        return {
-          id: inv.id,
-          srNo: String(index + 1).padStart(2, '0'),
-          name: inv.studentName || '—',
-          firstName: inv.firstName || inv.studentName?.split(' ')[0] || '',
-          lastName: inv.lastName || inv.studentName?.split(' ').slice(1).join(' ') || '',
-          course: inv.course || '—',
-          paidFees: effectivePaid,
-          totalFees: inv.totalFees || 0,
-          followUp: inv.lastFollowUp || '—',
-          dueDate: inv.dueDate || '—',
-          invoiceId: inv.invoiceCode || `GST/${String(index + 1).padStart(3, '0')}`,
-          paymentStatus: inv.paymentStatus || 'Partially Paid',
-          approvalStatus: inv.approvalStatus || 'Requests',
-          timeline: timelineItems,
-        };
-      });
+          return {
+            id: inv.id,
+            srNo: String(index + 1).padStart(2, '0'),
+            name: inv.studentName || '—',
+            firstName: inv.firstName || inv.studentName?.split(' ')[0] || '',
+            lastName: inv.lastName || inv.studentName?.split(' ').slice(1).join(' ') || '',
+            course: inv.course || '—',
+            paidFees: effectivePaid,
+            totalFees: inv.totalFees || 0,
+            followUp: inv.lastFollowUp || '—',
+            dueDate: inv.dueDate || '—',
+            invoiceId: inv.invoiceCode || `GST/${String(index + 1).padStart(3, '0')}`,
+            paymentStatus: inv.paymentStatus || 'Partially Paid',
+            approvalStatus: inv.approvalStatus || 'Requests',
+            timeline: timelineItems,
+          };
+        });
 
       const fullList = [...mappedInvoices, ...enrolledInvoices];
       setInvoices(fullList);
 
       if (fullList.length > 0 && !selectedInvoice) {
         setSelectedInvoice(fullList[0]);
+      } else if (fullList.length === 0) {
+        setSelectedInvoice(null);
       }
     } catch (err) {
       console.error('Failed to load invoices from server:', err);
@@ -140,8 +163,10 @@ export const SalesInvoicesPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadInvoices();
-  }, []);
+    if (currentSalesName) {
+      loadInvoices();
+    }
+  }, [currentSalesName]);
 
   const handleDownloadPDF = (inv: InvoiceItem, installmentTitle?: string, amount?: string) => {
     if (inv.approvalStatus !== 'Approved') {
@@ -235,10 +260,7 @@ export const SalesInvoicesPage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-      
-      {/* ========================================================= */}
-      {/* 1. INVOICE TABLE DIRECTORY VIEW                           */}
-      {/* ========================================================= */}
+      {/* 1. INVOICE TABLE DIRECTORY VIEW */}
       {view === 'list' && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold font-['Sora']">Invoice</h1>
@@ -249,7 +271,7 @@ export const SalesInvoicesPage: React.FC = () => {
               </div>
             ) : invoices.length === 0 ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
-                No invoices found.
+                No invoices found for your assigned students.
               </div>
             ) : (
               <table className="w-full text-left text-xs">
@@ -329,9 +351,7 @@ export const SalesInvoicesPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. INVOICE DETAILS DRILLDOWN VIEW (EXACT FIGMA LAYOUT)    */}
-      {/* ========================================================= */}
+      {/* 2. INVOICE DETAILS DRILLDOWN VIEW */}
       {view === 'details' && selectedInvoice && (
         <div className="space-y-6">
           <button
@@ -342,7 +362,6 @@ export const SalesInvoicesPage: React.FC = () => {
             <span>Invoice Details</span>
           </button>
 
-          {/* 1. Fees Breakdown Card */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Fees Breakdown</h3>
             <div className="grid grid-cols-3 gap-4 text-xs">
@@ -380,7 +399,6 @@ export const SalesInvoicesPage: React.FC = () => {
             </div>
           </div>
 
-          {/* 2. Student Overview Card */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Student Overview</h3>
             <div className="grid grid-cols-2 gap-y-4 text-xs">
@@ -398,18 +416,13 @@ export const SalesInvoicesPage: React.FC = () => {
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Payment Status</span>
-                <span className={`font-semibold text-sm ${
-                  selectedInvoice.paidFees >= selectedInvoice.totalFees && selectedInvoice.totalFees > 0 
-                    ? 'text-[#10B981]' 
-                    : 'text-[#10B981]'
-                }`}>
+                <span className="font-semibold text-sm text-[#10B981]">
                   {selectedInvoice.paidFees >= selectedInvoice.totalFees && selectedInvoice.totalFees > 0 ? 'Paid' : selectedInvoice.paymentStatus}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* 3. Timeline Card with Black "Download Invoice" Button */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Timeline</h3>
             {selectedInvoice.timeline.length === 0 ? (
@@ -439,7 +452,6 @@ export const SalesInvoicesPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Black Download Invoice Button matching Figma */}
                     <div className="flex justify-end pt-1">
                       <button
                         onClick={() => handleDownloadPDF(selectedInvoice, inst.installmentTitle, inst.amount)}
@@ -453,10 +465,8 @@ export const SalesInvoicesPage: React.FC = () => {
               </div>
             )}
           </div>
-
         </div>
       )}
-
     </div>
   );
 };

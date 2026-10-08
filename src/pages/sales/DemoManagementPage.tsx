@@ -11,6 +11,7 @@ import {
   Search,
   Video
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { demoService, DemoItem, DemoTab } from '../../services/demoService';
 import { leadService } from '../../services/leadService';
 
@@ -19,6 +20,8 @@ const TIME_SLOTS = ['11:00 - 12:00', '01:00 - 02:00', '03:00 - 04:00', '05:00 - 
 
 export const DemoManagementPage: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const auth = useAuth() as any;
+  const currentSalesName = (auth?.user?.name || '').trim().toLowerCase();
 
   // Navigation views: 'table' | 'schedule-form' | 'reschedule-form' | 'details'
   const [view, setView] = useState<'table' | 'schedule-form' | 'reschedule-form' | 'details'>('table');
@@ -38,7 +41,7 @@ export const DemoManagementPage: React.FC = () => {
   const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
 
-  // Form State (Schedule & Reschedule) - NO HARDCODED DEFAULTS
+  // Form State (Schedule & Reschedule)
   const [leadSearchQuery, setLeadSearchQuery] = useState('');
   const [matchingLeads, setMatchingLeads] = useState<any[]>([]);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
@@ -94,7 +97,6 @@ export const DemoManagementPage: React.FC = () => {
         if (faculties.length > 0) {
           setDynamicFaculties(Array.from(new Set(faculties)));
         } else {
-          // Fallback if none added yet
           setDynamicFaculties(['Poorva Pande', 'Tanmay Kalbhor']);
         }
       }
@@ -104,7 +106,6 @@ export const DemoManagementPage: React.FC = () => {
     }
   };
 
-  // Reset form states completely when opening schedule form
   const handleOpenScheduleForm = () => {
     setLeadSearchQuery('');
     setMatchingLeads([]);
@@ -124,14 +125,38 @@ export const DemoManagementPage: React.FC = () => {
     setView('schedule-form');
   };
 
-  // 1. Fetch Demos & Faculties on mount
+  // Load demos scoped strictly to leads assigned to this salesperson
   const loadDemos = async () => {
     try {
       setIsLoading(true);
-      const data = await demoService.getAllDemos();
-      setAllDemos(data);
-      if (data.length > 0 && !selectedDemo) {
-        setSelectedDemo(data[0]);
+      const [demosData, userLeads] = await Promise.all([
+        demoService.getAllDemos(),
+        leadService.getAllLeads(),
+      ]);
+
+      const assignedLeadNames = new Set(
+        userLeads
+          .filter((l: any) => {
+            const assigned = (l.assignedTo || '').trim().toLowerCase();
+            return (
+              assigned === currentSalesName ||
+              (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
+              (assigned.length > 0 && currentSalesName.includes(assigned))
+            );
+          })
+          .map((l: any) => `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase())
+      );
+
+      const scopedDemos = demosData.filter((d) => {
+        const studentFullName = `${d.name || ''} ${d.lastName || ''}`.trim().toLowerCase();
+        return assignedLeadNames.has(studentFullName);
+      });
+
+      setAllDemos(scopedDemos);
+      if (scopedDemos.length > 0 && !selectedDemo) {
+        setSelectedDemo(scopedDemos[0]);
+      } else if (scopedDemos.length === 0) {
+        setSelectedDemo(null);
       }
     } catch (err) {
       console.error('Failed to load demos from server:', err);
@@ -141,11 +166,13 @@ export const DemoManagementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadDemos();
-    loadFaculties();
-  }, []);
+    if (currentSalesName) {
+      loadDemos();
+      loadFaculties();
+    }
+  }, [currentSalesName]);
 
-  // 2. Deep linking: if opened from SalesLeadsPage with ?scheduleLeadId=xyz
+  // Deep linking: if opened with ?scheduleLeadId=xyz
   useEffect(() => {
     const leadIdParam = searchParams.get('scheduleLeadId');
     if (leadIdParam) {
@@ -167,7 +194,6 @@ export const DemoManagementPage: React.FC = () => {
     }
   }, [searchParams]);
 
-  // Tab segmented lists
   const scheduledList = allDemos.filter((d) => d.status === 'Scheduled');
   const completedList = allDemos.filter((d) => d.status === 'Completed');
   const cancelledList = allDemos.filter((d) => d.status === 'Cancelled');
@@ -179,14 +205,13 @@ export const DemoManagementPage: React.FC = () => {
       ? completedList 
       : cancelledList;
 
-  // Filtered dataset
   const filteredList = currentList.filter((item) => {
     const matchMode = filterMode === 'All' || item.mode.toLowerCase() === filterMode.toLowerCase();
     const matchCourse = filterCourse === 'All' || item.course.toLowerCase() === filterCourse.toLowerCase();
     return matchMode && matchCourse;
   });
 
-  // Handle lead search with MULTI-LEAD matching dropdown
+  // Search only through leads assigned to this salesperson
   const handleLeadSearchChange = async (val: string) => {
     setLeadSearchQuery(val);
     setSelectedLeadData(null);
@@ -197,12 +222,22 @@ export const DemoManagementPage: React.FC = () => {
     }
 
     try {
-      const leads = await leadService.getAllLeads();
+      const allLeads = await leadService.getAllLeads();
       const query = val.toLowerCase().trim();
-      const matches = leads.filter((l) => {
-        const fullName = `${l.firstName} ${l.lastName || ''}`.toLowerCase();
-        return fullName.includes(query) || (l.contactNo && l.contactNo.includes(query));
-      });
+
+      const matches = allLeads
+        .filter((l: any) => {
+          const assigned = (l.assignedTo || '').trim().toLowerCase();
+          return (
+            assigned === currentSalesName ||
+            (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
+            (assigned.length > 0 && currentSalesName.includes(assigned))
+          );
+        })
+        .filter((l) => {
+          const fullName = `${l.firstName} ${l.lastName || ''}`.toLowerCase();
+          return fullName.includes(query) || (l.contactNo && l.contactNo.includes(query));
+        });
 
       setMatchingLeads(matches);
       setIsSearchDropdownOpen(matches.length > 0);
@@ -500,7 +535,7 @@ export const DemoManagementPage: React.FC = () => {
               </div>
             ) : filteredList.length === 0 ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
-                No {activeTab.toLowerCase()} demos found.
+                No {activeTab.toLowerCase()} demos found for your leads.
               </div>
             ) : (
               <table className="w-full text-left text-xs">
@@ -623,7 +658,7 @@ export const DemoManagementPage: React.FC = () => {
             </div>
             {leadError && (
               <span className="text-[10px] font-semibold text-rose-500 block">
-                Please search and select a lead before scheduling*
+                Please search and select an assigned lead before scheduling*
               </span>
             )}
 
@@ -681,7 +716,6 @@ export const DemoManagementPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Dynamic Faculty Dropdown */}
               <div>
                 <div className="relative">
                   <select
@@ -818,7 +852,6 @@ export const DemoManagementPage: React.FC = () => {
 
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Select Lead</h3>
-            
             <div className="relative">
               <input
                 type="text"
@@ -827,51 +860,26 @@ export const DemoManagementPage: React.FC = () => {
                 className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 pr-10 rounded-lg border border-[#050720]/15 opacity-70 cursor-not-allowed"
               />
             </div>
-
-            <div className="pt-3 border-t border-[#050720]/10 space-y-3">
-              <h4 className="text-xs font-bold font-['Sora']">Student Overview</h4>
-              <div className="grid grid-cols-2 gap-y-3 text-xs">
-                <div>
-                  <span className="text-[10px] text-[#050720]/50 block">First Name</span>
-                  <span className="font-semibold text-sm">{selectedDemo.name}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#050720]/50 block">Last Name</span>
-                  <span className="font-semibold text-sm">{selectedDemo.lastName || '—'}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#050720]/50 block">Mobile</span>
-                  <span className="font-semibold text-sm">{selectedDemo.contactNo}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#050720]/50 block">Address</span>
-                  <span className="font-semibold text-sm">{selectedDemo.address || '—'}</span>
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Demo Details</h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <div className="relative">
-                  <select
-                    value={formCourse}
-                    onChange={(e) => setFormCourse(e.target.value)}
-                    className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
-                  >
-                    <option value="">Course*</option>
-                    {COURSES.filter(c => c !== 'All').map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
+              <div className="relative">
+                <select
+                  value={formCourse}
+                  onChange={(e) => setFormCourse(e.target.value)}
+                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
+                >
+                  <option value="">Course*</option>
+                  {COURSES.filter(c => c !== 'All').map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
 
-              {/* Dynamic Faculty Selector for Reschedule */}
               <div className="relative">
                 <select
                   value={formFaculty}
@@ -954,7 +962,7 @@ export const DemoManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* 4. RESCHEDULE CONFIRMATION MODAL */}
+      {/* 4. MODALS */}
       {showRescheduleSuccessModal && selectedDemo && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-lg w-full text-center space-y-5 shadow-2xl">
@@ -962,37 +970,6 @@ export const DemoManagementPage: React.FC = () => {
               <h2 className="text-lg font-bold font-['Sora'] text-[#050720]">Demo Scheduled</h2>
               <p className="text-xs text-[#050720]/60 mt-1">Please review the information.</p>
             </div>
-
-            <div className="bg-white border border-[#050720]/15 rounded-xl p-5 text-left space-y-4">
-              <h4 className="text-xs font-bold font-['Sora']">Demo Overview</h4>
-              <div className="grid grid-cols-2 gap-y-3 text-xs">
-                <div>
-                  <span className="text-[10px] text-[#050720]/50 block">Lead Name</span>
-                  <span className="font-semibold text-sm">{selectedDemo.name} {selectedDemo.lastName || ''}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#050720]/50 block">Faculty Name</span>
-                  <span className="font-semibold text-sm">{selectedDemo.faculty}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#050720]/50 block">Demo Date</span>
-                  <span className="font-semibold text-sm">{selectedDemo.demoDate}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#050720]/50 block">Demo Time</span>
-                  <span className="font-semibold text-sm">{selectedDemo.timeSlot}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#050720]/50 block">Course</span>
-                  <span className="font-semibold text-sm">{selectedDemo.course}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-[#050720]/50 block">Mode</span>
-                  <span className="font-semibold text-sm">{selectedDemo.mode}</span>
-                </div>
-              </div>
-            </div>
-
             <button
               onClick={() => {
                 setShowRescheduleSuccessModal(false);
@@ -1006,7 +983,6 @@ export const DemoManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* 5. SCHEDULE SUCCESS MODAL */}
       {showScheduleSuccessModal && selectedDemo && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -1030,7 +1006,6 @@ export const DemoManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* 6. CANCELLATION MODAL */}
       {showCancelModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
@@ -1060,7 +1035,7 @@ export const DemoManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* 7. DEMO DETAILS VIEW */}
+      {/* 5. DETAILS VIEW */}
       {view === 'details' && selectedDemo && (
         <div className="space-y-6 max-w-4xl">
           <button
@@ -1124,25 +1099,6 @@ export const DemoManagementPage: React.FC = () => {
                     {selectedDemo.feedback || 'Student showed strong interest in the course structure and tools.'}
                   </p>
                 </div>
-
-                <div>
-                  <span className="text-[10px] text-[#050720]/50 block mb-2">Attendance screenshot</span>
-                  <div className="rounded-xl overflow-hidden border border-[#050720]/15 bg-[#1F2430] p-4 flex flex-col items-center justify-center min-h-[220px] text-white">
-                    <div className="flex items-center gap-4 w-full justify-center">
-                      <div className="w-48 h-32 bg-slate-700 rounded-lg flex flex-col items-center justify-center text-xs">
-                        <Video className="w-6 h-6 text-amber-400 mb-1" />
-                        <span className="font-semibold">{selectedDemo.name}</span>
-                        <span className="text-[10px] text-slate-300">Student</span>
-                      </div>
-                      <div className="w-48 h-32 bg-slate-700 rounded-lg flex flex-col items-center justify-center text-xs">
-                        <Video className="w-6 h-6 text-emerald-400 mb-1" />
-                        <span className="font-semibold">{selectedDemo.faculty}</span>
-                        <span className="text-[10px] text-slate-300">Instructor</span>
-                      </div>
-                    </div>
-                    <span className="text-[10px] text-slate-400 mt-3 font-mono">Zoom Session Verified: {selectedDemo.demoDate} • {selectedDemo.timeSlot}</span>
-                  </div>
-                </div>
               </div>
             )}
 
@@ -1165,20 +1121,12 @@ export const DemoManagementPage: React.FC = () => {
               )}
 
               {selectedDemo.status === 'Completed' && (
-                <>
-                  <button
-                    onClick={() => setView('table')}
-                    className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
-                  >
-                    Go Back
-                  </button>
-                  <button
-                    onClick={() => alert(`Follow-up scheduled for ${selectedDemo.name}!`)}
-                    className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
-                  >
-                    Schedule follow-up
-                  </button>
-                </>
+                <button
+                  onClick={() => setView('table')}
+                  className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
+                >
+                  Go Back
+                </button>
               )}
 
               {selectedDemo.status === 'Cancelled' && (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Plus } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { leadService } from '../../services/leadService';
 import { demoService, DemoItem } from '../../services/demoService';
 import { financeService } from '../../services/financeService';
@@ -8,13 +9,19 @@ import { DetailedLead } from './SalesLeadsPage';
 
 export const SalesDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const auth = useAuth() as any;
+  const currentSalesName = (auth?.user?.name || '').trim().toLowerCase();
+
   const [leads, setLeads] = useState<DetailedLead[]>([]);
   const [demos, setDemos] = useState<DemoItem[]>([]);
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Scoped calculation: Filter leads, demos, follow-ups, and invoices by logged-in salesperson
   useEffect(() => {
     const fetchDashboardData = async () => {
+      if (!currentSalesName) return;
+
       try {
         setIsLoading(true);
         const [leadsData, demosData, invoicesData] = await Promise.all([
@@ -23,12 +30,34 @@ export const SalesDashboard: React.FC = () => {
           financeService.getAllInvoices().catch(() => []),
         ]);
 
-        setLeads(leadsData);
-        setDemos(demosData);
+        const userLeads = leadsData.filter((l: any) => {
+          const assigned = (l.assignedTo || '').trim().toLowerCase();
+          return (
+            assigned === currentSalesName ||
+            (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
+            (assigned.length > 0 && currentSalesName.includes(assigned))
+          );
+        });
 
-        const pendingInv = invoicesData.filter(
-          (inv: any) => (inv.status || inv.paymentStatus) === 'Partially Paid' || (inv.status || inv.paymentStatus) === 'Overdue'
-        ).length;
+        const myLeadNames = new Set(
+          userLeads.map((l: any) => `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase())
+        );
+
+        const userDemos = demosData.filter((d) => {
+          const studentFullName = `${d.name || ''} ${d.lastName || ''}`.trim().toLowerCase();
+          return myLeadNames.has(studentFullName);
+        });
+
+        const pendingInv = invoicesData
+          .filter((inv: any) => myLeadNames.has((inv.studentName || '').trim().toLowerCase()))
+          .filter(
+            (inv: any) =>
+              (inv.status || inv.paymentStatus) === 'Partially Paid' ||
+              (inv.status || inv.paymentStatus) === 'Overdue'
+          ).length;
+
+        setLeads(userLeads);
+        setDemos(userDemos);
         setPendingInvoicesCount(pendingInv);
       } catch (err) {
         console.error('Failed to load sales dashboard data:', err);
@@ -38,7 +67,7 @@ export const SalesDashboard: React.FC = () => {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [currentSalesName]);
 
   const totalLeadsCount = leads.length;
   const contactedCount = leads.filter((l) => l.status === 'Contacted').length;
@@ -59,6 +88,7 @@ export const SalesDashboard: React.FC = () => {
       year: 'numeric',
     })
     .replace(/\//g, '-');
+
   const leadsCreatedTodayCount = leads.filter(
     (l) => l.enquiryDate === todayStr || l.remark === 'Newly Added'
   ).length;
@@ -180,7 +210,7 @@ export const SalesDashboard: React.FC = () => {
           </div>
         ) : activeFollowUps.length === 0 ? (
           <div className="py-8 text-center text-xs text-[#050720]/50">
-            No active follow-ups due.
+            No active follow-ups due for your leads.
           </div>
         ) : (
           <table className="w-full text-left text-xs">
@@ -208,8 +238,7 @@ export const SalesDashboard: React.FC = () => {
                   <td className="py-3.5 text-[#050720]/70">{item.enquiryDate}</td>
                   <td className="py-3.5 text-[#050720]/70">{item.course}</td>
                   <td className="py-3.5">
-                    <span className={`font-semibold ${item.status === 'Interested' ? 'text-[#10B981]' : 'text-[#0066FF]'
-                      }`}>
+                    <span className={`font-semibold ${item.status === 'Interested' ? 'text-[#10B981]' : 'text-[#0066FF]'}`}>
                       {item.status}
                     </span>
                   </td>
@@ -247,7 +276,7 @@ export const SalesDashboard: React.FC = () => {
           </div>
         ) : scheduledDemos.length === 0 ? (
           <div className="py-8 text-center text-xs text-[#050720]/50">
-            No demos scheduled at this moment.
+            No demos scheduled at this moment for your leads.
           </div>
         ) : (
           <table className="w-full text-left text-xs">

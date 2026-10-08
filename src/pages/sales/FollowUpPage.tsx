@@ -1,23 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { leadService } from '../../services/leadService';
 import { DetailedLead } from './SalesLeadsPage';
 
 export const FollowUpPage: React.FC = () => {
   const navigate = useNavigate();
+  const auth = useAuth() as any;
+  const currentSalesName = (auth?.user?.name || '').trim().toLowerCase();
+
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [leads, setLeads] = useState<DetailedLead[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Fetch leads directly from MongoDB on mount
+  // Fetch leads and filter strictly by this logged-in salesperson
   useEffect(() => {
     const fetchFollowUps = async () => {
       try {
         setIsLoading(true);
         const data = await leadService.getAllLeads();
-        // Display leads that require follow-up attention
-        setLeads(data);
+
+        const userLeads = data.filter((lead: any) => {
+          const assigned = (lead.assignedTo || '').trim().toLowerCase();
+          return (
+            assigned === currentSalesName ||
+            (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
+            (assigned.length > 0 && currentSalesName.includes(assigned))
+          );
+        });
+
+        setLeads(userLeads);
       } catch (error) {
         console.error('Failed to fetch follow-ups from backend:', error);
       } finally {
@@ -25,22 +38,17 @@ export const FollowUpPage: React.FC = () => {
       }
     };
 
-    fetchFollowUps();
-  }, []);
+    if (currentSalesName) {
+      fetchFollowUps();
+    }
+  }, [currentSalesName]);
 
   const handleViewLead = (leadId: string) => {
-    // Route straight to the Leads page with the target lead selected
     navigate(`/sales/leads?leadId=${leadId}`);
   };
 
-  // Filter follow-up records based on date range if specified
   const filteredFollowUps = leads.filter((lead) => {
     if (!fromDate && !toDate) return true;
-
-    // Normalize date format for comparison if available
-    const leadDateStr = lead.followUp || lead.enquiryDate;
-    if (!leadDateStr) return true;
-
     return true;
   });
 
@@ -86,7 +94,7 @@ export const FollowUpPage: React.FC = () => {
           </div>
         ) : filteredFollowUps.length === 0 ? (
           <div className="py-12 text-center text-xs text-[#050720]/50">
-            No follow-ups due.
+            No follow-ups due for your assigned leads.
           </div>
         ) : (
           <table className="w-full text-left text-xs">
@@ -133,7 +141,7 @@ export const FollowUpPage: React.FC = () => {
                   <td className="py-3.5 text-right">
                     <button
                       onClick={() => handleViewLead(item.id)}
-                      className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                      className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
                     >
                       View
                     </button>
