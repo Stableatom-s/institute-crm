@@ -15,7 +15,6 @@ import { batchService, BatchItem, BatchStudent, BatchLecture } from '../../servi
 import { leadService } from '../../services/leadService';
 
 const COURSE_OPTIONS = ['All', 'UI/UX Design', 'No Code', 'Full Stack', 'Portfolio', 'React Native', 'React'];
-const FACULTY_OPTIONS = ['Poorva Pande', 'Tanmay Kalbhor', 'Neeraj Joshi', 'Aparna Kulkarni'];
 
 export const BatchManagementPage: React.FC = () => {
   const [currentView, setCurrentView] = useState<'list' | 'details' | 'create' | 'add-student' | 'student-detail' | 'lecture-view'>('list');
@@ -27,6 +26,7 @@ export const BatchManagementPage: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<BatchStudent | null>(null);
   const [selectedLecture, setSelectedLecture] = useState<BatchLecture | null>(null);
 
+  const [dynamicFaculties, setDynamicFaculties] = useState<string[]>([]);
   const [availableStudents, setAvailableStudents] = useState<BatchStudent[]>([]);
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
 
@@ -44,6 +44,39 @@ export const BatchManagementPage: React.FC = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const [checkedStudents, setCheckedStudents] = useState<BatchStudent[]>([]);
+
+  // 1. Fetch dynamic faculty members from live Team collection
+  const loadFaculties = async () => {
+    try {
+      const token = localStorage.getItem('crm_token');
+      const res = await fetch('http://localhost:5000/api/team', {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (res.ok) {
+        const teamData = await res.json();
+        const faculties = teamData
+          .filter((m: any) => {
+            const role = (m.role || m.department || '').toLowerCase();
+            return role === 'faculty' || role === 'instructor';
+          })
+          .map((m: any) => m.name || `${m.firstName || ''} ${m.lastName || ''}`.trim())
+          .filter((name: string) => Boolean(name));
+
+        if (faculties.length > 0) {
+          setDynamicFaculties(Array.from(new Set(faculties)));
+        } else {
+          setDynamicFaculties(['Poorva Pande', 'Tanmay Kalbhor']);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load faculties:', err);
+      setDynamicFaculties(['Poorva Pande', 'Tanmay Kalbhor']);
+    }
+  };
 
   const loadBatches = async () => {
     try {
@@ -77,7 +110,7 @@ export const BatchManagementPage: React.FC = () => {
             contact: l.contactNo || '',
             attendance: '00/00',
             remark: l.remark || 'Active student',
-            fees: l.finalFees ? `${l.finalFees} Paid` : '₹35,000 Paid',
+            fees: l.finalFees ? `₹${l.finalFees} Paid` : '₹35,000 Paid',
           };
         });
       setAvailableStudents(enrolled);
@@ -88,6 +121,7 @@ export const BatchManagementPage: React.FC = () => {
 
   useEffect(() => {
     loadBatches();
+    loadFaculties();
     loadEnrolledStudents();
   }, []);
 
@@ -340,16 +374,19 @@ export const BatchManagementPage: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, batchName: e.target.value })}
                 className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none focus:border-[#050720]"
               />
+
+              {/* Dynamic Faculty Dropdown */}
               <select
                 value={formData.faculty}
                 onChange={(e) => setFormData({ ...formData, faculty: e.target.value })}
                 className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none focus:border-[#050720] cursor-pointer"
               >
                 <option value="">Faculty*</option>
-                {FACULTY_OPTIONS.map((f) => (
+                {dynamicFaculties.map((f) => (
                   <option key={f} value={f}>{f}</option>
                 ))}
               </select>
+
               <input
                 type="date"
                 value={formData.startDate}
@@ -725,7 +762,7 @@ export const BatchManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* 5. VIEW STUDENT DETAILS (DYNAMIC ATTENDANCE CARDS & LOGS) */}
+      {/* 5. VIEW STUDENT DETAILS */}
       {currentView === 'student-detail' && selectedStudent && selectedBatch && (
         <div className="space-y-6">
           <button

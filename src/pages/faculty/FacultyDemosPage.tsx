@@ -24,7 +24,7 @@ interface DemoItem {
 
 export const FacultyDemoPage: React.FC = () => {
   const auth = useAuth() as any;
-  const currentUserName = auth?.user?.name || 'Poorva Pande';
+  const currentUserName = (auth?.user?.name || '').trim().toLowerCase();
 
   const [activeTab, setActiveTab] = useState<DemoTab>('Scheduled');
   const [currentView, setCurrentView] = useState<PageView>('list');
@@ -41,22 +41,22 @@ export const FacultyDemoPage: React.FC = () => {
   const [uploadedFileName, setUploadedFileName] = useState('name.jpeg/png/jpg');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  // Fetch demos directly from MongoDB backend
+  // STRICT FILTER: Load only demos assigned to the logged-in faculty
   const loadFacultyDemos = async () => {
     try {
       setIsLoading(true);
       const data = await demoService.getAllDemos();
 
-      // Filter demos assigned to this instructor (or show all if generic)
-      const facultyDemos = data.filter(
-        (d) =>
-          d.faculty.toLowerCase().includes(currentUserName.toLowerCase()) ||
-          currentUserName.toLowerCase().includes(d.faculty.toLowerCase())
-      );
+      const facultyDemos = data.filter((d) => {
+        const demoFaculty = (d.faculty || '').trim().toLowerCase();
+        return (
+          demoFaculty === currentUserName ||
+          (currentUserName.length > 0 && demoFaculty.includes(currentUserName)) ||
+          (demoFaculty.length > 0 && currentUserName.includes(demoFaculty))
+        );
+      });
 
-      const targetList = facultyDemos.length > 0 ? facultyDemos : data;
-
-      const mapped: DemoItem[] = targetList.map((d: ServiceDemoItem) => ({
+      const mapped: DemoItem[] = facultyDemos.map((d: ServiceDemoItem) => ({
         id: d.id,
         srNo: '',
         leadName: `${d.name} ${d.lastName || ''}`.trim(),
@@ -70,7 +70,7 @@ export const FacultyDemoPage: React.FC = () => {
         remark: d.remark || (d.status === 'Completed' ? 'Joining soon' : undefined),
         feedback: d.feedback,
         cancellationReason: d.cancellationReason,
-       screenshotUrl: (d as any).screenshotUrl,
+        screenshotUrl: (d as any).screenshotUrl,
       }));
 
       setDemos(mapped);
@@ -82,7 +82,9 @@ export const FacultyDemoPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadFacultyDemos();
+    if (currentUserName) {
+      loadFacultyDemos();
+    }
   }, [currentUserName]);
 
   const filteredDemos = demos.filter((item) => {
@@ -137,9 +139,7 @@ export const FacultyDemoPage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] space-y-6 pb-12">
-      {/* ─────────────────────────────────────────────────────────────
-          1. LIST VIEW (SCHEDULED / COMPLETED / CANCELLED TABS)
-      ───────────────────────────────────────────────────────────── */}
+      {/* 1. LIST VIEW */}
       {currentView === 'list' && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold text-[#050720] font-['Sora']">Demo Management</h1>
@@ -153,7 +153,7 @@ export const FacultyDemoPage: React.FC = () => {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`pb-3 text-sm font-semibold relative transition-colors ${
+                    className={`pb-3 text-sm font-semibold relative transition-colors cursor-pointer ${
                       isActive ? 'text-[#050720]' : 'text-[#050720]/40 hover:text-[#050720]/70'
                     }`}
                   >
@@ -198,7 +198,7 @@ export const FacultyDemoPage: React.FC = () => {
               </div>
             ) : filteredDemos.length === 0 ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
-                No {activeTab.toLowerCase()} demos found.
+                No {activeTab.toLowerCase()} demos assigned to you.
               </div>
             ) : (
               <table className="w-full text-left text-xs">
@@ -260,9 +260,7 @@ export const FacultyDemoPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─────────────────────────────────────────────────────────────
-          2. DETAILS VIEW (SCHEDULED / COMPLETED / CANCELLED)
-      ───────────────────────────────────────────────────────────── */}
+      {/* 2. DETAILS VIEW */}
       {currentView === 'details' && selectedDemo && (
         <div className="space-y-6">
           <div className="flex items-center gap-2">
@@ -282,7 +280,6 @@ export const FacultyDemoPage: React.FC = () => {
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-6">
             <h3 className="text-sm font-bold text-[#050720] font-['Sora']">Demo Overview</h3>
 
-            {/* Read-Only Overview Grid */}
             <div className="grid grid-cols-2 gap-y-4 text-xs">
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Lead Name</span>
@@ -309,7 +306,6 @@ export const FacultyDemoPage: React.FC = () => {
                 <span className="font-semibold text-[#050720]">{selectedDemo.mode}</span>
               </div>
 
-              {/* Cancelled-only specific field */}
               {selectedDemo.status === 'Cancelled' && (
                 <div className="col-span-2 pt-2">
                   <span className="text-[#050720]/50 block text-[11px]">Reason for cancellation</span>
@@ -320,7 +316,6 @@ export const FacultyDemoPage: React.FC = () => {
               )}
             </div>
 
-            {/* Completed Section: Feedback & Attendance Screenshot */}
             {selectedDemo.status === 'Completed' && (
               <div className="space-y-4 pt-2 border-t border-[#050720]/5">
                 <div>
@@ -350,21 +345,9 @@ export const FacultyDemoPage: React.FC = () => {
                   </div>
                 </div>
 
-                {previewImage ? (
+                {previewImage && (
                   <div className="mt-4 rounded-xl overflow-hidden border border-[#050720]/10 max-w-xl">
                     <img src={previewImage} alt="Attendance verification" className="w-full h-auto object-cover" />
-                  </div>
-                ) : (
-                  <div className="mt-4 bg-[#1A1A1A] rounded-xl p-4 max-w-xl border border-black/20 text-white space-y-2">
-                    <div className="text-[11px] text-gray-400 font-mono">Zoom Meeting Preview</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="h-32 bg-stone-700 rounded-lg flex items-center justify-center text-[11px] text-gray-300">
-                        Faculty ({selectedDemo.facultyName})
-                      </div>
-                      <div className="h-32 bg-stone-800 rounded-lg flex items-center justify-center text-[11px] text-gray-300">
-                        Student ({selectedDemo.leadName})
-                      </div>
-                    </div>
                   </div>
                 )}
 

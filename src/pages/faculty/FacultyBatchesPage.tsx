@@ -58,7 +58,7 @@ export const FacultyBatchesPage: React.FC = () => {
   const stateData = location.state as RouteState | null;
 
   const auth = useAuth() as any;
-  const currentUserName = auth?.user?.name || 'Poorva Pande';
+  const currentUserName = (auth?.user?.name || '').trim().toLowerCase();
 
   const [currentView, setCurrentView] = useState<ViewMode>('list');
   const [navOrigin, setNavOrigin] = useState<'students' | 'batches'>('batches');
@@ -81,22 +81,27 @@ export const FacultyBatchesPage: React.FC = () => {
 
   const [rollCallStudents, setRollCallStudents] = useState<Student[]>([]);
 
+  // STRICT FILTER: Load only batches assigned to the logged-in faculty
   const loadBatches = async () => {
     try {
       setIsLoading(true);
       const allBatches = await batchService.getAllBatches();
 
-      const facultyBatches = allBatches.filter(
-        (b) =>
-          b.faculty.toLowerCase().includes(currentUserName.toLowerCase()) ||
-          currentUserName.toLowerCase().includes(b.faculty.toLowerCase())
-      );
+      const facultyBatches = allBatches.filter((b) => {
+        const batchFaculty = (b.faculty || '').trim().toLowerCase();
+        return (
+          batchFaculty === currentUserName ||
+          (currentUserName.length > 0 && batchFaculty.includes(currentUserName)) ||
+          (batchFaculty.length > 0 && currentUserName.includes(batchFaculty))
+        );
+      });
 
-      const targetBatches = facultyBatches.length > 0 ? facultyBatches : allBatches;
-      setBatches(targetBatches);
+      setBatches(facultyBatches);
 
-      if (targetBatches.length > 0 && !selectedBatch) {
-        setSelectedBatch(targetBatches[0]);
+      if (facultyBatches.length > 0) {
+        setSelectedBatch(facultyBatches[0]);
+      } else {
+        setSelectedBatch(null);
       }
     } catch (err) {
       console.error('Failed to load faculty batches:', err);
@@ -106,7 +111,9 @@ export const FacultyBatchesPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadBatches();
+    if (currentUserName) {
+      loadBatches();
+    }
   }, [currentUserName]);
 
   useEffect(() => {
@@ -278,7 +285,7 @@ export const FacultyBatchesPage: React.FC = () => {
                 <option value="All">All Courses</option>
                 <option value="UI/UX Design">UI/UX Design</option>
                 <option value="No Code">No Code</option>
-                <option value="Full-Stack">Full-Stack</option>
+                <option value="Full Stack">Full Stack</option>
                 <option value="Portfolio">Portfolio</option>
               </select>
             </div>
@@ -289,7 +296,7 @@ export const FacultyBatchesPage: React.FC = () => {
               </div>
             ) : filteredBatches.length === 0 ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
-                No active batches found.
+                No active batches assigned to you.
               </div>
             ) : (
               <table className="w-full text-left text-xs">
@@ -417,7 +424,6 @@ export const FacultyBatchesPage: React.FC = () => {
                       st.name || `${st.firstName || ''} ${st.lastName || ''}`.trim() || 'Student';
                     const targetName = displayName.toLowerCase();
 
-                    // Derive attendance ratio dynamically
                     const lecs = selectedBatch.lectures || [];
                     let attended = 0;
                     lecs.forEach((lec) => {
@@ -804,7 +810,7 @@ export const FacultyBatchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* VIEW 3c: STUDENT DETAILS (DYNAMIC LOGS & METRICS) */}
+      {/* VIEW 3c: STUDENT DETAILS */}
       {currentView === 'student-details' && selectedStudent && selectedBatch && (
         <div className="space-y-6">
           <div className="flex items-center gap-2">
@@ -915,7 +921,7 @@ export const FacultyBatchesPage: React.FC = () => {
 
                   <div className="space-y-3 pt-4">
                     {logs.length === 0 ? (
-                      <p className="text-xs text-[#050720]/40 italic">No lecture attendance logs yet.</p>
+                      <p className="text-xs text-[#050720]/40 italic py-4">No lecture attendance logs yet.</p>
                     ) : (
                       logs.map((log) => (
                         <div

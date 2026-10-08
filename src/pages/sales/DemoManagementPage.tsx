@@ -15,7 +15,6 @@ import { demoService, DemoItem, DemoTab } from '../../services/demoService';
 import { leadService } from '../../services/leadService';
 
 const COURSES = ['All', 'UI/UX Design', 'No Code', 'Portfolio', 'Full-Stack', 'React Native'];
-const FACULTIES = ['Tanmay Kalbhor', 'Poorva Pande', 'Neeraj Joshi'];
 const TIME_SLOTS = ['11:00 - 12:00', '01:00 - 02:00', '03:00 - 04:00', '05:00 - 06:00'];
 
 export const DemoManagementPage: React.FC = () => {
@@ -28,6 +27,7 @@ export const DemoManagementPage: React.FC = () => {
 
   // Master lists
   const [allDemos, setAllDemos] = useState<DemoItem[]>([]);
+  const [dynamicFaculties, setDynamicFaculties] = useState<string[]>([]);
 
   // Active item in detail / reschedule view
   const [selectedDemo, setSelectedDemo] = useState<DemoItem | null>(null);
@@ -70,6 +70,40 @@ export const DemoManagementPage: React.FC = () => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancellationReasonInput, setCancellationReasonInput] = useState('');
 
+  // Fetch dynamic faculties from Team collection
+  const loadFaculties = async () => {
+    try {
+      const token = localStorage.getItem('crm_token');
+      const res = await fetch('http://localhost:5000/api/team', {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (res.ok) {
+        const teamData = await res.json();
+        const faculties = teamData
+          .filter((m: any) => {
+            const role = (m.role || m.department || '').toLowerCase();
+            return role === 'faculty' || role === 'instructor';
+          })
+          .map((m: any) => m.name || `${m.firstName || ''} ${m.lastName || ''}`.trim())
+          .filter((name: string) => Boolean(name));
+
+        if (faculties.length > 0) {
+          setDynamicFaculties(Array.from(new Set(faculties)));
+        } else {
+          // Fallback if none added yet
+          setDynamicFaculties(['Poorva Pande', 'Tanmay Kalbhor']);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load faculties:', err);
+      setDynamicFaculties(['Poorva Pande', 'Tanmay Kalbhor']);
+    }
+  };
+
   // Reset form states completely when opening schedule form
   const handleOpenScheduleForm = () => {
     setLeadSearchQuery('');
@@ -90,7 +124,7 @@ export const DemoManagementPage: React.FC = () => {
     setView('schedule-form');
   };
 
-  // 1. Fetch Demos from MongoDB on mount
+  // 1. Fetch Demos & Faculties on mount
   const loadDemos = async () => {
     try {
       setIsLoading(true);
@@ -108,6 +142,7 @@ export const DemoManagementPage: React.FC = () => {
 
   useEffect(() => {
     loadDemos();
+    loadFaculties();
   }, []);
 
   // 2. Deep linking: if opened from SalesLeadsPage with ?scheduleLeadId=xyz
@@ -176,7 +211,6 @@ export const DemoManagementPage: React.FC = () => {
     }
   };
 
-  // Selecting a lead from search results
   const handleSelectLead = (lead: any) => {
     setSelectedLeadData({
       id: lead.id,
@@ -194,7 +228,6 @@ export const DemoManagementPage: React.FC = () => {
     setIsSearchDropdownOpen(false);
   };
 
-  // Prepopulate and launch Reschedule screen
   const handleStartReschedule = (demo: DemoItem) => {
     setSelectedDemo(demo);
     setLeadSearchQuery(`${demo.name} ${demo.lastName || ''} (${demo.contactNo})`);
@@ -213,7 +246,6 @@ export const DemoManagementPage: React.FC = () => {
     setView('reschedule-form');
   };
 
-  // Submit Schedule Form with strict validation
   const handleSubmitSchedule = async () => {
     let hasError = false;
 
@@ -300,7 +332,6 @@ export const DemoManagementPage: React.FC = () => {
     }
   };
 
-  // Submit Reschedule Form to MongoDB
   const handleSubmitReschedule = async () => {
     if (!selectedDemo) return;
 
@@ -337,7 +368,6 @@ export const DemoManagementPage: React.FC = () => {
     }
   };
 
-  // Confirm Cancellation in MongoDB
   const handleConfirmCancel = async () => {
     if (!selectedDemo) return;
 
@@ -361,17 +391,14 @@ export const DemoManagementPage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-
-      {/* ========================================================= */}
-      {/* 1. TABLE VIEW                                             */}
-      {/* ========================================================= */}
+      {/* 1. TABLE VIEW */}
       {view === 'table' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold font-['Sora']">Demo Management</h1>
             <button
               onClick={handleOpenScheduleForm}
-              className="flex items-center gap-2 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="flex items-center gap-2 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               <Calendar className="w-4 h-4" />
               <span>Schedule Demo</span>
@@ -389,7 +416,7 @@ export const DemoManagementPage: React.FC = () => {
                     setFilterMode('All');
                     setFilterCourse('All');
                   }}
-                  className={`text-sm font-semibold transition-all relative pb-2 ${
+                  className={`text-sm font-semibold transition-all relative pb-2 cursor-pointer ${
                     activeTab === tab 
                       ? 'text-[#050720] font-bold' 
                       : 'text-[#050720]/50 hover:text-[#050720]'
@@ -407,20 +434,19 @@ export const DemoManagementPage: React.FC = () => {
             <div className="flex items-center gap-3 mt-5 mb-4 relative z-10">
               <span className="text-xs text-[#050720]/70 font-medium">Sort by:</span>
 
-              {/* Mode Filter */}
               <div className="relative">
                 <button
                   onClick={() => {
                     setIsModeDropdownOpen(!isModeDropdownOpen);
                     setIsCourseDropdownOpen(false);
                   }}
-                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-[#F8FAFC] border border-[#050720]/15 rounded-lg text-xs font-medium min-w-[90px]"
+                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-[#F8FAFC] border border-[#050720]/15 rounded-lg text-xs font-medium min-w-[90px] cursor-pointer"
                 >
                   <span>{filterMode === 'All' ? 'Mode' : filterMode}</span>
                   {isModeDropdownOpen ? <ChevronUp className="w-3.5 h-3.5 text-[#050720]/50" /> : <ChevronDown className="w-3.5 h-3.5 text-[#050720]/50" />}
                 </button>
                 {isModeDropdownOpen && (
-                  <div className="absolute left-0 top-9 w-32 bg-white border border-[#050720]/15 rounded-lg shadow-lg py-1">
+                  <div className="absolute left-0 top-9 w-32 bg-white border border-[#050720]/15 rounded-lg shadow-lg py-1 z-20">
                     {['All', 'Online', 'Offline'].map((m) => (
                       <button
                         key={m}
@@ -428,7 +454,7 @@ export const DemoManagementPage: React.FC = () => {
                           setFilterMode(m);
                           setIsModeDropdownOpen(false);
                         }}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720]"
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720] cursor-pointer"
                       >
                         {m}
                       </button>
@@ -437,20 +463,19 @@ export const DemoManagementPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Course Filter */}
               <div className="relative">
                 <button
                   onClick={() => {
                     setIsCourseDropdownOpen(!isCourseDropdownOpen);
                     setIsModeDropdownOpen(false);
                   }}
-                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-[#F8FAFC] border border-[#050720]/15 rounded-lg text-xs font-medium min-w-[100px]"
+                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-[#F8FAFC] border border-[#050720]/15 rounded-lg text-xs font-medium min-w-[100px] cursor-pointer"
                 >
                   <span>{filterCourse === 'All' ? 'Course' : filterCourse}</span>
                   {isCourseDropdownOpen ? <ChevronUp className="w-3.5 h-3.5 text-[#050720]/50" /> : <ChevronDown className="w-3.5 h-3.5 text-[#050720]/50" />}
                 </button>
                 {isCourseDropdownOpen && (
-                  <div className="absolute left-0 top-9 w-40 bg-white border border-[#050720]/15 rounded-lg shadow-lg py-1">
+                  <div className="absolute left-0 top-9 w-40 bg-white border border-[#050720]/15 rounded-lg shadow-lg py-1 z-20">
                     {COURSES.map((c) => (
                       <button
                         key={c}
@@ -458,7 +483,7 @@ export const DemoManagementPage: React.FC = () => {
                           setFilterCourse(c);
                           setIsCourseDropdownOpen(false);
                         }}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720]"
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720] cursor-pointer"
                       >
                         {c}
                       </button>
@@ -521,7 +546,7 @@ export const DemoManagementPage: React.FC = () => {
                             setSelectedDemo(demo);
                             setView('details');
                           }}
-                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
                         >
                           View
                         </button>
@@ -541,29 +566,27 @@ export const DemoManagementPage: React.FC = () => {
                 className="w-8 h-7 text-center border border-[#050720]/20 rounded text-xs text-[#050720] font-semibold"
               />
               <div className="flex items-center gap-1.5 ml-2">
-                <button className="p-1 hover:text-[#050720]"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" /></button>
                 <span className="text-[11px] font-semibold text-[#050720]">01 of 10</span>
-                <button className="p-1 hover:text-[#050720]"><ChevronRight className="w-3.5 h-3.5" /></button>
+                <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronRight className="w-3.5 h-3.5" /></button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. SCHEDULE DEMO VIEW                                     */}
-      {/* ========================================================= */}
+      {/* 2. SCHEDULE DEMO VIEW */}
       {view === 'schedule-form' && (
         <div className="space-y-6 max-w-4xl">
           <button
             onClick={() => setView('table')}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Schedule Demo</span>
           </button>
 
-          {/* Select Lead with Multi-Match Dropdown */}
+          {/* Select Lead */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Select Lead</h3>
             
@@ -579,7 +602,6 @@ export const DemoManagementPage: React.FC = () => {
               />
               <Search className="w-4 h-4 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
 
-              {/* Multi-result dropdown menu */}
               {isSearchDropdownOpen && matchingLeads.length > 0 && (
                 <div className="absolute left-0 right-0 top-11 bg-white border border-[#050720]/15 rounded-lg shadow-xl py-1 z-30 max-h-52 overflow-y-auto">
                   {matchingLeads.map((lead) => (
@@ -587,7 +609,7 @@ export const DemoManagementPage: React.FC = () => {
                       key={lead.id}
                       type="button"
                       onClick={() => handleSelectLead(lead)}
-                      className="w-full text-left px-4 py-2 text-xs hover:bg-[#FFB908]/15 text-[#050720] flex justify-between items-center border-b border-[#050720]/5 last:border-b-0"
+                      className="w-full text-left px-4 py-2 text-xs hover:bg-[#FFB908]/15 text-[#050720] flex justify-between items-center border-b border-[#050720]/5 last:border-b-0 cursor-pointer"
                     >
                       <div>
                         <span className="font-bold">{lead.firstName} {lead.lastName || ''}</span>
@@ -645,7 +667,7 @@ export const DemoManagementPage: React.FC = () => {
                     }}
                     className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border appearance-none ${
                       courseError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
-                    } focus:outline-none`}
+                    } focus:outline-none cursor-pointer`}
                   >
                     <option value="">Select Course*</option>
                     {COURSES.filter(c => c !== 'All').map((c) => (
@@ -659,6 +681,7 @@ export const DemoManagementPage: React.FC = () => {
                 )}
               </div>
 
+              {/* Dynamic Faculty Dropdown */}
               <div>
                 <div className="relative">
                   <select
@@ -669,10 +692,10 @@ export const DemoManagementPage: React.FC = () => {
                     }}
                     className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border appearance-none ${
                       facultyError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
-                    } focus:outline-none`}
+                    } focus:outline-none cursor-pointer`}
                   >
                     <option value="">Select Faculty*</option>
-                    {FACULTIES.map((f) => (
+                    {dynamicFaculties.map((f) => (
                       <option key={f} value={f}>{f}</option>
                     ))}
                   </select>
@@ -712,7 +735,7 @@ export const DemoManagementPage: React.FC = () => {
                     }}
                     className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border appearance-none ${
                       slotError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
-                    } focus:outline-none`}
+                    } focus:outline-none cursor-pointer`}
                   >
                     <option value="">Select Time Slot*</option>
                     {TIME_SLOTS.map((t) => (
@@ -767,13 +790,13 @@ export const DemoManagementPage: React.FC = () => {
           <div className="flex gap-4">
             <button
               onClick={() => setView('table')}
-              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={handleSubmitSchedule}
-              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs flex items-center justify-center gap-1.5"
+              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Calendar className="w-4 h-4" />
               <span>Schedule Demo</span>
@@ -782,20 +805,17 @@ export const DemoManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 3. RESCHEDULE DEMO VIEW                                   */}
-      {/* ========================================================= */}
+      {/* 3. RESCHEDULE DEMO VIEW */}
       {view === 'reschedule-form' && selectedDemo && (
         <div className="space-y-6 max-w-4xl">
           <button
             onClick={() => setView('details')}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Reschedule Demo</span>
           </button>
 
-          {/* Select Lead (Pre-filled for Reschedule) */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Select Lead</h3>
             
@@ -831,7 +851,6 @@ export const DemoManagementPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Demo Details */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Demo Details</h3>
 
@@ -841,7 +860,7 @@ export const DemoManagementPage: React.FC = () => {
                   <select
                     value={formCourse}
                     onChange={(e) => setFormCourse(e.target.value)}
-                    className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                    className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                   >
                     <option value="">Course*</option>
                     {COURSES.filter(c => c !== 'All').map((c) => (
@@ -852,14 +871,15 @@ export const DemoManagementPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Dynamic Faculty Selector for Reschedule */}
               <div className="relative">
                 <select
                   value={formFaculty}
                   onChange={(e) => setFormFaculty(e.target.value)}
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                 >
                   <option value="">Faculty*</option>
-                  {FACULTIES.map((f) => (
+                  {dynamicFaculties.map((f) => (
                     <option key={f} value={f}>{f}</option>
                   ))}
                 </select>
@@ -879,7 +899,7 @@ export const DemoManagementPage: React.FC = () => {
                 <select
                   value={formTimeSlot}
                   onChange={(e) => setFormTimeSlot(e.target.value)}
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                 >
                   <option value="">Time Slot*</option>
                   {TIME_SLOTS.map((t) => (
@@ -891,7 +911,6 @@ export const DemoManagementPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Mode Selection */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
             <h3 className="text-sm font-bold font-['Sora']">Demo Mode*</h3>
             <div className="flex items-center gap-8 text-xs">
@@ -918,17 +937,16 @@ export const DemoManagementPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Form Actions */}
           <div className="flex gap-4">
             <button
               onClick={() => setView('details')}
-              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={handleSubmitReschedule}
-              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               Reschedule Demo
             </button>
@@ -936,9 +954,7 @@ export const DemoManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 4. RESCHEDULE CONFIRMATION MODAL                          */}
-      {/* ========================================================= */}
+      {/* 4. RESCHEDULE CONFIRMATION MODAL */}
       {showRescheduleSuccessModal && selectedDemo && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-lg w-full text-center space-y-5 shadow-2xl">
@@ -982,7 +998,7 @@ export const DemoManagementPage: React.FC = () => {
                 setShowRescheduleSuccessModal(false);
                 setView('details');
               }}
-              className="w-full py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="w-full py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               Go back
             </button>
@@ -990,9 +1006,7 @@ export const DemoManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 5. SCHEDULE SUCCESS MODAL (NEW DEMO)                      */}
-      {/* ========================================================= */}
+      {/* 5. SCHEDULE SUCCESS MODAL */}
       {showScheduleSuccessModal && selectedDemo && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -1008,7 +1022,7 @@ export const DemoManagementPage: React.FC = () => {
                 setShowScheduleSuccessModal(false);
                 setView('details');
               }}
-              className="w-full py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="w-full py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               View demo details
             </button>
@@ -1016,9 +1030,7 @@ export const DemoManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 6. CANCELLATION MODAL                                     */}
-      {/* ========================================================= */}
+      {/* 6. CANCELLATION MODAL */}
       {showCancelModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
@@ -1033,13 +1045,13 @@ export const DemoManagementPage: React.FC = () => {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setShowCancelModal(false)}
-                className="flex-1 py-2 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                className="flex-1 py-2 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
               >
                 Keep Demo
               </button>
               <button
                 onClick={handleConfirmCancel}
-                className="flex-1 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 Submit
               </button>
@@ -1048,14 +1060,12 @@ export const DemoManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 7. DEMO DETAILS VIEW                                      */}
-      {/* ========================================================= */}
+      {/* 7. DEMO DETAILS VIEW */}
       {view === 'details' && selectedDemo && (
         <div className="space-y-6 max-w-4xl">
           <button
             onClick={() => setView('table')}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>
@@ -1141,13 +1151,13 @@ export const DemoManagementPage: React.FC = () => {
                 <>
                   <button
                     onClick={() => setShowCancelModal(true)}
-                    className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                    className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
                   >
                     Cancel Demo
                   </button>
                   <button
                     onClick={() => handleStartReschedule(selectedDemo)}
-                    className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                    className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
                   >
                     Reschedule Demo
                   </button>
@@ -1158,13 +1168,13 @@ export const DemoManagementPage: React.FC = () => {
                 <>
                   <button
                     onClick={() => setView('table')}
-                    className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                    className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
                   >
                     Go Back
                   </button>
                   <button
                     onClick={() => alert(`Follow-up scheduled for ${selectedDemo.name}!`)}
-                    className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                    className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
                   >
                     Schedule follow-up
                   </button>
@@ -1175,13 +1185,13 @@ export const DemoManagementPage: React.FC = () => {
                 <>
                   <button
                     onClick={() => setView('table')}
-                    className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                    className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => handleStartReschedule(selectedDemo)}
-                    className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                    className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
                   >
                     Reschedule Demo
                   </button>
@@ -1191,7 +1201,6 @@ export const DemoManagementPage: React.FC = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

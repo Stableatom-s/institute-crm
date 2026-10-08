@@ -7,7 +7,7 @@ import { batchService, BatchItem } from '../../services/batchService';
 export const FacultyDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const auth = useAuth() as any;
-  const currentUserName = auth?.user?.name || 'Poorva Pande';
+  const currentUserName = (auth?.user?.name || '').trim().toLowerCase();
 
   const [demos, setDemos] = useState<DemoItem[]>([]);
   const [batches, setBatches] = useState<BatchItem[]>([]);
@@ -15,6 +15,7 @@ export const FacultyDashboardPage: React.FC = () => {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      if (!currentUserName) return;
       try {
         setIsLoading(true);
         const [allDemos, allBatches] = await Promise.all([
@@ -22,21 +23,27 @@ export const FacultyDashboardPage: React.FC = () => {
           batchService.getAllBatches(),
         ]);
 
-        const facultyDemos = allDemos.filter(
-          (d) =>
-            d.faculty.toLowerCase().includes(currentUserName.toLowerCase()) ||
-            currentUserName.toLowerCase().includes(d.faculty.toLowerCase())
-        );
-        const displayDemos = facultyDemos.length > 0 ? facultyDemos : allDemos;
-        setDemos(displayDemos.filter((d) => d.status === 'Scheduled'));
+        // Strict filter: match only demos assigned to this faculty member
+        const facultyDemos = allDemos.filter((d) => {
+          const facultyName = (d.faculty || '').trim().toLowerCase();
+          return (
+            facultyName === currentUserName ||
+            (currentUserName.length > 0 && facultyName.includes(currentUserName)) ||
+            (facultyName.length > 0 && currentUserName.includes(facultyName))
+          );
+        });
+        setDemos(facultyDemos.filter((d) => d.status === 'Scheduled'));
 
-        const facultyBatches = allBatches.filter(
-          (b) =>
-            b.faculty.toLowerCase().includes(currentUserName.toLowerCase()) ||
-            currentUserName.toLowerCase().includes(b.faculty.toLowerCase())
-        );
-        const displayBatches = facultyBatches.length > 0 ? facultyBatches : allBatches;
-        setBatches(displayBatches);
+        // Strict filter: match only batches assigned to this faculty member
+        const facultyBatches = allBatches.filter((b) => {
+          const facultyName = (b.faculty || '').trim().toLowerCase();
+          return (
+            facultyName === currentUserName ||
+            (currentUserName.length > 0 && facultyName.includes(currentUserName)) ||
+            (facultyName.length > 0 && currentUserName.includes(facultyName))
+          );
+        });
+        setBatches(facultyBatches);
       } catch (err) {
         console.error('Failed to load faculty dashboard data:', err);
       } finally {
@@ -101,7 +108,7 @@ export const FacultyDashboardPage: React.FC = () => {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-sm font-bold text-[#050720] font-['Sora']">Upcoming Demo</h2>
           <button
-            onClick={() => navigate('/faculty/demo-management')}
+            onClick={() => navigate('/faculty/demos')}
             className="text-xs font-medium text-[#2F65FF] hover:underline cursor-pointer"
           >
             View all
@@ -144,7 +151,7 @@ export const FacultyDashboardPage: React.FC = () => {
                   <td className="py-3.5 text-[#050720]/70">{demo.mode}</td>
                   <td className="py-3.5 text-right">
                     <button
-                      onClick={() => navigate('/faculty/demo-management')}
+                      onClick={() => navigate('/faculty/demos')}
                       className="px-3.5 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
                     >
                       View
