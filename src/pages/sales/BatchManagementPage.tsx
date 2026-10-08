@@ -94,7 +94,7 @@ export const BatchManagementPage: React.FC = () => {
     }
   };
 
-  // 2. Fetch leads and check real approved payments from invoices
+// 2. Fetch leads and check real approved payments from invoices (ONLY Enrolled students)
   const loadEnrolledStudents = async () => {
     try {
       const [allLeads, invoices] = await Promise.all([
@@ -111,8 +111,9 @@ export const BatchManagementPage: React.FC = () => {
         invoicePaidMap.set(key, { paid, total, status: inv.paymentStatus || 'Partially Paid' });
       });
 
+      // ✅ STRICT FILTER: ONLY students with status === 'Enrolled'
       const enrolled = allLeads
-        .filter((l) => l.status === 'Enrolled' || l.status === 'Interested')
+        .filter((l) => (l.status || '').trim().toLowerCase() === 'enrolled')
         .map((l, idx) => {
           const fullName = `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Student';
           const key = fullName.toLowerCase();
@@ -124,7 +125,7 @@ export const BatchManagementPage: React.FC = () => {
           const totalFee = paymentInfo && paymentInfo.total > 0 ? paymentInfo.total : parsedTotal;
           const remaining = Math.max(0, totalFee - actualPaid);
 
-          // Compute accurate fee text instead of hardcoded full payment
+          // Compute accurate fee text
           let feeDisplay = `₹${actualPaid.toLocaleString()} Paid`;
           if (actualPaid === 0) {
             feeDisplay = `₹0 Paid (Due ₹${totalFee.toLocaleString()})`;
