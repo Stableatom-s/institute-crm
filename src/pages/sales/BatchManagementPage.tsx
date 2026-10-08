@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { batchService, BatchItem, BatchStudent, BatchLecture } from '../../services/batchService';
 import { leadService } from '../../services/leadService';
+import { financeService } from '../../services/financeService';
 
 const COURSE_OPTIONS = ['All', 'UI/UX Design', 'No Code', 'Full Stack', 'Portfolio', 'React Native', 'React'];
 
@@ -93,13 +94,46 @@ export const BatchManagementPage: React.FC = () => {
     }
   };
 
+  // 2. Fetch leads and check real approved payments from invoices
   const loadEnrolledStudents = async () => {
     try {
-      const allLeads = await leadService.getAllLeads();
+      const [allLeads, invoices] = await Promise.all([
+        leadService.getAllLeads(),
+        financeService.getAllInvoices().catch(() => []),
+      ]);
+
+      // Map approved paid fees per student name
+      const invoicePaidMap = new Map<string, { paid: number; total: number; status: string }>();
+      invoices.forEach((inv) => {
+        const key = (inv.studentName || '').trim().toLowerCase();
+        const paid = inv.approvalStatus === 'Approved' ? (inv.paidFees || 0) : 0;
+        const total = inv.totalFees || 0;
+        invoicePaidMap.set(key, { paid, total, status: inv.paymentStatus || 'Partially Paid' });
+      });
+
       const enrolled = allLeads
         .filter((l) => l.status === 'Enrolled' || l.status === 'Interested')
         .map((l, idx) => {
           const fullName = `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Student';
+          const key = fullName.toLowerCase();
+          const parsedTotal = parseInt((l.finalFees || '0').replace(/[^0-9]/g, ''), 10) || 0;
+
+          // Lookup real payment details from approved invoices
+          const paymentInfo = invoicePaidMap.get(key);
+          const actualPaid = paymentInfo ? paymentInfo.paid : 0;
+          const totalFee = paymentInfo && paymentInfo.total > 0 ? paymentInfo.total : parsedTotal;
+          const remaining = Math.max(0, totalFee - actualPaid);
+
+          // Compute accurate fee text instead of hardcoded full payment
+          let feeDisplay = `₹${actualPaid.toLocaleString()} Paid`;
+          if (actualPaid === 0) {
+            feeDisplay = `₹0 Paid (Due ₹${totalFee.toLocaleString()})`;
+          } else if (remaining > 0) {
+            feeDisplay = `₹${actualPaid.toLocaleString()} Paid (Due ₹${remaining.toLocaleString()})`;
+          } else if (totalFee > 0 && actualPaid >= totalFee) {
+            feeDisplay = `₹${actualPaid.toLocaleString()} Paid (Fully Paid)`;
+          }
+
           return {
             id: l.id,
             srNo: String(idx + 1).padStart(2, '0'),
@@ -110,9 +144,10 @@ export const BatchManagementPage: React.FC = () => {
             contact: l.contactNo || '',
             attendance: '00/00',
             remark: l.remark || 'Active student',
-            fees: l.finalFees ? `₹${l.finalFees} Paid` : '₹35,000 Paid',
+            fees: feeDisplay,
           };
         });
+
       setAvailableStudents(enrolled);
     } catch (err) {
       console.error('Failed to load students for batch:', err);
@@ -375,7 +410,6 @@ export const BatchManagementPage: React.FC = () => {
                 className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none focus:border-[#050720]"
               />
 
-              {/* Dynamic Faculty Dropdown */}
               <select
                 value={formData.faculty}
                 onChange={(e) => setFormData({ ...formData, faculty: e.target.value })}
