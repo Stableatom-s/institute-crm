@@ -88,9 +88,14 @@ export const FeesManagementPage: React.FC = () => {
           };
         });
 
-      const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
+const mappedInvoices: FeeStudent[] = invoices.map((inv, index) => {
         const isApproved = inv.approvalStatus === 'Approved';
-        const effectivePaid = isApproved ? (inv.paidFees || 0) : 0;
+        
+        // Ensure paidFees never exceeds totalFees
+        const rawPaid = inv.paidFees || 0;
+        const boundedPaid = isApproved 
+          ? Math.min(inv.totalFees || 0, rawPaid) 
+          : 0;
 
         return {
           id: inv.id,
@@ -100,14 +105,14 @@ export const FeesManagementPage: React.FC = () => {
           lastName: inv.lastName || inv.studentName.split(' ').slice(1).join(' ') || '',
           course: inv.course,
           totalFees: inv.totalFees || 0,
-          paidFees: effectivePaid,
+          paidFees: boundedPaid,
           lastFollowUp: inv.lastFollowUp || '—',
-          remarks: inv.paymentStatus,
+          remarks: boundedPaid >= inv.totalFees && inv.totalFees > 0 ? 'Paid' : (inv.paymentStatus || 'Partially Paid'),
           approvalStatus: inv.approvalStatus || 'None',
           invoiceId: inv.invoiceCode,
           timeline: (inv.timeline || []).map((t: any) => ({
             id: t.id,
-            title: t.installmentTitle,
+            title: t.installmentTitle || t.title,
             dueDate: t.dueDate,
             paidDate: t.paidDate,
             amount: t.amount,
