@@ -1,4 +1,5 @@
 import React from 'react';
+import logoSvg from '../../assets/logo.svg';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutGrid,
@@ -80,16 +81,14 @@ export const Sidebar: React.FC = () => {
     <aside className="w-60 bg-white border-r border-[#050720]/10 flex flex-col justify-between shrink-0 h-screen select-none">
       <div>
         {/* Radiquolab Logo Header */}
-        <div className="h-20 flex flex-col justify-center px-6">
-          <div className="flex items-center gap-1">
-            <span className="text-lg font-extrabold tracking-tight text-[#050720] font-['Sora']">
-              RADIQUO<span className="text-[#FFB908]">LAB</span>
-            </span>
-          </div>
-          <span className="text-[9px] font-bold tracking-[0.2em] text-[#050720]/60 uppercase -mt-1 font-['Sora']">
-            DESIGN INSTITUTE
-          </span>
-        </div>
+        <div className="flex flex-col items-center justify-center select-none">
+  <img 
+    src={logoSvg} 
+    alt="Radiquolab Design Institute" 
+    className="h-10 w-auto object-contain" 
+    draggable={false}
+  />
+</div>
 
         {/* Dynamic Role Navigation List */}
         <nav className="px-3 space-y-1 mt-2">

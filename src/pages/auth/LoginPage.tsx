@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import logoSvg from '../../assets/logo.svg';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -68,15 +69,17 @@ export const LoginPage: React.FC = () => {
       {/* Centered Login Card */}
       <div className="bg-white rounded-2xl p-8 sm:p-10 max-w-[420px] w-full shadow-sm border border-[#050720]/10 text-center space-y-6">
         
-        {/* Institute Brand Logo */}
-        <div className="flex flex-col items-center justify-center select-none">
-          <div className="text-xl font-extrabold tracking-tight font-['Sora'] text-[#050720] flex items-center">
-            RADIQUO<span className="text-[#FFB908]">LAB</span>
-          </div>
-          <span className="text-[9px] tracking-[0.25em] text-[#050720]/60 font-semibold uppercase mt-0.5">
-            Design Institute
-          </span>
-        </div>
+         
+
+{/* Institute Brand Logo */}
+<div className="flex flex-col items-center justify-center select-none">
+  <img 
+    src={logoSvg} 
+    alt="Radiquolab Design Institute" 
+    className="h-10 w-auto object-contain" 
+    draggable={false}
+  />
+</div>
 
         {/* Heading */}
         <h2 className="text-xl font-bold font-['Sora'] text-[#050720]">Login</h2>
