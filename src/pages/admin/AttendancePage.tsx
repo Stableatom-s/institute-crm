@@ -51,6 +51,50 @@ const ALL_MONTHS = [
   'December'
 ];
 
+// Helper to compute actual worked duration from 12-hour or ISO time strings
+const calculateWorkingHours = (inTimeStr?: string, outTimeStr?: string): string => {
+  if (!inTimeStr || inTimeStr === '-') return '-';
+
+  const parseTime = (timeStr: string): Date | null => {
+    try {
+      const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+      if (match) {
+        let hours = parseInt(match[1], 10);
+        const minutes = parseInt(match[2], 10);
+        const meridian = match[3]?.toUpperCase();
+
+        if (meridian === 'PM' && hours < 12) hours += 12;
+        if (meridian === 'AM' && hours === 12) hours = 0;
+
+        const d = new Date();
+        d.setHours(hours, minutes, 0, 0);
+        return d;
+      }
+
+      const iso = new Date(timeStr);
+      if (!isNaN(iso.getTime())) return iso;
+    } catch {
+      return null;
+    }
+    return null;
+  };
+
+  const start = parseTime(inTimeStr);
+  if (!start) return '-';
+
+  const end = outTimeStr && outTimeStr !== '-' && outTimeStr !== 'Yet to checkout' 
+    ? parseTime(outTimeStr) 
+    : new Date();
+
+  if (!end || end < start) return '-';
+
+  const diffMs = end.getTime() - start.getTime();
+  const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+  return `${String(diffHrs).padStart(2, '0')}:${String(diffMins).padStart(2, '0')} Hrs`;
+};
+
 export const AdminAttendancePage: React.FC = () => {
   const [view, setView] = useState<'roster' | 'details'>('roster');
   const [employees, setEmployees] = useState<EmployeeAttendance[]>([]);
@@ -71,57 +115,49 @@ export const AdminAttendancePage: React.FC = () => {
       if (Array.isArray(data) && data.length > 0) {
         const mapped: EmployeeAttendance[] = data.map((item: any, idx: number) => {
           const roleDisplay = item.userRole === 'sales' ? 'Salesperson' : 'Faculty';
+          const clockInTime = item.inTime || item.clockIn || '-';
+          const clockOutTime = item.outTime || item.clockOut || '-';
+
+          // Determine status dynamically based on actual clock data
+          let computedStatus: 'Present' | 'On Leave' | 'Absent' = 'Absent';
+          if (item.status === 'On Leave') {
+            computedStatus = 'On Leave';
+          } else if (clockInTime !== '-') {
+            computedStatus = 'Present';
+          }
+
+          const hoursWorked = item.workingHours || calculateWorkingHours(clockInTime, clockOutTime);
+
           return {
             id: item._id || item.id || `emp-${idx}`,
             srNo: String(idx + 1).padStart(2, '0'),
-            employeeName: item.userName || 'Staff Member',
+            employeeName: item.userName || `${item.firstName || ''} ${item.lastName || ''}`.trim() || 'Staff Member',
             role: roleDisplay,
-            clockIn: item.inTime || '09:30 AM',
-            clockOut: item.outTime || 'Yet to checkout',
-            status: item.outTime && item.outTime !== 'Yet to checkout' ? 'Present' : 'Present',
-            remarkStatus: '-',
-            remarkCourse: 'UI/UX Design',
-            location: 'Radiquolab Design Institute - 18.5075, 73.8216',
-            clockOutLocation: item.outTime && item.outTime !== 'Yet to checkout' ? 'Office (Pune)' : '-',
-            workingHours: item.workingHours || '04:30 Hrs',
+            clockIn: clockInTime,
+            clockOut: clockOutTime,
+            status: computedStatus,
+            remarkStatus: item.remark || '-',
+            remarkCourse: item.course || 'UI/UX Design',
+            location: item.location || (clockInTime !== '-' ? 'Radiquolab Design Institute' : '-'),
+            clockOutLocation: item.clockOutLocation || (clockOutTime !== '-' ? 'Office (Pune)' : '-'),
+            workingHours: hoursWorked,
             todayActivities: (item.activities || []).map((a: any) => ({
               activity: a.activity,
               timeSpent: a.timeSpent,
             })),
-            leaveHistory: [],
+            leaveHistory: item.leaveHistory || [],
           };
         });
         setEmployees(mapped);
         if (!selectedEmployee) setSelectedEmployee(mapped[0]);
       } else {
-        const defaultList: EmployeeAttendance[] = [
-          {
-            id: 'emp-1',
-            srNo: '01',
-            employeeName: 'Poorva Pande',
-            role: 'Faculty',
-            clockIn: localStorage.getItem('radiquolab_punch_in') || '09:30 AM',
-            clockOut: '-',
-            status: 'Present',
-            remarkStatus: '-',
-            remarkCourse: 'UI/UX Design',
-            location: 'Radiquolab Design Institute - 18.5075, 73.8216',
-            clockOutLocation: '-',
-            workingHours: '04:30 Hrs',
-            todayActivities: [
-              { activity: 'Conducted No-Code Demo', timeSpent: '02:00 Hrs' },
-              { activity: 'Batch Lecture: UI Prototyping', timeSpent: '02:30 Hrs' }
-            ],
-            leaveHistory: [
-              { id: 'l1', leaveType: 'Sick', leaveDate: '21-12-2025', reason: 'Flu Recovery', applicationDate: '20-12-2025', status: 'Approved' }
-            ]
-          }
-        ];
-        setEmployees(defaultList);
-        if (!selectedEmployee) setSelectedEmployee(defaultList[0]);
+        setEmployees([]);
+        setSelectedEmployee(null);
       }
     } catch (err) {
       console.error('Failed to load employee attendance records:', err);
+      setEmployees([]);
+      setSelectedEmployee(null);
     } finally {
       setIsLoading(false);
     }
@@ -232,7 +268,7 @@ export const AdminAttendancePage: React.FC = () => {
                             ? 'text-[#10B981]' 
                             : emp.status === 'On Leave' 
                             ? 'text-[#EF4444]' 
-                            : 'text-[#050720]/60'
+                            : 'text-[#050720]/40'
                         }`}>
                           {emp.status}
                         </span>

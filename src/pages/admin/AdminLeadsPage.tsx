@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { leadService } from '../../services/leadService';
 import { teamService } from '../../services/teamService';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export type LeadStatus = 'Interested' | 'Not Interested' | 'Demo Scheduled' | 'Enrolled' | 'Contacted';
 
@@ -35,11 +36,13 @@ export interface DetailedLead {
   occupation: string;
   leadSource: string;
   address: string;
-  assignedTo?: string; // <-- Change to optional
+  assignedTo?: string;
   offeredFees?: string;
   finalFees?: string;
   referral?: 'Yes' | 'No';
-  enquiringFor?: 'Self' | 'Other'; // <-- Restrict to exact literal union
+  referralMobile?: string;
+  referralName?: string;
+  enquiringFor?: 'Self' | 'Family' | 'Friend' | 'Other' | string;
   timeline: TimelineEntry[];
 }
 
@@ -47,6 +50,9 @@ const COURSES = ['Course', 'UI/UX Design', 'No Code', 'Portfolio', 'Full-Stack',
 const STATUSES = ['Status', 'Interested', 'Not Interested', 'Demo Scheduled', 'Enrolled'];
 
 export const AdminLeadsPage: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [view, setView] = useState<'list' | 'details' | 'add'>('list');
   const [leads, setLeads] = useState<DetailedLead[]>([]);
   const [selectedLead, setSelectedLead] = useState<DetailedLead | null>(null);
@@ -79,9 +85,11 @@ export const AdminLeadsPage: React.FC = () => {
   const [formAddress, setFormAddress] = useState('');
   const [formCourses, setFormCourses] = useState<string[]>([]);
   const [formReferral, setFormReferral] = useState<'Yes' | 'No'>('No');
+  const [formReferralMobile, setFormReferralMobile] = useState('');
+  const [formReferralName, setFormReferralName] = useState('');
   const [formOfferedFees, setFormOfferedFees] = useState('');
   const [formFinalFees, setFormFinalFees] = useState('');
-  const [formEnquiringFor, setFormEnquiringFor] = useState('Self');
+  const [formEnquiringFor, setFormEnquiringFor] = useState<'Self' | 'Family' | 'Friend'>('Self');
   const [formAssignTo, setFormAssignTo] = useState('');
   const [formError, setFormError] = useState(false);
 
@@ -126,6 +134,31 @@ export const AdminLeadsPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Listen to router navigation state to open Add Lead form directly
+  useEffect(() => {
+    if (location.state && (location.state as any).openAddModal) {
+      setFormFirstName('');
+      setFormLastName('');
+      setFormMobile('');
+      setFormEmail('');
+      setFormOccupation('College Student');
+      setFormLeadSource('');
+      setFormEnquiryDate(new Date().toLocaleDateString('en-GB').replace(/\//g, '-'));
+      setFormAddress('');
+      setFormCourses([]);
+      setFormReferral('No');
+      setFormReferralMobile('');
+      setFormReferralName('');
+      setFormOfferedFees('');
+      setFormFinalFees('');
+      setFormEnquiringFor('Self');
+      setFormAssignTo(salesPersons[0] || 'Salesperson');
+      setFormError(false);
+      setView('add');
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, salesPersons, navigate]);
 
   // Filtered Leads
   const filteredLeads = leads.filter((l) => {
@@ -211,50 +244,53 @@ export const AdminLeadsPage: React.FC = () => {
   };
 
   const handleConfirmAssign = async () => {
-  const payload: any = {
-    firstName: formFirstName,
-    lastName: formLastName,
-    contactNo: formMobile,
-    email: formEmail,
-    enquiryDate: formEnquiryDate,
-    course: formCourses[0] || 'UI/UX Design',
-    status: 'Interested',
-    followUp: '01-01-2026',
-    remark: 'Newly Added',
-    occupation: formOccupation,
-    leadSource: formLeadSource || 'Walk-in',
-    address: formAddress || 'Pune',
-    assignedTo: formAssignTo || 'Sales',
-    offeredFees: formOfferedFees || '₹35,000',
-    finalFees: formFinalFees || '₹35,000',
-    referral: formReferral,
-    enquiringFor: formEnquiringFor,
-    timeline: [
-      {
-        id: `t-${Date.now()}`,
-        timestamp: `${formEnquiryDate}, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-        status: 'Interested',
-        title: 'Lead Remark',
-        description: `Lead created by Admin and assigned to ${formAssignTo}`,
-      },
-    ],
+    const payload: any = {
+      firstName: formFirstName,
+      lastName: formLastName,
+      contactNo: formMobile,
+      email: formEmail,
+      enquiryDate: formEnquiryDate,
+      course: formCourses[0] || 'UI/UX Design',
+      status: 'Interested',
+      followUp: '01-01-2026',
+      remark: 'Newly Added',
+      occupation: formOccupation,
+      leadSource: formLeadSource || 'Walk-in',
+      address: formAddress || 'Pune',
+      assignedTo: formAssignTo || 'Sales',
+      offeredFees: formOfferedFees || '₹35,000',
+      finalFees: formFinalFees || '₹35,000',
+      referral: formReferral,
+      referralMobile: formReferral === 'Yes' ? formReferralMobile : undefined,
+      referralName: formReferral === 'Yes' ? formReferralName : undefined,
+      enquiringFor: formEnquiringFor,
+      timeline: [
+        {
+          id: `t-${Date.now()}`,
+          timestamp: `${formEnquiryDate}, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          status: 'Interested',
+          title: 'Lead Remark',
+          description: `Lead created by Admin and assigned to ${formAssignTo}`,
+        },
+      ],
+    };
+
+    try {
+      const created: any = await leadService.createLead(payload);
+      setLeads([created, ...leads]);
+      setSelectedLead(created);
+      setShowAssignModal(false);
+      setShowAssignedAlert(true);
+      setTimeout(() => {
+        setShowAssignedAlert(false);
+        setView('list');
+      }, 1500);
+    } catch (err) {
+      console.error('Failed to create lead:', err);
+      alert('Error saving lead to database.');
+    }
   };
 
-  try {
-    const created: any = await leadService.createLead(payload);
-    setLeads([created, ...leads]);
-    setSelectedLead(created);
-    setShowAssignModal(false);
-    setShowAssignedAlert(true);
-    setTimeout(() => {
-      setShowAssignedAlert(false);
-      setView('list');
-    }, 1500);
-  } catch (err) {
-    console.error('Failed to create lead:', err);
-    alert('Error saving lead to database.');
-  }
-};
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
       {/* 1. LEADS DIRECTORY LISTING */}
@@ -274,6 +310,8 @@ export const AdminLeadsPage: React.FC = () => {
                 setFormAddress('');
                 setFormCourses([]);
                 setFormReferral('No');
+                setFormReferralMobile('');
+                setFormReferralName('');
                 setFormOfferedFees('');
                 setFormFinalFees('');
                 setFormEnquiringFor('Self');
@@ -287,7 +325,7 @@ export const AdminLeadsPage: React.FC = () => {
             </button>
           </div>
 
-          {/* KPI Stat Cards (Dynamically computed) */}
+          {/* KPI Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Total Leads</span>
@@ -514,6 +552,22 @@ export const AdminLeadsPage: React.FC = () => {
                     <span className="text-[10px] text-[#050720]/50 block">Assigned to</span>
                     <span className="font-semibold text-sm">{selectedLead.assignedTo || 'Sales'}</span>
                   </div>
+                  {selectedLead.referral === 'Yes' && (
+                    <>
+                      <div>
+                        <span className="text-[10px] text-[#050720]/50 block">Referral Mobile</span>
+                        <span className="font-semibold text-sm">{selectedLead.referralMobile || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[#050720]/50 block">Referral Name</span>
+                        <span className="font-semibold text-sm">{selectedLead.referralName || '—'}</span>
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <span className="text-[10px] text-[#050720]/50 block">Enquiring for</span>
+                    <span className="font-semibold text-sm">{selectedLead.enquiringFor || 'Self'}</span>
+                  </div>
                 </div>
               </div>
 
@@ -684,7 +738,10 @@ export const AdminLeadsPage: React.FC = () => {
                   type="text"
                   placeholder="Mobile*"
                   value={formMobile}
-                  onChange={(e) => setFormMobile(e.target.value)}
+                  onChange={(e) => {
+                    setFormMobile(e.target.value);
+                    if (e.target.value) setFormError(false);
+                  }}
                   className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border ${
                     formError && !formMobile ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
                   } focus:outline-none`}
@@ -765,8 +822,9 @@ export const AdminLeadsPage: React.FC = () => {
           </div>
 
           {/* Section 3: Referral */}
-          <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
+          <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Referral</h3>
+            
             <div className="flex items-center gap-8 text-xs">
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input
@@ -783,12 +841,43 @@ export const AdminLeadsPage: React.FC = () => {
                   type="radio"
                   name="refOption"
                   checked={formReferral === 'No'}
-                  onChange={() => setFormReferral('No')}
+                  onChange={() => {
+                    setFormReferral('No');
+                    setFormReferralMobile('');
+                    setFormReferralName('');
+                  }}
                   className="w-4 h-4 accent-[#050720]"
                 />
                 <span className="font-medium">No</span>
               </label>
             </div>
+
+            {/* Conditionally reveal fields when Referral is "Yes" */}
+            {formReferral === 'Yes' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
+                  <span className="text-[10px] text-[#050720]/50 block">Referral Mobile</span>
+                  <input
+                    type="text"
+                    placeholder="Enter referral mobile"
+                    value={formReferralMobile}
+                    onChange={(e) => setFormReferralMobile(e.target.value)}
+                    className="w-full bg-transparent text-sm font-semibold text-[#050720] focus:outline-none placeholder:font-normal placeholder:text-xs"
+                  />
+                </div>
+
+                <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
+                  <span className="text-[10px] text-[#050720]/50 block">Referral Name</span>
+                  <input
+                    type="text"
+                    placeholder="Enter referral name"
+                    value={formReferralName}
+                    onChange={(e) => setFormReferralName(e.target.value)}
+                    className="w-full bg-transparent text-sm font-semibold text-[#050720] focus:outline-none placeholder:font-normal placeholder:text-xs"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Section 4: Fees */}
@@ -819,22 +908,22 @@ export const AdminLeadsPage: React.FC = () => {
           {/* Section 5: Enquiring For */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Enquiring for</h3>
-            <div className="relative">
-              <span className="text-[10px] text-[#050720]/50 block mb-1">Enquiring for</span>
+            <div className="relative p-3 bg-white border border-[#050720]/15 rounded-lg">
+              <span className="text-[10px] text-[#050720]/50 block">Enquiring for</span>
               <select
                 value={formEnquiringFor}
-                onChange={(e) => setFormEnquiringFor(e.target.value)}
-                className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
+                onChange={(e) => setFormEnquiringFor(e.target.value as 'Self' | 'Family' | 'Friend')}
+                className="w-full bg-transparent text-sm font-semibold text-[#050720] appearance-none focus:outline-none cursor-pointer pr-8"
               >
                 <option value="Self">Self</option>
                 <option value="Family">Family</option>
-                <option value="Other">Other</option>
+                <option value="Friend">Friend</option>
               </select>
-              <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 bottom-3 pointer-events-none" />
+              <ChevronDown className="w-3.5 h-3.5 text-[#050720]/50 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
 
-          {/* Section 6: Assign To (DYNAMIC SALES TEAM MEMBERS) */}
+          {/* Section 6: Assign To */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
             <h3 className="text-sm font-bold font-['Sora']">Assign to</h3>
             <div className="relative">

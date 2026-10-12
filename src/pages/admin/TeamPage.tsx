@@ -37,7 +37,7 @@ export interface TeamMember {
   assignedBatches: string[];
   activeTill?: string;
   status: MemberTab;
-  photoUrl: string;
+  photoUrl?: string;
   workHistory: {
     companyName: string;
     jobTitle: string;
@@ -262,9 +262,9 @@ export const AdminTeamPage: React.FC = () => {
       address: addAddress,
       education: addEducation,
       course: addCourses[0] || 'UI/UX Design',
-      assignedBatches: ['MWF-JAN-2026', 'Weekend-FEB-2026'],
+      assignedBatches: [], // Start clean with no random mock batches
       status: 'Active',
-      photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+      photoUrl: '', // No fake photo fallback
       workHistory: {
         companyName: addCompany,
         jobTitle: addJobTitle,
@@ -293,6 +293,25 @@ export const AdminTeamPage: React.FC = () => {
       setShowCredentialsSentAlert(false);
       setView('roster');
     }, 1500);
+  };
+
+  // Helper for generating initial badges
+  const renderAvatar = (firstName: string, lastName: string, photoUrl?: string) => {
+    if (photoUrl) {
+      return (
+        <img
+          src={photoUrl}
+          alt={`${firstName} ${lastName}`}
+          className="w-full h-full object-cover"
+        />
+      );
+    }
+    const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'TM';
+    return (
+      <div className="w-full h-full bg-[#050720]/5 flex items-center justify-center font-['Sora'] font-bold text-base text-[#050720]/70 select-none">
+        {initials}
+      </div>
+    );
   };
 
   return (
@@ -468,13 +487,9 @@ export const AdminTeamPage: React.FC = () => {
               )}
             </div>
 
-            {/* Profile Avatar */}
-            <div className="w-20 h-24 rounded-lg overflow-hidden border border-[#050720]/15 bg-slate-100">
-              <img
-                src={selectedMember.photoUrl}
-                alt={selectedMember.name}
-                className="w-full h-full object-cover"
-              />
+            {/* Profile Avatar / Initials */}
+            <div className="w-20 h-24 rounded-lg overflow-hidden border border-[#050720]/15 bg-slate-100 flex items-center justify-center">
+              {renderAvatar(selectedMember.firstName, selectedMember.lastName, selectedMember.photoUrl)}
             </div>
 
             {/* Field Grid */}
@@ -493,7 +508,7 @@ export const AdminTeamPage: React.FC = () => {
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Alternative Mobile*</span>
-                <span className="font-semibold text-sm">{selectedMember.altMobile || '9875898412'}</span>
+                <span className="font-semibold text-sm">{selectedMember.altMobile || '-'}</span>
               </div>
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">Email*</span>
@@ -656,12 +671,8 @@ export const AdminTeamPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-6">
             <h3 className="text-sm font-bold font-['Sora']">Personal Details</h3>
 
-            <div className="w-20 h-24 rounded-lg overflow-hidden border border-[#050720]/15 bg-slate-100">
-              <img
-                src={selectedMember?.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'}
-                alt={selectedMember?.name || 'Member'}
-                className="w-full h-full object-cover"
-              />
+            <div className="w-20 h-24 rounded-lg overflow-hidden border border-[#050720]/15 bg-slate-100 flex items-center justify-center">
+              {renderAvatar(selectedMember?.firstName || '', selectedMember?.lastName || '', selectedMember?.photoUrl)}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -859,7 +870,9 @@ export const AdminTeamPage: React.FC = () => {
 
             {/* Photo Upload */}
             <div className="space-y-2">
-              <div className="w-20 h-24 rounded-lg border border-[#050720]/15 bg-[#E2E8F0] flex items-center justify-center" />
+              <div className="w-20 h-24 rounded-lg border border-[#050720]/15 bg-[#E2E8F0] flex items-center justify-center font-bold text-xs text-[#050720]/40">
+                Photo
+              </div>
               <div className="flex items-center gap-3">
                 <label className="cursor-pointer flex items-center gap-2 px-4 py-2 border border-[#050720]/20 rounded-lg text-xs font-semibold hover:bg-[#050720]/5 transition-colors">
                   <Plus className="w-3.5 h-3.5" />
@@ -1111,12 +1124,8 @@ export const AdminTeamPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-6">
             <h3 className="text-sm font-bold font-['Sora']">Preview</h3>
 
-            <div className="w-20 h-24 rounded-lg overflow-hidden border border-[#050720]/15 bg-slate-100">
-              <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"
-                alt="Preview"
-                className="w-full h-full object-cover"
-              />
+            <div className="w-20 h-24 rounded-lg overflow-hidden border border-[#050720]/15 bg-slate-100 flex items-center justify-center">
+              {renderAvatar(addFirstName, addLastName)}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -1160,18 +1169,6 @@ export const AdminTeamPage: React.FC = () => {
                 <span className="text-[10px] text-[#050720]/50 block mb-1">Course</span>
                 <div className="inline-block px-3 py-1 border border-[#0066FF] rounded text-xs font-semibold text-[#0066FF] bg-blue-50/30">
                   {addCourses[0] || 'UI/UX Design'}
-                </div>
-              </div>
-
-              <div>
-                <span className="text-[10px] text-[#050720]/50 block mb-1">Assigned Batches</span>
-                <div className="flex flex-wrap gap-2">
-                  <span className="px-3 py-1 border border-[#0066FF] rounded text-xs font-semibold text-[#0066FF] bg-blue-50/30">
-                    MWF-JAN-2026
-                  </span>
-                  <span className="px-3 py-1 border border-[#0066FF] rounded text-xs font-semibold text-[#0066FF] bg-blue-50/30">
-                    Weekend-FEB-2026
-                  </span>
                 </div>
               </div>
             </div>
