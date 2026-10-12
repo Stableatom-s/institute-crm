@@ -44,7 +44,7 @@ async function seedUsers() {
     for (const acc of defaultAccounts) {
       const existing = await User.findOne({ email: acc.email });
       if (!existing) {
-        await User.create(acc);
+        await User.create(acc as any);
         console.log(`Created account: ${acc.email} (${acc.role})`);
       } else {
         existing.password = acc.password;

@@ -60,7 +60,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
 
     // 3. New Leads (Admin & Sales)
     if (role === 'admin' || role === 'sales') {
-      const recentLeads = await Lead.find({ status: 'New' }).sort({ createdAt: -1 }).limit(5);
+      const recentLeads = await (Lead as any).find({ status: 'New' }).sort({ createdAt: -1 }).limit(5);
       recentLeads.forEach((ld: any) => {
         notifications.push({
           id: `lead-${ld._id}`,
