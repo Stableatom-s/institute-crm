@@ -52,6 +52,15 @@ app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+app.use(async (_req, _res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Application API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadRoutes);
