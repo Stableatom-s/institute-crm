@@ -12,13 +12,12 @@ import {
   Receipt,
   UserCheck,
   CalendarX,
-  Users,
-  LogOut
+  Users
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const Sidebar: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   if (!user) return null;
@@ -67,10 +66,6 @@ export const Sidebar: React.FC = () => {
       ? facultyLinks
       : salesLinks;
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   // Safe initial character extraction
   const avatarInitial = (user.name && user.name.trim().length > 0)

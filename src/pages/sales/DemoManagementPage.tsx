@@ -1,22 +1,34 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  ChevronDown, 
-  ChevronUp, 
-  ChevronLeft, 
-  ChevronRight, 
+import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Search,
-  Video
-} from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { demoService, DemoItem, DemoTab } from '../../services/demoService';
-import { leadService } from '../../services/leadService';
+} from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { demoService, DemoItem, DemoTab } from "../../services/demoService";
+import { leadService } from "../../services/leadService";
+import { API_BASE_URL } from "../../lib/api";
 
-const COURSES = ['All', 'UI/UX Design', 'No Code', 'Portfolio', 'Full-Stack', 'React Native'];
-const TIME_SLOTS = ['11:00 - 12:00', '01:00 - 02:00', '03:00 - 04:00', '05:00 - 06:00'];
+const COURSES = [
+  "All",
+  "UI/UX Design",
+  "No Code",
+  "Portfolio",
+  "Full-Stack",
+  "React Native",
+];
+const TIME_SLOTS = [
+  "11:00 - 12:00",
+  "01:00 - 02:00",
+  "03:00 - 04:00",
+  "05:00 - 06:00",
+];
 
 export const DemoManagementPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -26,7 +38,8 @@ export const DemoManagementPage: React.FC = () => {
   const getActiveUser = () => {
     if (auth?.user?.name) return auth.user;
     try {
-      const stored = localStorage.getItem('crm_user') || localStorage.getItem('user');
+      const stored =
+        localStorage.getItem("crm_user") || localStorage.getItem("user");
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -34,12 +47,14 @@ export const DemoManagementPage: React.FC = () => {
   };
 
   const activeUser = getActiveUser();
-  const currentSalesName = (activeUser?.name || '').trim().toLowerCase();
-  const userRole = (activeUser?.role || '').trim().toLowerCase();
+  const currentSalesName = (activeUser?.name || "").trim().toLowerCase();
+  const userRole = (activeUser?.role || "").trim().toLowerCase();
 
   // Navigation views: 'table' | 'schedule-form' | 'reschedule-form' | 'details'
-  const [view, setView] = useState<'table' | 'schedule-form' | 'reschedule-form' | 'details'>('table');
-  const [activeTab, setActiveTab] = useState<DemoTab>('Scheduled');
+  const [view, setView] = useState<
+    "table" | "schedule-form" | "reschedule-form" | "details"
+  >("table");
+  const [activeTab, setActiveTab] = useState<DemoTab>("Scheduled");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Master lists
@@ -51,13 +66,13 @@ export const DemoManagementPage: React.FC = () => {
   const [selectedDemo, setSelectedDemo] = useState<DemoItem | null>(null);
 
   // Dropdown Sort Filters
-  const [filterMode, setFilterMode] = useState<string>('All');
-  const [filterCourse, setFilterCourse] = useState<string>('All');
+  const [filterMode, setFilterMode] = useState<string>("All");
+  const [filterCourse, setFilterCourse] = useState<string>("All");
   const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
 
   // Form State (Schedule & Reschedule)
-  const [leadSearchQuery, setLeadSearchQuery] = useState('');
+  const [leadSearchQuery, setLeadSearchQuery] = useState("");
   const [matchingLeads, setMatchingLeads] = useState<any[]>([]);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const [selectedLeadData, setSelectedLeadData] = useState<{
@@ -68,11 +83,11 @@ export const DemoManagementPage: React.FC = () => {
     address: string;
   } | null>(null);
 
-  const [formCourse, setFormCourse] = useState('');
-  const [formFaculty, setFormFaculty] = useState('');
-  const [formDate, setFormDate] = useState('');
-  const [formTimeSlot, setFormTimeSlot] = useState('');
-  const [formMode, setFormMode] = useState<'Online' | 'Offline' | ''>('');
+  const [formCourse, setFormCourse] = useState("");
+  const [formFaculty, setFormFaculty] = useState("");
+  const [formDate, setFormDate] = useState("");
+  const [formTimeSlot, setFormTimeSlot] = useState("");
+  const [formMode, setFormMode] = useState<"Online" | "Offline" | "">("");
 
   // Validation Error States
   const [leadError, setLeadError] = useState(false);
@@ -83,18 +98,20 @@ export const DemoManagementPage: React.FC = () => {
   const [modeError, setModeError] = useState(false);
 
   // Modals
-  const [showScheduleSuccessModal, setShowScheduleSuccessModal] = useState(false);
-  const [showRescheduleSuccessModal, setShowRescheduleSuccessModal] = useState(false);
+  const [showScheduleSuccessModal, setShowScheduleSuccessModal] =
+    useState(false);
+  const [showRescheduleSuccessModal, setShowRescheduleSuccessModal] =
+    useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancellationReasonInput, setCancellationReasonInput] = useState('');
+  const [cancellationReasonInput, setCancellationReasonInput] = useState("");
 
   // Fetch dynamic faculties from Team collection
   const loadFaculties = async () => {
     try {
-      const token = localStorage.getItem('crm_token');
-      const res = await fetch('http://localhost:5000/api/team', {
+      const token = localStorage.getItem("crm_token");
+      const res = await fetch(`${API_BASE_URL}/team`, {
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
@@ -103,41 +120,44 @@ export const DemoManagementPage: React.FC = () => {
         const teamData = await res.json();
         const faculties = teamData
           .filter((m: any) => {
-            const role = (m.role || m.department || '').toLowerCase();
-            return role === 'faculty' || role === 'instructor';
+            const role = (m.role || m.department || "").toLowerCase();
+            return role === "faculty" || role === "instructor";
           })
-          .map((m: any) => m.name || `${m.firstName || ''} ${m.lastName || ''}`.trim())
+          .map(
+            (m: any) =>
+              m.name || `${m.firstName || ""} ${m.lastName || ""}`.trim(),
+          )
           .filter((name: string) => Boolean(name));
 
         if (faculties.length > 0) {
           setDynamicFaculties(Array.from(new Set(faculties)));
         } else {
-          setDynamicFaculties(['Poorva Pande', 'Tanmay Kalbhor']);
+          setDynamicFaculties(["Poorva Pande", "Tanmay Kalbhor"]);
         }
       }
     } catch (err) {
-      console.error('Failed to load faculties:', err);
-      setDynamicFaculties(['Poorva Pande', 'Tanmay Kalbhor']);
+      console.error("Failed to load faculties:", err);
+      setDynamicFaculties(["Poorva Pande", "Tanmay Kalbhor"]);
     }
   };
 
   const handleOpenScheduleForm = () => {
-    setLeadSearchQuery('');
+    setLeadSearchQuery("");
     setMatchingLeads(cachedLeads.slice(0, 8));
     setIsSearchDropdownOpen(false);
     setSelectedLeadData(null);
-    setFormCourse('');
-    setFormFaculty('');
-    setFormDate('');
-    setFormTimeSlot('');
-    setFormMode('');
+    setFormCourse("");
+    setFormFaculty("");
+    setFormDate("");
+    setFormTimeSlot("");
+    setFormMode("");
     setLeadError(false);
     setCourseError(false);
     setFacultyError(false);
     setDateError(false);
     setSlotError(false);
     setModeError(false);
-    setView('schedule-form');
+    setView("schedule-form");
   };
 
   // Load demos scoped strictly to this salesperson's assigned leads
@@ -150,12 +170,13 @@ export const DemoManagementPage: React.FC = () => {
       ]);
 
       const myLeads = userLeads.filter((l: any) => {
-        if (userRole === 'admin' || userRole === 'super admin') return true;
-        const assigned = (l.assignedTo || '').trim().toLowerCase();
+        if (userRole === "admin" || userRole === "super admin") return true;
+        const assigned = (l.assignedTo || "").trim().toLowerCase();
         if (!currentSalesName) return false;
         return (
           assigned === currentSalesName ||
-          (currentSalesName.length > 0 && assigned.includes(currentSalesName)) ||
+          (currentSalesName.length > 0 &&
+            assigned.includes(currentSalesName)) ||
           (assigned.length > 0 && currentSalesName.includes(assigned))
         );
       });
@@ -163,12 +184,16 @@ export const DemoManagementPage: React.FC = () => {
       setCachedLeads(myLeads);
 
       const assignedLeadNames = new Set(
-        myLeads.map((l: any) => `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase())
+        myLeads.map((l: any) =>
+          `${l.firstName || ""} ${l.lastName || ""}`.trim().toLowerCase(),
+        ),
       );
 
       const scopedDemos = demosData.filter((d: any) => {
-        if (userRole === 'admin' || userRole === 'super admin') return true;
-        const studentFullName = `${d.name || ''} ${d.lastName || ''}`.trim().toLowerCase();
+        if (userRole === "admin" || userRole === "super admin") return true;
+        const studentFullName = `${d.name || ""} ${d.lastName || ""}`
+          .trim()
+          .toLowerCase();
         return assignedLeadNames.has(studentFullName);
       });
 
@@ -179,7 +204,7 @@ export const DemoManagementPage: React.FC = () => {
         setSelectedDemo(null);
       }
     } catch (err) {
-      console.error('Failed to load demos from server:', err);
+      console.error("Failed to load demos from server:", err);
     } finally {
       setIsLoading(false);
     }
@@ -192,7 +217,7 @@ export const DemoManagementPage: React.FC = () => {
 
   // Deep linking: if opened with ?scheduleLeadId=xyz
   useEffect(() => {
-    const leadIdParam = searchParams.get('scheduleLeadId');
+    const leadIdParam = searchParams.get("scheduleLeadId");
     if (leadIdParam) {
       leadService.getAllLeads().then((leads) => {
         const matched = leads.find((l) => l.id === leadIdParam);
@@ -200,32 +225,38 @@ export const DemoManagementPage: React.FC = () => {
           setSelectedLeadData({
             id: matched.id,
             firstName: matched.firstName,
-            lastName: matched.lastName || '',
+            lastName: matched.lastName || "",
             mobile: matched.contactNo,
-            address: matched.address || 'Pune',
+            address: matched.address || "Pune",
           });
-          setLeadSearchQuery(`${matched.firstName} ${matched.lastName || ''} (${matched.contactNo})`);
-          setFormCourse(matched.course || '');
-          setView('schedule-form');
+          setLeadSearchQuery(
+            `${matched.firstName} ${matched.lastName || ""} (${matched.contactNo})`,
+          );
+          setFormCourse(matched.course || "");
+          setView("schedule-form");
         }
       });
     }
   }, [searchParams]);
 
-  const scheduledList = allDemos.filter((d) => d.status === 'Scheduled');
-  const completedList = allDemos.filter((d) => d.status === 'Completed');
-  const cancelledList = allDemos.filter((d) => d.status === 'Cancelled');
+  const scheduledList = allDemos.filter((d) => d.status === "Scheduled");
+  const completedList = allDemos.filter((d) => d.status === "Completed");
+  const cancelledList = allDemos.filter((d) => d.status === "Cancelled");
 
-  const currentList = 
-    activeTab === 'Scheduled' 
-      ? scheduledList 
-      : activeTab === 'Completed' 
-      ? completedList 
-      : cancelledList;
+  const currentList =
+    activeTab === "Scheduled"
+      ? scheduledList
+      : activeTab === "Completed"
+        ? completedList
+        : cancelledList;
 
   const filteredList = currentList.filter((item) => {
-    const matchMode = filterMode === 'All' || item.mode.toLowerCase() === filterMode.toLowerCase();
-    const matchCourse = filterCourse === 'All' || item.course.toLowerCase() === filterCourse.toLowerCase();
+    const matchMode =
+      filterMode === "All" ||
+      item.mode.toLowerCase() === filterMode.toLowerCase();
+    const matchCourse =
+      filterCourse === "All" ||
+      item.course.toLowerCase() === filterCourse.toLowerCase();
     return matchMode && matchCourse;
   });
 
@@ -241,8 +272,8 @@ export const DemoManagementPage: React.FC = () => {
     }
 
     const matches = cachedLeads.filter((l) => {
-      const fullName = `${l.firstName || ''} ${l.lastName || ''}`.toLowerCase();
-      const phone = (l.contactNo || '').toLowerCase();
+      const fullName = `${l.firstName || ""} ${l.lastName || ""}`.toLowerCase();
+      const phone = (l.contactNo || "").toLowerCase();
       return fullName.includes(query) || phone.includes(query);
     });
 
@@ -254,11 +285,13 @@ export const DemoManagementPage: React.FC = () => {
     setSelectedLeadData({
       id: lead.id,
       firstName: lead.firstName,
-      lastName: lead.lastName || '',
+      lastName: lead.lastName || "",
       mobile: lead.contactNo,
-      address: lead.address || 'Pune',
+      address: lead.address || "Pune",
     });
-    setLeadSearchQuery(`${lead.firstName} ${lead.lastName || ''} (${lead.contactNo})`);
+    setLeadSearchQuery(
+      `${lead.firstName} ${lead.lastName || ""} (${lead.contactNo})`,
+    );
     if (lead.course) {
       setFormCourse(lead.course);
       setCourseError(false);
@@ -269,12 +302,14 @@ export const DemoManagementPage: React.FC = () => {
 
   const handleStartReschedule = (demo: DemoItem) => {
     setSelectedDemo(demo);
-    setLeadSearchQuery(`${demo.name} ${demo.lastName || ''} (${demo.contactNo})`);
+    setLeadSearchQuery(
+      `${demo.name} ${demo.lastName || ""} (${demo.contactNo})`,
+    );
     setSelectedLeadData({
       firstName: demo.name,
-      lastName: demo.lastName || '',
+      lastName: demo.lastName || "",
       mobile: demo.contactNo,
-      address: demo.address || 'Pune',
+      address: demo.address || "Pune",
     });
     setFormCourse(demo.course);
     setFormFaculty(demo.faculty);
@@ -282,7 +317,7 @@ export const DemoManagementPage: React.FC = () => {
     setFormTimeSlot(demo.timeSlot);
     setFormMode(demo.mode);
     setCourseError(false);
-    setView('reschedule-form');
+    setView("reschedule-form");
   };
 
   const handleSubmitSchedule = async () => {
@@ -340,9 +375,9 @@ export const DemoManagementPage: React.FC = () => {
       timeSlot: formTimeSlot,
       demoDate: formDate,
       course: formCourse,
-      mode: formMode as 'Online' | 'Offline',
+      mode: formMode as "Online" | "Offline",
       faculty: formFaculty,
-      status: 'Scheduled',
+      status: "Scheduled",
     };
 
     try {
@@ -351,14 +386,14 @@ export const DemoManagementPage: React.FC = () => {
       if (selectedLeadData.id) {
         await leadService.updateStatus(
           selectedLeadData.id,
-          'Demo Scheduled',
+          "Demo Scheduled",
           `Demo booked with ${formFaculty} on ${formDate} (${formTimeSlot})`,
           {
             timestamp: `${formDate}, ${formTimeSlot}`,
-            status: 'Demo Scheduled',
+            status: "Demo Scheduled",
             title: `Demo Scheduled (${formMode})`,
             description: `Assigned faculty: ${formFaculty}. Course: ${formCourse}.`,
-          }
+          },
         );
       }
 
@@ -366,27 +401,37 @@ export const DemoManagementPage: React.FC = () => {
       setSelectedDemo(saved);
       setShowScheduleSuccessModal(true);
     } catch (err) {
-      console.error('Failed to schedule demo:', err);
-      alert('Error saving demo to server.');
+      console.error("Failed to schedule demo:", err);
+      alert("Error saving demo to server.");
     }
   };
 
   const handleSubmitReschedule = async () => {
     if (!selectedDemo) return;
 
-    if (!formCourse || !formFaculty || !formDate || !formTimeSlot || !formMode) {
-      alert('Please fill out all fields before rescheduling.');
+    if (
+      !formCourse ||
+      !formFaculty ||
+      !formDate ||
+      !formTimeSlot ||
+      !formMode
+    ) {
+      alert("Please fill out all fields before rescheduling.");
       return;
     }
 
     try {
-      const updated = await demoService.updateDemoStatus(selectedDemo.id, 'Scheduled', {
-        course: formCourse,
-        faculty: formFaculty,
-        demoDate: formDate,
-        timeSlot: formTimeSlot,
-        mode: formMode as 'Online' | 'Offline',
-      });
+      const updated = await demoService.updateDemoStatus(
+        selectedDemo.id,
+        "Scheduled",
+        {
+          course: formCourse,
+          faculty: formFaculty,
+          demoDate: formDate,
+          timeSlot: formTimeSlot,
+          mode: formMode as "Online" | "Offline",
+        },
+      );
 
       const patchedDemo: DemoItem = {
         ...updated,
@@ -394,16 +439,18 @@ export const DemoManagementPage: React.FC = () => {
         faculty: formFaculty,
         demoDate: formDate,
         timeSlot: formTimeSlot,
-        mode: formMode as 'Online' | 'Offline',
-        status: 'Scheduled',
+        mode: formMode as "Online" | "Offline",
+        status: "Scheduled",
       };
 
-      setAllDemos(allDemos.map((d) => (d.id === selectedDemo.id ? patchedDemo : d)));
+      setAllDemos(
+        allDemos.map((d) => (d.id === selectedDemo.id ? patchedDemo : d)),
+      );
       setSelectedDemo(patchedDemo);
       setShowRescheduleSuccessModal(true);
     } catch (err) {
-      console.error('Error rescheduling demo:', err);
-      alert('Failed to reschedule demo on database.');
+      console.error("Error rescheduling demo:", err);
+      alert("Failed to reschedule demo on database.");
     }
   };
 
@@ -411,30 +458,35 @@ export const DemoManagementPage: React.FC = () => {
     if (!selectedDemo) return;
 
     try {
-      await demoService.updateDemoStatus(selectedDemo.id, 'Cancelled');
+      await demoService.updateDemoStatus(selectedDemo.id, "Cancelled");
       const cancelledDemo: DemoItem = {
         ...selectedDemo,
-        status: 'Cancelled',
-        cancellationReason: cancellationReasonInput || 'No Response from Student',
+        status: "Cancelled",
+        cancellationReason:
+          cancellationReasonInput || "No Response from Student",
       };
 
-      setAllDemos(allDemos.map((d) => (d.id === selectedDemo.id ? cancelledDemo : d)));
+      setAllDemos(
+        allDemos.map((d) => (d.id === selectedDemo.id ? cancelledDemo : d)),
+      );
       setSelectedDemo(cancelledDemo);
       setShowCancelModal(false);
-      setCancellationReasonInput('');
+      setCancellationReasonInput("");
     } catch (err) {
-      console.error('Error cancelling demo:', err);
-      alert('Failed to cancel demo on server.');
+      console.error("Error cancelling demo:", err);
+      alert("Failed to cancel demo on server.");
     }
   };
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
       {/* 1. TABLE VIEW */}
-      {view === 'table' && (
+      {view === "table" && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold font-['Sora']">Demo Management</h1>
+            <h1 className="text-2xl font-bold font-['Sora']">
+              Demo Management
+            </h1>
             <button
               onClick={handleOpenScheduleForm}
               className="flex items-center gap-2 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
@@ -447,31 +499,35 @@ export const DemoManagementPage: React.FC = () => {
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
             {/* Tabs */}
             <div className="flex items-center gap-8 border-b border-[#050720]/10 pb-3">
-              {(['Scheduled', 'Completed', 'Cancelled'] as DemoTab[]).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => {
-                    setActiveTab(tab);
-                    setFilterMode('All');
-                    setFilterCourse('All');
-                  }}
-                  className={`text-sm font-semibold transition-all relative pb-2 cursor-pointer ${
-                    activeTab === tab 
-                      ? 'text-[#050720] font-bold' 
-                      : 'text-[#050720]/50 hover:text-[#050720]'
-                  }`}
-                >
-                  <span>{tab}</span>
-                  {activeTab === tab && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FFB908] rounded-full" />
-                  )}
-                </button>
-              ))}
+              {(["Scheduled", "Completed", "Cancelled"] as DemoTab[]).map(
+                (tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => {
+                      setActiveTab(tab);
+                      setFilterMode("All");
+                      setFilterCourse("All");
+                    }}
+                    className={`text-sm font-semibold transition-all relative pb-2 cursor-pointer ${
+                      activeTab === tab
+                        ? "text-[#050720] font-bold"
+                        : "text-[#050720]/50 hover:text-[#050720]"
+                    }`}
+                  >
+                    <span>{tab}</span>
+                    {activeTab === tab && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#FFB908] rounded-full" />
+                    )}
+                  </button>
+                ),
+              )}
             </div>
 
             {/* Filters */}
             <div className="flex items-center gap-3 mt-5 mb-4 relative z-10">
-              <span className="text-xs text-[#050720]/70 font-medium">Sort by:</span>
+              <span className="text-xs text-[#050720]/70 font-medium">
+                Sort by:
+              </span>
 
               <div className="relative">
                 <button
@@ -481,12 +537,16 @@ export const DemoManagementPage: React.FC = () => {
                   }}
                   className="flex items-center justify-between gap-3 px-3 py-1.5 bg-[#F8FAFC] border border-[#050720]/15 rounded-lg text-xs font-medium min-w-[90px] cursor-pointer"
                 >
-                  <span>{filterMode === 'All' ? 'Mode' : filterMode}</span>
-                  {isModeDropdownOpen ? <ChevronUp className="w-3.5 h-3.5 text-[#050720]/50" /> : <ChevronDown className="w-3.5 h-3.5 text-[#050720]/50" />}
+                  <span>{filterMode === "All" ? "Mode" : filterMode}</span>
+                  {isModeDropdownOpen ? (
+                    <ChevronUp className="w-3.5 h-3.5 text-[#050720]/50" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-[#050720]/50" />
+                  )}
                 </button>
                 {isModeDropdownOpen && (
                   <div className="absolute left-0 top-9 w-32 bg-white border border-[#050720]/15 rounded-lg shadow-lg py-1 z-20">
-                    {['All', 'Online', 'Offline'].map((m) => (
+                    {["All", "Online", "Offline"].map((m) => (
                       <button
                         key={m}
                         onClick={() => {
@@ -510,8 +570,14 @@ export const DemoManagementPage: React.FC = () => {
                   }}
                   className="flex items-center justify-between gap-3 px-3 py-1.5 bg-[#F8FAFC] border border-[#050720]/15 rounded-lg text-xs font-medium min-w-[100px] cursor-pointer"
                 >
-                  <span>{filterCourse === 'All' ? 'Course' : filterCourse}</span>
-                  {isCourseDropdownOpen ? <ChevronUp className="w-3.5 h-3.5 text-[#050720]/50" /> : <ChevronDown className="w-3.5 h-3.5 text-[#050720]/50" />}
+                  <span>
+                    {filterCourse === "All" ? "Course" : filterCourse}
+                  </span>
+                  {isCourseDropdownOpen ? (
+                    <ChevronUp className="w-3.5 h-3.5 text-[#050720]/50" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-[#050720]/50" />
+                  )}
                 </button>
                 {isCourseDropdownOpen && (
                   <div className="absolute left-0 top-9 w-40 bg-white border border-[#050720]/15 rounded-lg shadow-lg py-1 z-20">
@@ -552,7 +618,7 @@ export const DemoManagementPage: React.FC = () => {
                     <th className="pb-3.5 font-semibold">Course</th>
                     <th className="pb-3.5 font-semibold">Mode</th>
                     <th className="pb-3.5 font-semibold">Faculty</th>
-                    {activeTab === 'Completed' && (
+                    {activeTab === "Completed" && (
                       <>
                         <th className="pb-3.5 font-semibold">Demo Status</th>
                         <th className="pb-3.5 font-semibold">Remark</th>
@@ -563,27 +629,44 @@ export const DemoManagementPage: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
                   {filteredList.map((demo, index) => (
-                    <tr key={demo.id} className="hover:bg-[#FFB908]/5 transition-colors">
+                    <tr
+                      key={demo.id}
+                      className="hover:bg-[#FFB908]/5 transition-colors"
+                    >
                       <td className="py-3.5 text-[#050720]/70">
-                        {String(index + 1).padStart(2, '0')}
+                        {String(index + 1).padStart(2, "0")}
                       </td>
-                      <td className="py-3.5 font-medium">{demo.name} {demo.lastName}</td>
-                      <td className="py-3.5 text-[#050720]/70">{demo.timeSlot}</td>
-                      <td className="py-3.5 text-[#050720]/70">{demo.demoDate}</td>
-                      <td className="py-3.5 text-[#050720]/70">{demo.course}</td>
+                      <td className="py-3.5 font-medium">
+                        {demo.name} {demo.lastName}
+                      </td>
+                      <td className="py-3.5 text-[#050720]/70">
+                        {demo.timeSlot}
+                      </td>
+                      <td className="py-3.5 text-[#050720]/70">
+                        {demo.demoDate}
+                      </td>
+                      <td className="py-3.5 text-[#050720]/70">
+                        {demo.course}
+                      </td>
                       <td className="py-3.5 text-[#050720]/70">{demo.mode}</td>
-                      <td className="py-3.5 text-[#050720]/70">{demo.faculty}</td>
-                      {activeTab === 'Completed' && (
+                      <td className="py-3.5 text-[#050720]/70">
+                        {demo.faculty}
+                      </td>
+                      {activeTab === "Completed" && (
                         <>
-                          <td className="py-3.5 font-semibold text-[#050720]">{demo.demoStatusText || 'Attended'}</td>
-                          <td className="py-3.5 text-[#050720]/70">{demo.remark || 'Joining soon'}</td>
+                          <td className="py-3.5 font-semibold text-[#050720]">
+                            {demo.demoStatusText || "Attended"}
+                          </td>
+                          <td className="py-3.5 text-[#050720]/70">
+                            {demo.remark || "Joining soon"}
+                          </td>
                         </>
                       )}
                       <td className="py-3.5 text-right">
                         <button
                           onClick={() => {
                             setSelectedDemo(demo);
-                            setView('details');
+                            setView("details");
                           }}
                           className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
                         >
@@ -605,9 +688,15 @@ export const DemoManagementPage: React.FC = () => {
                 className="w-8 h-7 text-center border border-[#050720]/20 rounded text-xs text-[#050720] font-semibold"
               />
               <div className="flex items-center gap-1.5 ml-2">
-                <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" /></button>
-                <span className="text-[11px] font-semibold text-[#050720]">01 of 10</span>
-                <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronRight className="w-3.5 h-3.5" /></button>
+                <button className="p-1 hover:text-[#050720] cursor-pointer">
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-[11px] font-semibold text-[#050720]">
+                  01 of 10
+                </span>
+                <button className="p-1 hover:text-[#050720] cursor-pointer">
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           </div>
@@ -615,10 +704,10 @@ export const DemoManagementPage: React.FC = () => {
       )}
 
       {/* 2. SCHEDULE DEMO VIEW */}
-      {view === 'schedule-form' && (
+      {view === "schedule-form" && (
         <div className="space-y-6 max-w-4xl">
           <button
-            onClick={() => setView('table')}
+            onClick={() => setView("table")}
             className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
@@ -628,7 +717,7 @@ export const DemoManagementPage: React.FC = () => {
           {/* Select Lead */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Select Lead</h3>
-            
+
             <div className="relative">
               <input
                 type="text"
@@ -642,7 +731,9 @@ export const DemoManagementPage: React.FC = () => {
                 placeholder="Search leads by name or contact..."
                 onChange={(e) => handleLeadSearchChange(e.target.value)}
                 className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 pr-10 rounded-lg border ${
-                  leadError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
+                  leadError
+                    ? "border-rose-500 ring-1 ring-rose-500"
+                    : "border-[#050720]/15"
                 } focus:outline-none focus:border-[#050720]`}
               />
               <Search className="w-4 h-4 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -657,10 +748,16 @@ export const DemoManagementPage: React.FC = () => {
                       className="w-full text-left px-4 py-2 text-xs hover:bg-[#FFB908]/15 text-[#050720] flex justify-between items-center border-b border-[#050720]/5 last:border-b-0 cursor-pointer"
                     >
                       <div>
-                        <span className="font-bold">{lead.firstName} {lead.lastName || ''}</span>
-                        <span className="text-[11px] text-[#050720]/60 block">{lead.course} • {lead.contactNo}</span>
+                        <span className="font-bold">
+                          {lead.firstName} {lead.lastName || ""}
+                        </span>
+                        <span className="text-[11px] text-[#050720]/60 block">
+                          {lead.course} • {lead.contactNo}
+                        </span>
                       </div>
-                      <span className="text-[10px] text-[#050720]/40">{lead.address || 'Pune'}</span>
+                      <span className="text-[10px] text-[#050720]/40">
+                        {lead.address || "Pune"}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -674,23 +771,41 @@ export const DemoManagementPage: React.FC = () => {
 
             {selectedLeadData && (
               <div className="pt-3 border-t border-[#050720]/10 space-y-3">
-                <h4 className="text-xs font-bold font-['Sora']">Student Overview</h4>
+                <h4 className="text-xs font-bold font-['Sora']">
+                  Student Overview
+                </h4>
                 <div className="grid grid-cols-2 gap-y-3 text-xs">
                   <div>
-                    <span className="text-[10px] text-[#050720]/50 block">First Name</span>
-                    <span className="font-semibold text-sm">{selectedLeadData.firstName}</span>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      First Name
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLeadData.firstName}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Last Name</span>
-                    <span className="font-semibold text-sm">{selectedLeadData.lastName || '—'}</span>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      Last Name
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLeadData.lastName || "—"}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Mobile</span>
-                    <span className="font-semibold text-sm">{selectedLeadData.mobile}</span>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      Mobile
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLeadData.mobile}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Address</span>
-                    <span className="font-semibold text-sm">{selectedLeadData.address || '—'}</span>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      Address
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLeadData.address || "—"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -711,18 +826,24 @@ export const DemoManagementPage: React.FC = () => {
                       if (e.target.value) setCourseError(false);
                     }}
                     className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border appearance-none ${
-                      courseError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
+                      courseError
+                        ? "border-rose-500 ring-1 ring-rose-500"
+                        : "border-[#050720]/15"
                     } focus:outline-none cursor-pointer`}
                   >
                     <option value="">Select Course*</option>
-                    {COURSES.filter(c => c !== 'All').map((c) => (
-                      <option key={c} value={c}>{c}</option>
+                    {COURSES.filter((c) => c !== "All").map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
                     ))}
                   </select>
                   <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
                 {courseError && (
-                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">Course is required*</span>
+                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">
+                    Course is required*
+                  </span>
                 )}
               </div>
 
@@ -735,18 +856,24 @@ export const DemoManagementPage: React.FC = () => {
                       if (e.target.value) setFacultyError(false);
                     }}
                     className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border appearance-none ${
-                      facultyError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
+                      facultyError
+                        ? "border-rose-500 ring-1 ring-rose-500"
+                        : "border-[#050720]/15"
                     } focus:outline-none cursor-pointer`}
                   >
                     <option value="">Select Faculty*</option>
                     {dynamicFaculties.map((f) => (
-                      <option key={f} value={f}>{f}</option>
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
                     ))}
                   </select>
                   <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
                 {facultyError && (
-                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">Faculty assignment is required*</span>
+                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">
+                    Faculty assignment is required*
+                  </span>
                 )}
               </div>
 
@@ -760,12 +887,16 @@ export const DemoManagementPage: React.FC = () => {
                       if (e.target.value) setDateError(false);
                     }}
                     className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2 rounded-lg border ${
-                      dateError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
+                      dateError
+                        ? "border-rose-500 ring-1 ring-rose-500"
+                        : "border-[#050720]/15"
                     } focus:outline-none`}
                   />
                 </div>
                 {dateError && (
-                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">Demo date is required*</span>
+                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">
+                    Demo date is required*
+                  </span>
                 )}
               </div>
 
@@ -778,18 +909,24 @@ export const DemoManagementPage: React.FC = () => {
                       if (e.target.value) setSlotError(false);
                     }}
                     className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border appearance-none ${
-                      slotError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-[#050720]/15'
+                      slotError
+                        ? "border-rose-500 ring-1 ring-rose-500"
+                        : "border-[#050720]/15"
                     } focus:outline-none cursor-pointer`}
                   >
                     <option value="">Select Time Slot*</option>
                     {TIME_SLOTS.map((t) => (
-                      <option key={t} value={t}>{t}</option>
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
                     ))}
                   </select>
                   <Clock className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
                 {slotError && (
-                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">Time slot is required*</span>
+                  <span className="text-[10px] font-semibold text-rose-500 mt-1 block">
+                    Time slot is required*
+                  </span>
                 )}
               </div>
             </div>
@@ -803,9 +940,9 @@ export const DemoManagementPage: React.FC = () => {
                 <input
                   type="radio"
                   name="demoMode"
-                  checked={formMode === 'Online'}
+                  checked={formMode === "Online"}
                   onChange={() => {
-                    setFormMode('Online');
+                    setFormMode("Online");
                     setModeError(false);
                   }}
                   className="w-4 h-4 accent-[#FFB908]"
@@ -816,9 +953,9 @@ export const DemoManagementPage: React.FC = () => {
                 <input
                   type="radio"
                   name="demoMode"
-                  checked={formMode === 'Offline'}
+                  checked={formMode === "Offline"}
                   onChange={() => {
-                    setFormMode('Offline');
+                    setFormMode("Offline");
                     setModeError(false);
                   }}
                   className="w-4 h-4 accent-[#FFB908]"
@@ -827,13 +964,15 @@ export const DemoManagementPage: React.FC = () => {
               </label>
             </div>
             {modeError && (
-              <span className="text-[10px] font-semibold text-rose-500 block">Please select Online or Offline*</span>
+              <span className="text-[10px] font-semibold text-rose-500 block">
+                Please select Online or Offline*
+              </span>
             )}
           </div>
 
           <div className="flex gap-4">
             <button
-              onClick={() => setView('table')}
+              onClick={() => setView("table")}
               className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
             >
               Cancel
@@ -850,10 +989,10 @@ export const DemoManagementPage: React.FC = () => {
       )}
 
       {/* 3. RESCHEDULE DEMO VIEW */}
-      {view === 'reschedule-form' && selectedDemo && (
+      {view === "reschedule-form" && selectedDemo && (
         <div className="space-y-6 max-w-4xl">
           <button
-            onClick={() => setView('details')}
+            onClick={() => setView("details")}
             className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
@@ -866,7 +1005,7 @@ export const DemoManagementPage: React.FC = () => {
               <input
                 type="text"
                 disabled
-                value={`${selectedDemo.name} ${selectedDemo.lastName || ''} (${selectedDemo.contactNo})`}
+                value={`${selectedDemo.name} ${selectedDemo.lastName || ""} (${selectedDemo.contactNo})`}
                 className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 pr-10 rounded-lg border border-[#050720]/15 opacity-70 cursor-not-allowed"
               />
             </div>
@@ -883,8 +1022,10 @@ export const DemoManagementPage: React.FC = () => {
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                 >
                   <option value="">Course*</option>
-                  {COURSES.filter(c => c !== 'All').map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                  {COURSES.filter((c) => c !== "All").map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
                   ))}
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -898,7 +1039,9 @@ export const DemoManagementPage: React.FC = () => {
                 >
                   <option value="">Faculty*</option>
                   {dynamicFaculties.map((f) => (
-                    <option key={f} value={f}>{f}</option>
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
                   ))}
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -921,7 +1064,9 @@ export const DemoManagementPage: React.FC = () => {
                 >
                   <option value="">Time Slot*</option>
                   {TIME_SLOTS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
                   ))}
                 </select>
                 <Clock className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -936,8 +1081,8 @@ export const DemoManagementPage: React.FC = () => {
                 <input
                   type="radio"
                   name="rescheduleMode"
-                  checked={formMode === 'Online'}
-                  onChange={() => setFormMode('Online')}
+                  checked={formMode === "Online"}
+                  onChange={() => setFormMode("Online")}
                   className="w-4 h-4 accent-[#FFB908]"
                 />
                 <span className="font-medium">Online</span>
@@ -946,8 +1091,8 @@ export const DemoManagementPage: React.FC = () => {
                 <input
                   type="radio"
                   name="rescheduleMode"
-                  checked={formMode === 'Offline'}
-                  onChange={() => setFormMode('Offline')}
+                  checked={formMode === "Offline"}
+                  onChange={() => setFormMode("Offline")}
                   className="w-4 h-4 accent-[#FFB908]"
                 />
                 <span className="font-medium">Offline</span>
@@ -957,7 +1102,7 @@ export const DemoManagementPage: React.FC = () => {
 
           <div className="flex gap-4">
             <button
-              onClick={() => setView('details')}
+              onClick={() => setView("details")}
               className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
             >
               Cancel
@@ -977,13 +1122,17 @@ export const DemoManagementPage: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-lg w-full text-center space-y-5 shadow-2xl">
             <div>
-              <h2 className="text-lg font-bold font-['Sora'] text-[#050720]">Demo Scheduled</h2>
-              <p className="text-xs text-[#050720]/60 mt-1">Please review the information.</p>
+              <h2 className="text-lg font-bold font-['Sora'] text-[#050720]">
+                Demo Scheduled
+              </h2>
+              <p className="text-xs text-[#050720]/60 mt-1">
+                Please review the information.
+              </p>
             </div>
             <button
               onClick={() => {
                 setShowRescheduleSuccessModal(false);
-                setView('details');
+                setView("details");
               }}
               className="w-full py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
@@ -997,7 +1146,9 @@ export const DemoManagementPage: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
             <div>
-              <h2 className="text-lg font-bold font-['Sora'] text-[#050720]">Demo has been scheduled</h2>
+              <h2 className="text-lg font-bold font-['Sora'] text-[#050720]">
+                Demo has been scheduled
+              </h2>
               <div className="text-xs text-[#050720]/70 mt-3 space-y-0.5">
                 <p>Date: {selectedDemo.demoDate}</p>
                 <p>Time: {selectedDemo.timeSlot}</p>
@@ -1006,7 +1157,7 @@ export const DemoManagementPage: React.FC = () => {
             <button
               onClick={() => {
                 setShowScheduleSuccessModal(false);
-                setView('details');
+                setView("details");
               }}
               className="w-full py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
@@ -1019,7 +1170,9 @@ export const DemoManagementPage: React.FC = () => {
       {showCancelModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
-            <h2 className="text-base font-bold font-['Sora'] text-[#050720]">Cancel demo?</h2>
+            <h2 className="text-base font-bold font-['Sora'] text-[#050720]">
+              Cancel demo?
+            </h2>
             <input
               type="text"
               placeholder="Enter reason for cancellation"
@@ -1046,74 +1199,104 @@ export const DemoManagementPage: React.FC = () => {
       )}
 
       {/* 5. DETAILS VIEW */}
-      {view === 'details' && selectedDemo && (
+      {view === "details" && selectedDemo && (
         <div className="space-y-6 max-w-4xl">
           <button
-            onClick={() => setView('table')}
+            onClick={() => setView("table")}
             className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>
-              {selectedDemo.status === 'Completed'
-                ? 'Completed demo details'
-                : selectedDemo.status === 'Cancelled'
-                ? 'Cancelled demo details'
-                : 'Scheduled demo details'}
+              {selectedDemo.status === "Completed"
+                ? "Completed demo details"
+                : selectedDemo.status === "Cancelled"
+                  ? "Cancelled demo details"
+                  : "Scheduled demo details"}
             </span>
           </button>
 
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-6">
             <h3 className="text-sm font-bold font-['Sora']">Demo Overview</h3>
-            
+
             <div className="grid grid-cols-2 gap-y-4 text-xs">
               <div>
-                <span className="text-[10px] text-[#050720]/50 block">Lead Name</span>
-                <span className="font-semibold text-sm">{selectedDemo.name} {selectedDemo.lastName || ''}</span>
+                <span className="text-[10px] text-[#050720]/50 block">
+                  Lead Name
+                </span>
+                <span className="font-semibold text-sm">
+                  {selectedDemo.name} {selectedDemo.lastName || ""}
+                </span>
               </div>
               <div>
-                <span className="text-[10px] text-[#050720]/50 block">Faculty Name</span>
-                <span className="font-semibold text-sm">{selectedDemo.faculty}</span>
+                <span className="text-[10px] text-[#050720]/50 block">
+                  Faculty Name
+                </span>
+                <span className="font-semibold text-sm">
+                  {selectedDemo.faculty}
+                </span>
               </div>
               <div>
-                <span className="text-[10px] text-[#050720]/50 block">Demo Date</span>
-                <span className="font-semibold text-sm">{selectedDemo.demoDate}</span>
+                <span className="text-[10px] text-[#050720]/50 block">
+                  Demo Date
+                </span>
+                <span className="font-semibold text-sm">
+                  {selectedDemo.demoDate}
+                </span>
               </div>
               <div>
-                <span className="text-[10px] text-[#050720]/50 block">Demo Time</span>
-                <span className="font-semibold text-sm">{selectedDemo.timeSlot}</span>
+                <span className="text-[10px] text-[#050720]/50 block">
+                  Demo Time
+                </span>
+                <span className="font-semibold text-sm">
+                  {selectedDemo.timeSlot}
+                </span>
               </div>
               <div>
-                <span className="text-[10px] text-[#050720]/50 block">Course</span>
-                <span className="font-semibold text-sm">{selectedDemo.course}</span>
+                <span className="text-[10px] text-[#050720]/50 block">
+                  Course
+                </span>
+                <span className="font-semibold text-sm">
+                  {selectedDemo.course}
+                </span>
               </div>
               <div>
-                <span className="text-[10px] text-[#050720]/50 block">Mode</span>
-                <span className="font-semibold text-sm">{selectedDemo.mode}</span>
+                <span className="text-[10px] text-[#050720]/50 block">
+                  Mode
+                </span>
+                <span className="font-semibold text-sm">
+                  {selectedDemo.mode}
+                </span>
               </div>
             </div>
 
-            {selectedDemo.status === 'Cancelled' && (
+            {selectedDemo.status === "Cancelled" && (
               <div className="pt-2">
-                <span className="text-[10px] text-[#050720]/50 block">Reason for cancellation</span>
+                <span className="text-[10px] text-[#050720]/50 block">
+                  Reason for cancellation
+                </span>
                 <span className="font-semibold text-xs text-[#050720] mt-0.5 block">
-                  {selectedDemo.cancellationReason || 'No Response from Student'}
+                  {selectedDemo.cancellationReason ||
+                    "No Response from Student"}
                 </span>
               </div>
             )}
 
-            {selectedDemo.status === 'Completed' && (
+            {selectedDemo.status === "Completed" && (
               <div className="space-y-4 pt-2">
                 <div>
-                  <span className="text-[10px] text-[#050720]/50 block">Demo feedback</span>
+                  <span className="text-[10px] text-[#050720]/50 block">
+                    Demo feedback
+                  </span>
                   <p className="text-xs text-[#050720]/80 mt-1 leading-relaxed">
-                    {selectedDemo.feedback || 'Student showed strong interest in the course structure and tools.'}
+                    {selectedDemo.feedback ||
+                      "Student showed strong interest in the course structure and tools."}
                   </p>
                 </div>
               </div>
             )}
 
             <div className="flex gap-4 pt-4 border-t border-[#050720]/10">
-              {selectedDemo.status === 'Scheduled' && (
+              {selectedDemo.status === "Scheduled" && (
                 <>
                   <button
                     onClick={() => setShowCancelModal(true)}
@@ -1130,19 +1313,19 @@ export const DemoManagementPage: React.FC = () => {
                 </>
               )}
 
-              {selectedDemo.status === 'Completed' && (
+              {selectedDemo.status === "Completed" && (
                 <button
-                  onClick={() => setView('table')}
+                  onClick={() => setView("table")}
                   className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
                 >
                   Go Back
                 </button>
               )}
 
-              {selectedDemo.status === 'Cancelled' && (
+              {selectedDemo.status === "Cancelled" && (
                 <>
                   <button
-                    onClick={() => setView('table')}
+                    onClick={() => setView("table")}
                     className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
                   >
                     Cancel

@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { API_BASE_URL } from "../lib/api";
 
-export type UserRole = 'admin' | 'faculty' | 'sales';
+export type UserRole = "admin" | "faculty" | "sales";
 
 export interface UserSession {
   id: string;
@@ -20,24 +21,28 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('crm_token'));
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [token, setToken] = useState<string | null>(() =>
+    localStorage.getItem("crm_token"),
+  );
   const [user, setUser] = useState<UserSession | null>(() => {
-    const saved = localStorage.getItem('crm_user');
+    const saved = localStorage.getItem("crm_user");
     return saved ? JSON.parse(saved) : null;
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const verifyToken = async () => {
-      const activeToken = localStorage.getItem('crm_token');
+      const activeToken = localStorage.getItem("crm_token");
       if (!activeToken) {
         setIsLoading(false);
         return;
       }
 
       try {
-        const res = await fetch('http://localhost:5000/api/auth/me', {
+        const res = await fetch(`${API_BASE_URL}/auth/me`, {
           headers: {
             Authorization: `Bearer ${activeToken}`,
           },
@@ -52,12 +57,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             role: profile.role,
           };
           setUser(sessionUser);
-          localStorage.setItem('crm_user', JSON.stringify(sessionUser));
+          localStorage.setItem("crm_user", JSON.stringify(sessionUser));
         } else {
           logout();
         }
       } catch (err) {
-        console.error('Failed to verify token:', err);
+        console.error("Failed to verify token:", err);
       } finally {
         setIsLoading(false);
       }
@@ -69,15 +74,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = (newToken: string, newUser: UserSession) => {
     setToken(newToken);
     setUser(newUser);
-    localStorage.setItem('crm_token', newToken);
-    localStorage.setItem('crm_user', JSON.stringify(newUser));
+    localStorage.setItem("crm_token", newToken);
+    localStorage.setItem("crm_user", JSON.stringify(newUser));
   };
 
   const logout = () => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem('crm_token');
-    localStorage.removeItem('crm_user');
+    localStorage.removeItem("crm_token");
+    localStorage.removeItem("crm_user");
   };
 
   return (
@@ -99,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };

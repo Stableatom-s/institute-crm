@@ -77,9 +77,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
 export const authRoutes = router;
 export default router;
 
-import bcrypt from 'bcryptjs';
-import { authenticateToken, AuthRequest } from '../middleware/auth';
-import { User } from '../models/User';
+
 
 // PUT /api/auth/reset-password
 router.put('/reset-password', authenticateToken, async (req: AuthRequest, res: Response) => {
@@ -104,7 +102,7 @@ router.put('/reset-password', authenticateToken, async (req: AuthRequest, res: R
     }
 
     // Verify old password
-    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    const isMatch = await bcrypt.compare(oldPassword, user.password || '');
     if (!isMatch) {
       return res.status(400).json({ message: 'Incorrect old password.' });
     }
