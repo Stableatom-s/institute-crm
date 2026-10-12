@@ -17,9 +17,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-connectDB();
-
-// Dynamic CORS configuration allowing localhost and production Vercel domains
+// Dynamic CORS configuration allowing localhost and Vercel domains safely
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
@@ -29,7 +27,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (such as mobile apps, curl, or Postman)
+      // Allow requests with no origin (same-origin, curl, mobile, serverless proxy)
       if (!origin) return callback(null, true);
 
       const isExplicitlyAllowed = allowedOrigins.includes(origin);
@@ -38,7 +36,8 @@ app.use(
       if (isExplicitlyAllowed || isVercelDomain) {
         callback(null, true);
       } else {
-        callback(new Error(`Origin ${origin} not allowed by CORS`));
+        // Return false instead of throwing new Error to avoid uncaught 500 crashes
+        callback(null, false);
       }
     },
     credentials: true,
@@ -52,11 +51,13 @@ app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+// Serverless DB connection middleware
 app.use(async (_req, _res, next) => {
   try {
     await connectDB();
     next();
   } catch (err) {
+    console.error('Database connection middleware error:', err);
     next(err);
   }
 });
