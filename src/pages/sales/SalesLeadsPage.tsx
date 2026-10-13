@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   Plus,
@@ -49,7 +49,11 @@ export interface DetailedLead {
   offeredFees?: string;
   finalFees?: string;
   referral?: "Yes" | "No";
-  enquiringFor?: "Self" | "Other";
+  referralMobile?: string;
+  referralName?: string;
+  enquiringFor?: "Self" | "Family" | "Friend" | "Other" | string;
+  studentName?: string;
+  studentMobile?: string;
   timeline: TimelineEntry[];
 }
 
@@ -72,6 +76,7 @@ const STATUSES = [
 
 export const SalesLeadsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const auth = useAuth() as any;
 
@@ -120,14 +125,44 @@ export const SalesLeadsPage: React.FC = () => {
   const [formAddress, setFormAddress] = useState("");
   const [formCourses, setFormCourses] = useState<string[]>([]);
   const [formReferral, setFormReferral] = useState<"Yes" | "No">("No");
+  const [formReferralMobile, setFormReferralMobile] = useState("");
+  const [formReferralName, setFormReferralName] = useState("");
   const [formOfferedFees, setFormOfferedFees] = useState("");
   const [formFinalFees, setFormFinalFees] = useState("");
-  const [formEnquiringFor, setFormEnquiringFor] = useState<"Self" | "Other">(
-    "Self"
-  );
+  const [formEnquiringFor, setFormEnquiringFor] = useState<"Self" | "Family" | "Friend">("Self");
   const [formStudentName, setFormStudentName] = useState("");
   const [formStudentMobile, setFormStudentMobile] = useState("");
   const [formError, setFormError] = useState(false);
+
+  const resetAddForm = () => {
+    setFormFirstName("");
+    setFormLastName("");
+    setFormMobile("");
+    setFormEmail("");
+    setFormOccupation("College Student");
+    setFormLeadSource("");
+    setFormEnquiryDate("");
+    setFormAddress("");
+    setFormCourses([]);
+    setFormReferral("No");
+    setFormReferralMobile("");
+    setFormReferralName("");
+    setFormOfferedFees("");
+    setFormFinalFees("");
+    setFormEnquiringFor("Self");
+    setFormStudentName("");
+    setFormStudentMobile("");
+    setFormError(false);
+  };
+
+  // Direct redirection listener from Dashboard
+  useEffect(() => {
+    if (location.state && (location.state as any).openAddModal) {
+      resetAddForm();
+      setView("add");
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   // Load leads scoped strictly to this salesperson
   const fetchLeads = useCallback(async () => {
@@ -148,9 +183,9 @@ export const SalesLeadsPage: React.FC = () => {
         );
       });
 
-      setLeads(userLeads);
+      setLeads(userLeads as unknown as DetailedLead[]);
       if (userLeads.length > 0) {
-        setSelectedLead(userLeads[0]);
+        setSelectedLead(userLeads[0] as unknown as DetailedLead);
         setCurrentLeadStatus(userLeads[0].status);
       } else {
         setSelectedLead(null);
@@ -294,7 +329,11 @@ export const SalesLeadsPage: React.FC = () => {
       offeredFees: formOfferedFees || "₹35,000",
       finalFees: formFinalFees || "₹35,000",
       referral: formReferral,
+      referralMobile: formReferral === "Yes" ? formReferralMobile : undefined,
+      referralName: formReferral === "Yes" ? formReferralName : undefined,
       enquiringFor: formEnquiringFor,
+      studentName: formEnquiringFor !== "Self" ? formStudentName : undefined,
+      studentMobile: formEnquiringFor !== "Self" ? formStudentMobile : undefined,
       timeline: [
         {
           id: `t-${Date.now()}`,
@@ -308,8 +347,8 @@ export const SalesLeadsPage: React.FC = () => {
 
     try {
       const savedLead = await leadService.createLead(payload);
-      setLeads((prev) => [savedLead, ...prev]);
-      setSelectedLead(savedLead);
+      setLeads((prev) => [savedLead as unknown as DetailedLead, ...prev]);
+      setSelectedLead(savedLead as unknown as DetailedLead);
       setView("list");
     } catch (error) {
       console.error("Error creating lead on database:", error);
@@ -456,22 +495,7 @@ export const SalesLeadsPage: React.FC = () => {
 
             <button
               onClick={() => {
-                setFormFirstName("");
-                setFormLastName("");
-                setFormMobile("");
-                setFormEmail("");
-                setFormOccupation("College Student");
-                setFormLeadSource("");
-                setFormEnquiryDate("");
-                setFormAddress("");
-                setFormCourses([]);
-                setFormReferral("No");
-                setFormOfferedFees("");
-                setFormFinalFees("");
-                setFormEnquiringFor("Self");
-                setFormStudentName("");
-                setFormStudentMobile("");
-                setFormError(false);
+                resetAddForm();
                 setView("add");
               }}
               className="flex items-center gap-1.5 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
@@ -681,6 +705,34 @@ export const SalesLeadsPage: React.FC = () => {
                       {selectedLead.address || "—"}
                     </span>
                   </div>
+                  {selectedLead.referral === "Yes" && (
+                    <>
+                      <div>
+                        <span className="text-[10px] text-[#050720]/50 block">
+                          Referral Mobile
+                        </span>
+                        <span className="font-semibold text-sm">
+                          {selectedLead.referralMobile || "—"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[#050720]/50 block">
+                          Referral Name
+                        </span>
+                        <span className="font-semibold text-sm">
+                          {selectedLead.referralName || "—"}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <span className="text-[10px] text-[#050720]/50 block">
+                      Enquiring for
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {selectedLead.enquiringFor || "Self"}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -854,6 +906,7 @@ export const SalesLeadsPage: React.FC = () => {
             <span>Add Leads</span>
           </button>
 
+          {/* Section 1: Student Details */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Student Details</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -946,6 +999,7 @@ export const SalesLeadsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Section 2: Course */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
             <h3 className="text-sm font-bold font-['Sora']">Course</h3>
             <div className="flex flex-wrap items-center gap-6 text-xs">
@@ -978,7 +1032,8 @@ export const SalesLeadsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
+          {/* Section 3: Referral with Conditional Inputs */}
+          <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Referral</h3>
             <div className="flex items-center gap-8 text-xs">
               <label className="flex items-center gap-2.5 cursor-pointer">
@@ -996,14 +1051,46 @@ export const SalesLeadsPage: React.FC = () => {
                   type="radio"
                   name="refOption"
                   checked={formReferral === "No"}
-                  onChange={() => setFormReferral("No")}
+                  onChange={() => {
+                    setFormReferral("No");
+                    setFormReferralMobile("");
+                    setFormReferralName("");
+                  }}
                   className="w-4 h-4 accent-[#050720]"
                 />
                 <span className="font-medium">No</span>
               </label>
             </div>
+
+            {/* Conditionally reveal fields when Referral is "Yes" */}
+            {formReferral === "Yes" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
+                  <span className="text-[10px] text-[#050720]/50 block">Referral Mobile</span>
+                  <input
+                    type="text"
+                    placeholder="Enter referral mobile"
+                    value={formReferralMobile}
+                    onChange={(e) => setFormReferralMobile(e.target.value)}
+                    className="w-full bg-transparent text-sm font-semibold text-[#050720] focus:outline-none placeholder:font-normal placeholder:text-xs"
+                  />
+                </div>
+
+                <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
+                  <span className="text-[10px] text-[#050720]/50 block">Referral Name</span>
+                  <input
+                    type="text"
+                    placeholder="Enter referral name"
+                    value={formReferralName}
+                    onChange={(e) => setFormReferralName(e.target.value)}
+                    className="w-full bg-transparent text-sm font-semibold text-[#050720] focus:outline-none placeholder:font-normal placeholder:text-xs"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* Section 4: Fees */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Fees</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1028,45 +1115,50 @@ export const SalesLeadsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Section 5: Enquiring for */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Enquiring for</h3>
             <div className="space-y-4">
-              <div className="relative">
-                <span className="text-[10px] text-[#050720]/50 block mb-1">
+              <div className="relative p-3 bg-white border border-[#050720]/15 rounded-lg">
+                <span className="text-[10px] text-[#050720]/50 block">
                   Enquiring for
                 </span>
                 <select
                   value={formEnquiringFor}
                   onChange={(e) =>
-                    setFormEnquiringFor(e.target.value as "Self" | "Other")
+                    setFormEnquiringFor(e.target.value as "Self" | "Family" | "Friend")
                   }
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
+                  className="w-full bg-transparent text-sm font-semibold text-[#050720] appearance-none focus:outline-none cursor-pointer pr-8"
                 >
                   <option value="Self">Self</option>
-                  <option value="Other">Other</option>
+                  <option value="Family">Family</option>
+                  <option value="Friend">Friend</option>
                 </select>
-                <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-3.5 bottom-3 pointer-events-none" />
+                <ChevronDown className="w-3.5 h-3.5 text-[#050720]/50 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Student *"
-                    value={formStudentName}
-                    onChange={(e) => setFormStudentName(e.target.value)}
-                    className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
-                  />
+
+              {formEnquiringFor !== "Self" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Student Name*"
+                      value={formStudentName}
+                      onChange={(e) => setFormStudentName(e.target.value)}
+                      className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Student Mobile*"
+                      value={formStudentMobile}
+                      onChange={(e) => setFormStudentMobile(e.target.value)}
+                      className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Mobile*"
-                    value={formStudentMobile}
-                    onChange={(e) => setFormStudentMobile(e.target.value)}
-                    className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
-                  />
-                </div>
-              </div>
+              )}
             </div>
           </div>
 

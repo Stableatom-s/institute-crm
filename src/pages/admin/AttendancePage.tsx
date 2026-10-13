@@ -51,48 +51,55 @@ const ALL_MONTHS = [
   'December'
 ];
 
-// Helper to compute actual worked duration from 12-hour or ISO time strings
+// Robust calculation helper for elapsed duration
 const calculateWorkingHours = (inTimeStr?: string, outTimeStr?: string): string => {
-  if (!inTimeStr || inTimeStr === '-') return '-';
+  if (!inTimeStr || inTimeStr === '-' || inTimeStr.trim() === '') return '-';
 
-  const parseTime = (timeStr: string): Date | null => {
+  const parseTimeToMinutes = (timeStr: string): number | null => {
     try {
-      const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+      const clean = timeStr.trim().toUpperCase();
+      const match = clean.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
       if (match) {
         let hours = parseInt(match[1], 10);
         const minutes = parseInt(match[2], 10);
-        const meridian = match[3]?.toUpperCase();
+        const meridian = match[3];
 
         if (meridian === 'PM' && hours < 12) hours += 12;
         if (meridian === 'AM' && hours === 12) hours = 0;
 
-        const d = new Date();
-        d.setHours(hours, minutes, 0, 0);
-        return d;
+        return hours * 60 + minutes;
       }
 
       const iso = new Date(timeStr);
-      if (!isNaN(iso.getTime())) return iso;
+      if (!isNaN(iso.getTime())) {
+        return iso.getHours() * 60 + iso.getMinutes();
+      }
     } catch {
       return null;
     }
     return null;
   };
 
-  const start = parseTime(inTimeStr);
-  if (!start) return '-';
+  const startMins = parseTimeToMinutes(inTimeStr);
+  if (startMins === null) return '-';
 
-  const end = outTimeStr && outTimeStr !== '-' && outTimeStr !== 'Yet to checkout' 
-    ? parseTime(outTimeStr) 
-    : new Date();
+  let endMins: number | null = null;
+  if (outTimeStr && outTimeStr !== '-' && outTimeStr !== 'Yet to checkout') {
+    endMins = parseTimeToMinutes(outTimeStr);
+  } else {
+    const now = new Date();
+    endMins = now.getHours() * 60 + now.getMinutes();
+  }
 
-  if (!end || end < start) return '-';
+  if (endMins === null) return '-';
 
-  const diffMs = end.getTime() - start.getTime();
-  const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  let diff = endMins - startMins;
+  if (diff < 0) diff += 24 * 60;
 
-  return `${String(diffHrs).padStart(2, '0')}:${String(diffMins).padStart(2, '0')} Hrs`;
+  const diffHrs = Math.floor(diff / 60);
+  const diffRemainderMins = diff % 60;
+
+  return `${String(diffHrs).padStart(2, '0')}:${String(diffRemainderMins).padStart(2, '0')} Hrs`;
 };
 
 export const AdminAttendancePage: React.FC = () => {
@@ -118,7 +125,7 @@ export const AdminAttendancePage: React.FC = () => {
           const clockInTime = item.inTime || item.clockIn || '-';
           const clockOutTime = item.outTime || item.clockOut || '-';
 
-          // Determine status dynamically based on actual clock data
+          // Determine status dynamically
           let computedStatus: 'Present' | 'On Leave' | 'Absent' = 'Absent';
           if (item.status === 'On Leave') {
             computedStatus = 'On Leave';
@@ -126,7 +133,9 @@ export const AdminAttendancePage: React.FC = () => {
             computedStatus = 'Present';
           }
 
-          const hoursWorked = item.workingHours || calculateWorkingHours(clockInTime, clockOutTime);
+          // Prioritize actual time calculation over stale DB mock string
+          const calculated = calculateWorkingHours(clockInTime, clockOutTime);
+          const hoursWorked = calculated !== '-' ? calculated : (item.workingHours || '-');
 
           return {
             id: item._id || item.id || `emp-${idx}`,
@@ -175,15 +184,12 @@ export const AdminAttendancePage: React.FC = () => {
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
 
-      {/* ========================================================= */}
-      {/* 1. ATTENDANCE MANAGEMENT ROSTER                           */}
-      {/* ========================================================= */}
+      {/* 1. ATTENDANCE MANAGEMENT ROSTER */}
       {view === 'roster' && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold font-['Sora']">Attendance Management</h1>
 
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
-            
             {/* Sort by Course Dropdown */}
             <div className="flex items-center gap-3 relative z-20">
               <span className="text-xs text-[#050720]/70 font-medium">Sort by:</span>
@@ -315,9 +321,7 @@ export const AdminAttendancePage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. EMPLOYEE ATTENDANCE DETAILS VIEW                       */}
-      {/* ========================================================= */}
+      {/* 2. EMPLOYEE ATTENDANCE DETAILS VIEW */}
       {view === 'details' && selectedEmployee && (
         <div className="space-y-6">
           <button

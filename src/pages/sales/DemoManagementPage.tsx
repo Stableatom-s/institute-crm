@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Calendar,
@@ -31,6 +31,8 @@ const TIME_SLOTS = [
 ];
 
 export const DemoManagementPage: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const auth = useAuth() as any;
 
@@ -141,7 +143,7 @@ export const DemoManagementPage: React.FC = () => {
     }
   };
 
-  const handleOpenScheduleForm = () => {
+  const handleOpenScheduleForm = useCallback(() => {
     setLeadSearchQuery("");
     setMatchingLeads(cachedLeads.slice(0, 8));
     setIsSearchDropdownOpen(false);
@@ -158,7 +160,7 @@ export const DemoManagementPage: React.FC = () => {
     setSlotError(false);
     setModeError(false);
     setView("schedule-form");
-  };
+  }, [cachedLeads]);
 
   // Load demos scoped strictly to this salesperson's assigned leads
   const loadDemos = useCallback(async () => {
@@ -214,6 +216,14 @@ export const DemoManagementPage: React.FC = () => {
     loadDemos();
     loadFaculties();
   }, [loadDemos]);
+
+  // Handle direct navigation from dashboard "Schedule Demo" button
+  useEffect(() => {
+    if (location.state && (location.state as any).openScheduleModal) {
+      handleOpenScheduleForm();
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, handleOpenScheduleForm, navigate]);
 
   // Deep linking: if opened with ?scheduleLeadId=xyz
   useEffect(() => {

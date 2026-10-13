@@ -121,14 +121,14 @@ export const SalesDashboard: React.FC = () => {
         <h1 className="text-2xl font-bold font-['Sora']">Dashboard</h1>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/sales/demos')}
+            onClick={() => navigate('/sales/demos', { state: { openScheduleModal: true } })}
             className="flex items-center gap-2 px-4 py-2 border border-[#050720]/25 rounded-lg text-xs font-bold text-[#050720] bg-white hover:bg-[#050720]/5 transition-colors shadow-xs cursor-pointer"
           >
             <Calendar className="w-3.5 h-3.5" />
             <span>Schedule Demo</span>
           </button>
           <button
-            onClick={() => navigate('/sales/leads')}
+            onClick={() => navigate('/sales/leads', { state: { openAddModal: true } })}
             className="flex items-center gap-1.5 px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -139,13 +139,13 @@ export const SalesDashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sales Action Overview */}
-        <div className="bg-white rounded-xl border border-[#050720]/10 p-5 shadow-xs relative overflow-hidden">
-          <div className="absolute left-0 top-6 bottom-6 w-1 bg-[#FFB908] rounded-r" />
+        <div className="relative bg-white rounded-2xl border border-[#050720]/10 p-6 shadow-xs">
+          <div className="absolute left-0 top-3 bottom-3 w-2 bg-[#FFB908] rounded-r-full" />
           <div className="pl-3">
             <h3 className="text-sm font-bold font-['Sora']">Sales Action Overview</h3>
             <span className="text-[10px] text-[#050720]/50 block mt-0.5">This month</span>
 
-            <div className="grid grid-cols-4 gap-2 text-center mt-5">
+            <div className="grid grid-cols-4 gap-2 text-center mt-6">
               <div>
                 <span className="text-[10px] text-[#050720]/60 block font-medium">Follow-ups Due</span>
                 <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
@@ -175,13 +175,13 @@ export const SalesDashboard: React.FC = () => {
         </div>
 
         {/* Lead Pipeline Snapshot */}
-        <div className="bg-white rounded-xl border border-[#050720]/10 p-5 shadow-xs relative overflow-hidden">
-          <div className="absolute left-0 top-6 bottom-6 w-1 bg-[#FFB908] rounded-r" />
+        <div className="relative bg-white rounded-2xl border border-[#050720]/10 p-6 shadow-xs">
+          <div className="absolute left-0 top-3 bottom-3 w-2 bg-[#FFB908] rounded-r-full" />
           <div className="pl-3">
             <h3 className="text-sm font-bold font-['Sora']">Lead Pipeline Snapshot</h3>
             <span className="text-[10px] text-[#050720]/50 block mt-0.5">This month</span>
 
-            <div className="grid grid-cols-5 gap-1 text-center mt-5">
+            <div className="grid grid-cols-5 gap-1 text-center mt-6">
               <div>
                 <span className="text-[10px] text-[#050720]/60 block font-medium">Total</span>
                 <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
