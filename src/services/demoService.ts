@@ -28,9 +28,9 @@ export const demoService = {
     return data.map((item) => ({
       ...item,
       id: item._id || item.id,
-      contactNo: item.contactNo || '9078675645',
+      contactNo: item.contactNo || '',
       lastName: item.lastName || '',
-      address: item.address || 'Pune',
+      address: item.address || '',
     }));
   },
 
@@ -42,9 +42,9 @@ export const demoService = {
     return {
       ...item,
       id: item._id || item.id,
-      contactNo: item.contactNo || demoData.contactNo || '9078675645',
+      contactNo: item.contactNo || demoData.contactNo || '',
       lastName: item.lastName || demoData.lastName || '',
-      address: item.address || demoData.address || 'Pune',
+      address: item.address || demoData.address || '',
     };
   },
 
@@ -55,12 +55,12 @@ export const demoService = {
   ): Promise<DemoItem> => {
     const item = await apiRequest<any>(`/demos/${id}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ status, ...extraFields }),
+      body: JSON.stringify({ status, ...(extraFields || {}) }),
     });
     return {
       ...item,
       id: item._id || item.id,
-      contactNo: item.contactNo || '9078675645',
+      contactNo: item.contactNo || '',
     };
   },
 };

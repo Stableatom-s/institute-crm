@@ -37,7 +37,6 @@ export interface LeaveRecord {
 }
 
 export const attendanceService = {
-  // Admin staff attendance roster
   getAllEmployeeAttendance: async (): Promise<any[]> => {
     try {
       const data = await apiRequest<any[]>('/attendance');
@@ -53,10 +52,10 @@ export const attendanceService = {
       const data = await apiRequest<any[]>(`/attendance/my-records${query}`);
       return data.map((d) => ({
         id: d._id || d.id,
-        date: d.date,
-        inTime: d.inTime,
-        outTime: d.outTime,
-        workingHours: d.workingHours || '00:00',
+        date: d.date || '',
+        inTime: d.inTime || '-',
+        outTime: d.outTime || '-',
+        workingHours: d.workingHours || '-',
         activities: d.activities || [],
       }));
     } catch {
@@ -78,27 +77,26 @@ export const attendanceService = {
     });
   },
 
-  // Leave operations
   getAllLeaves: async (): Promise<LeaveRecord[]> => {
     try {
       const data = await apiRequest<any[]>('/leaves');
       return data.map((l, idx) => ({
         id: l._id || l.id,
         srNo: String(idx + 1).padStart(2, '0'),
-        name: l.userName || `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Staff Member',
-        firstName: l.firstName || (l.userName || '').split(' ')[0] || 'Staff',
+        name: l.userName || `${l.firstName || ''} ${l.lastName || ''}`.trim() || '',
+        firstName: l.firstName || (l.userName || '').split(' ')[0] || '',
         lastName: l.lastName || (l.userName || '').split(' ').slice(1).join(' ') || '',
-        role: l.role || l.userRole || 'Faculty',
-        mobile: l.mobile || '9784569874',
-        email: l.email || 'staff@radiquolab.com',
-        leaveType: l.leaveType || 'Casual',
-        leaveDate: l.leaveDate || l.fromDate || '12-02-2026',
-        fromDate: l.fromDate || l.leaveDate || '12-02-2026',
-        toDate: l.toDate || l.leaveDate || '12-02-2026',
-        noOfDays: l.noOfDays || '01',
-        reason: l.reason || 'Personal Reason',
-        applicationDate: l.applicationDate || '11-02-2026',
-        status: l.status === 'Approved' ? 'Active' : (l.status as any),
+        role: l.role || l.userRole || '',
+        mobile: l.mobile || '',
+        email: l.email || '',
+        leaveType: l.leaveType || '',
+        leaveDate: l.leaveDate || l.fromDate || '',
+        fromDate: l.fromDate || l.leaveDate || '',
+        toDate: l.toDate || l.leaveDate || '',
+        noOfDays: l.noOfDays || '',
+        reason: l.reason || '',
+        applicationDate: l.applicationDate || '',
+        status: l.status || 'Pending',
         rejectionReason: l.rejectionReason,
       }));
     } catch {
@@ -112,13 +110,13 @@ export const attendanceService = {
       const data = await apiRequest<any[]>(`/leaves/my${query}`);
       return data.map((l) => ({
         id: l._id || l.id,
-        leaveType: l.leaveType,
-        leaveDate: l.leaveDate || l.fromDate,
-        fromDate: l.fromDate,
-        toDate: l.toDate,
-        reason: l.reason,
-        applicationDate: l.applicationDate,
-        status: l.status === 'Active' ? 'Approved' : l.status,
+        leaveType: l.leaveType || '',
+        leaveDate: l.leaveDate || l.fromDate || '',
+        fromDate: l.fromDate || '',
+        toDate: l.toDate || '',
+        reason: l.reason || '',
+        applicationDate: l.applicationDate || '',
+        status: l.status || 'Pending',
         rejectionReason: l.rejectionReason,
       }));
     } catch {
@@ -133,27 +131,27 @@ export const attendanceService = {
     });
     return {
       id: data._id || data.id,
-      leaveType: data.leaveType,
-      leaveDate: data.leaveDate || data.fromDate,
-      fromDate: data.fromDate,
-      toDate: data.toDate,
-      reason: data.reason,
-      applicationDate: data.applicationDate,
+      leaveType: data.leaveType || '',
+      leaveDate: data.leaveDate || data.fromDate || '',
+      fromDate: data.fromDate || '',
+      toDate: data.toDate || '',
+      reason: data.reason || '',
+      applicationDate: data.applicationDate || '',
       status: data.status || 'Pending',
     };
   },
 
-  approveLeave: async (id: string, adminName: string = 'Admin'): Promise<any> => {
+  approveLeave: async (id: string, adminName?: string): Promise<any> => {
     return await apiRequest(`/leaves/${id}/approve`, {
       method: 'PATCH',
-      body: JSON.stringify({ adminName }),
+      body: JSON.stringify({ adminName: adminName || '' }),
     });
   },
 
-  rejectLeave: async (id: string, rejectionReason: string, adminName: string = 'Admin'): Promise<any> => {
+  rejectLeave: async (id: string, rejectionReason: string, adminName?: string): Promise<any> => {
     return await apiRequest(`/leaves/${id}/reject`, {
       method: 'PATCH',
-      body: JSON.stringify({ rejectionReason, adminName }),
+      body: JSON.stringify({ rejectionReason, adminName: adminName || '' }),
     });
   },
 };

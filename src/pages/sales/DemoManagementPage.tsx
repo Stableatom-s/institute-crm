@@ -378,16 +378,20 @@ export const DemoManagementPage: React.FC = () => {
     if (hasError || !selectedLeadData) return;
 
     const payload: Partial<DemoItem> = {
-      name: selectedLeadData.firstName,
-      lastName: selectedLeadData.lastName,
-      contactNo: selectedLeadData.mobile,
-      address: selectedLeadData.address,
+      name: selectedLeadData.firstName.trim(),
+      lastName: (selectedLeadData.lastName || '').trim(),
+      contactNo: (selectedLeadData.mobile || '').trim(),
+      address: (selectedLeadData.address || '').trim(),
       timeSlot: formTimeSlot,
       demoDate: formDate,
       course: formCourse,
       mode: formMode as "Online" | "Offline",
       faculty: formFaculty,
       status: "Scheduled",
+      remark: '',
+      feedback: '',
+      cancellationReason: '',
+      screenshotUrl: '',
     };
 
     try {

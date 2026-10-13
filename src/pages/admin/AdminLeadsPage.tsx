@@ -243,30 +243,25 @@ export const AdminLeadsPage: React.FC = () => {
   };
 
   const handleConfirmAssign = async () => {
-    // Dynamic next-day follow up instead of static 01-01-2026
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dynamicFollowUp = tomorrow.toLocaleDateString('en-GB').replace(/\//g, '-');
-
     const payload: any = {
-      firstName: formFirstName,
-      lastName: formLastName,
-      contactNo: formMobile,
-      email: formEmail,
+      firstName: formFirstName.trim(),
+      lastName: formLastName.trim(),
+      contactNo: formMobile.trim(),
+      email: formEmail.trim(),
       enquiryDate: formEnquiryDate,
-      course: formCourses[0] || 'UI/UX Design',
+      course: formCourses.join(', ') || '',
       status: 'Interested',
-      followUp: dynamicFollowUp,
+      followUp: '', // Empty until explicitly scheduled
       remark: 'Newly Added',
       occupation: formOccupation,
-      leadSource: formLeadSource || 'Walk-in',
-      address: formAddress || 'Pune',
-      assignedTo: formAssignTo || 'Sales',
-      offeredFees: formOfferedFees || '₹35,000',
-      finalFees: formFinalFees || '₹35,000',
+      leadSource: formLeadSource.trim(),
+      address: formAddress.trim(),
+      assignedTo: formAssignTo || '',
+      offeredFees: formOfferedFees.trim(),
+      finalFees: formFinalFees.trim(),
       referral: formReferral,
-      referralMobile: formReferral === 'Yes' ? formReferralMobile : undefined,
-      referralName: formReferral === 'Yes' ? formReferralName : undefined,
+      referralMobile: formReferral === 'Yes' ? formReferralMobile.trim() : '',
+      referralName: formReferral === 'Yes' ? formReferralName.trim() : '',
       enquiringFor: formEnquiringFor,
       timeline: [
         {
@@ -274,7 +269,7 @@ export const AdminLeadsPage: React.FC = () => {
           timestamp: `${formEnquiryDate}, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
           status: 'Interested',
           title: 'Lead Remark',
-          description: `Lead created by Admin and assigned to ${formAssignTo}`,
+          description: formAssignTo ? `Lead created by Admin and assigned to ${formAssignTo}` : 'Lead created by Admin',
         },
       ],
     };

@@ -18,14 +18,15 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// POST create lead - ensures assignedTo is saved reliably
+// POST create lead
 router.post('/', async (req: Request, res: Response) => {
   try {
     const count = await Lead.countDocuments();
     const newLead = new Lead({
       ...req.body,
       srNo: String(count + 1).padStart(2, '0'),
-      assignedTo: req.body.assignedTo || 'Unassigned', 
+      assignedTo: req.body.assignedTo || 'Unassigned',
+      followUp: req.body.followUp || '',
     });
     const saved = await newLead.save();
     res.status(201).json(saved);
@@ -37,7 +38,7 @@ router.post('/', async (req: Request, res: Response) => {
 // PATCH lead status and timeline
 router.patch('/:id/status', async (req: Request, res: Response) => {
   try {
-    const { status, remark, timelineEntry, assignedTo } = req.body;
+    const { status, remark, timelineEntry, assignedTo, followUp } = req.body;
     const lead = await Lead.findById(req.params.id);
 
     if (!lead) {
@@ -46,7 +47,8 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
 
     if (status) lead.status = status;
     if (remark) lead.remark = remark;
-    if (assignedTo) (lead as any).assignedTo = assignedTo;
+    if (followUp !== undefined) lead.followUp = followUp;
+    if (assignedTo) lead.assignedTo = assignedTo;
     if (timelineEntry) lead.timeline.unshift(timelineEntry);
 
     const updated = await lead.save();

@@ -1,17 +1,41 @@
 import { apiRequest } from '../lib/api';
-import { DetailedLead, LeadStatus } from '../pages/sales/SalesLeadsPage';
+
+export interface DetailedLead {
+  id: string;
+  srNo: string;
+  firstName: string;
+  lastName: string;
+  contactNo: string;
+  email: string;
+  enquiryDate: string;
+  course: string;
+  status: any;
+  followUp: string;
+  remark: string;
+  occupation: string;
+  leadSource: string;
+  address: string;
+  assignedTo?: string;
+  offeredFees?: string;
+  finalFees?: string;
+  referral?: 'Yes' | 'No';
+  referralMobile?: string;
+  referralName?: string;
+  enquiringFor?: 'Self' | 'Family' | 'Friend' | 'Other' | string;
+  studentName?: string;
+  studentMobile?: string;
+  timeline: any[];
+}
 
 export const leadService = {
-  // Fetch all leads from MongoDB
   getAllLeads: async (): Promise<DetailedLead[]> => {
     const data = await apiRequest<any[]>('/leads');
     return data.map((item) => ({
       ...item,
-      id: item._id || item.id, // Normalize MongoDB _id to id
+      id: item._id || item.id,
     }));
   },
 
-  // Create new lead in MongoDB
   createLead: async (leadData: Partial<DetailedLead>): Promise<DetailedLead> => {
     const item = await apiRequest<any>('/leads', {
       method: 'POST',
@@ -23,10 +47,9 @@ export const leadService = {
     };
   },
 
-  // Update lead status and append timeline note in MongoDB
   updateStatus: async (
     id: string,
-    status: LeadStatus,
+    status: any,
     remark?: string,
     timelineEntry?: any
   ): Promise<DetailedLead> => {

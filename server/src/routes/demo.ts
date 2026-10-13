@@ -28,8 +28,38 @@ router.post('/', async (req: Request, res: Response) => {
 
 router.patch('/:id/status', async (req: Request, res: Response) => {
   try {
-    const { status } = req.body;
-    const updated = await Demo.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    const { 
+      status, 
+      feedback, 
+      screenshotUrl, 
+      cancellationReason, 
+      course, 
+      faculty, 
+      demoDate, 
+      timeSlot, 
+      mode, 
+      demoStatusText, 
+      remark 
+    } = req.body;
+
+    const updateFields: any = { status };
+    if (feedback !== undefined) updateFields.feedback = feedback;
+    if (screenshotUrl !== undefined) updateFields.screenshotUrl = screenshotUrl;
+    if (cancellationReason !== undefined) updateFields.cancellationReason = cancellationReason;
+    if (course !== undefined) updateFields.course = course;
+    if (faculty !== undefined) updateFields.faculty = faculty;
+    if (demoDate !== undefined) updateFields.demoDate = demoDate;
+    if (timeSlot !== undefined) updateFields.timeSlot = timeSlot;
+    if (mode !== undefined) updateFields.mode = mode;
+    if (demoStatusText !== undefined) updateFields.demoStatusText = demoStatusText;
+    if (remark !== undefined) updateFields.remark = remark;
+
+    const updated = await Demo.findByIdAndUpdate(
+      req.params.id, 
+      { $set: updateFields }, 
+      { new: true }
+    );
+
     if (!updated) return res.status(404).json({ message: 'Demo not found' });
     res.json(updated);
   } catch (error) {
@@ -38,3 +68,4 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
 });
 
 export const demoRoutes = router;
+export default router;

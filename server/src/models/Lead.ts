@@ -22,11 +22,15 @@ export interface ILead extends Document {
   occupation: string;
   leadSource: string;
   address: string;
-  assignedTo: string; // <-- 1. ADD THIS TO INTERFACE
+  assignedTo: string;
   offeredFees: string;
   finalFees: string;
   referral: 'Yes' | 'No';
-  enquiringFor: 'Self' | 'Other';
+  referralMobile?: string;
+  referralName?: string;
+  enquiringFor: 'Self' | 'Family' | 'Friend' | 'Other';
+  studentName?: string;
+  studentMobile?: string;
   timeline: ITimelineEntry[];
 }
 
@@ -57,14 +61,22 @@ const leadSchema = new Schema<ILead>(
     },
     followUp: { type: String, default: '' },
     remark: { type: String, default: '' },
-    occupation: { type: String, default: 'College Student' },
-    leadSource: { type: String, default: 'Instagram' },
-    address: { type: String, default: 'Pune' },
-    assignedTo: { type: String, default: 'Unassigned' }, // <-- 2. ADD THIS TO SCHEMA
-    offeredFees: { type: String, default: '₹35,000' },
-    finalFees: { type: String, default: '₹35,000' },
+    occupation: { type: String, default: '' },
+    leadSource: { type: String, default: '' },
+    address: { type: String, default: '' },
+    assignedTo: { type: String, default: '' },
+    offeredFees: { type: String, default: '' },
+    finalFees: { type: String, default: '' },
     referral: { type: String, enum: ['Yes', 'No'], default: 'No' },
-    enquiringFor: { type: String, enum: ['Self', 'Other'], default: 'Self' },
+    referralMobile: { type: String, default: '' },
+    referralName: { type: String, default: '' },
+    enquiringFor: { 
+      type: String, 
+      enum: ['Self', 'Family', 'Friend', 'Other'], 
+      default: 'Self' 
+    },
+    studentName: { type: String, default: '' },
+    studentMobile: { type: String, default: '' },
     timeline: [timelineSchema],
   },
   { timestamps: true }

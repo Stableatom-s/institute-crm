@@ -12,8 +12,11 @@ export interface IDemo extends Document {
   mode: 'Online' | 'Offline';
   faculty: string;
   status: 'Scheduled' | 'Completed' | 'Cancelled';
+  demoStatusText?: string;
+  remark?: string;
   cancellationReason?: string;
   feedback?: string;
+  screenshotUrl?: string;
 }
 
 const demoSchema = new Schema<IDemo>(
@@ -21,16 +24,19 @@ const demoSchema = new Schema<IDemo>(
     srNo: { type: String, required: true },
     name: { type: String, required: true },
     lastName: { type: String, default: '' },
-    contactNo: { type: String, required: true, default: '9078675645' },
-    address: { type: String, default: 'Pune' },
+    contactNo: { type: String, required: true },
+    address: { type: String, default: '' },
     timeSlot: { type: String, required: true },
     demoDate: { type: String, required: true },
     course: { type: String, required: true },
-    mode: { type: String, enum: ['Online', 'Offline'], default: 'Online' },
+    mode: { type: String, enum: ['Online', 'Offline'], required: true },
     faculty: { type: String, required: true },
     status: { type: String, enum: ['Scheduled', 'Completed', 'Cancelled'], default: 'Scheduled' },
-    cancellationReason: { type: String },
-    feedback: { type: String },
+    demoStatusText: { type: String, default: '' },
+    remark: { type: String, default: '' },
+    cancellationReason: { type: String, default: '' },
+    feedback: { type: String, default: '' },
+    screenshotUrl: { type: String, default: '' },
   },
   { timestamps: true }
 );

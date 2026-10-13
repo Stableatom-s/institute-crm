@@ -298,42 +298,37 @@ export const SalesLeadsPage: React.FC = () => {
     }
     setFormError(false);
 
-    const activeRepName =
-      activeUser?.name || auth?.user?.name || "Gaurav Thorat";
-
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dynamicFollowUp = tomorrow.toLocaleDateString('en-GB').replace(/\//g, '-');
+    const activeRepName = activeUser?.name || auth?.user?.name || '';
 
     const payload: Partial<DetailedLead> = {
-      firstName: formFirstName,
-      lastName: formLastName,
-      contactNo: formMobile,
-      email: formEmail,
+      firstName: formFirstName.trim(),
+      lastName: formLastName.trim(),
+      contactNo: formMobile.trim(),
+      email: formEmail.trim(),
       enquiryDate: formEnquiryDate || new Date().toISOString().split("T")[0],
-      course: formCourses[0] || "UI/UX Design",
+      course: formCourses.join(', ') || '',
       status: "Interested",
-      followUp: dynamicFollowUp,
+      followUp: "", // Left blank until user sets a follow-up
       remark: "Newly Added",
       occupation: formOccupation,
-      leadSource: formLeadSource || "Walk-in",
-      address: formAddress || "Pune",
+      leadSource: formLeadSource.trim(),
+      address: formAddress.trim(),
       assignedTo: activeRepName,
-      offeredFees: formOfferedFees || "₹35,000",
-      finalFees: formFinalFees || "₹35,000",
+      offeredFees: formOfferedFees.trim(),
+      finalFees: formFinalFees.trim(),
       referral: formReferral,
-      referralMobile: formReferral === "Yes" ? formReferralMobile : undefined,
-      referralName: formReferral === "Yes" ? formReferralName : undefined,
+      referralMobile: formReferral === "Yes" ? formReferralMobile.trim() : "",
+      referralName: formReferral === "Yes" ? formReferralName.trim() : "",
       enquiringFor: formEnquiringFor,
-      studentName: formEnquiringFor !== "Self" ? formStudentName : undefined,
-      studentMobile: formEnquiringFor !== "Self" ? formStudentMobile : undefined,
+      studentName: formEnquiringFor !== "Self" ? formStudentName.trim() : "",
+      studentMobile: formEnquiringFor !== "Self" ? formStudentMobile.trim() : "",
       timeline: [
         {
           id: `t-${Date.now()}`,
-          timestamp: `${formEnquiryDate || new Date().toISOString().split("T")[0]}, 10:00 AM`,
+          timestamp: `${formEnquiryDate || new Date().toISOString().split("T")[0]}, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
           status: "Interested",
           title: "Lead Remark",
-          description: `Lead created and assigned to ${activeRepName}`,
+          description: activeRepName ? `Lead created and assigned to ${activeRepName}` : 'Lead created',
         },
       ],
     };
