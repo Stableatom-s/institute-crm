@@ -106,12 +106,11 @@ export const AdminLeadsPage: React.FC = () => {
         teamService.getAllMembers(),
       ]);
 
-      setLeads(leadsData);
+      setLeads(leadsData as unknown as DetailedLead[]);
       if (leadsData.length > 0 && !selectedLead) {
-        setSelectedLead(leadsData[0]);
+        setSelectedLead(leadsData[0] as unknown as DetailedLead);
       }
 
-      // Filter only members whose role is sales
       const salesMembers = teamData
         .filter((m) => {
           const role = (m.role || '').toLowerCase();
@@ -244,6 +243,11 @@ export const AdminLeadsPage: React.FC = () => {
   };
 
   const handleConfirmAssign = async () => {
+    // Dynamic next-day follow up instead of static 01-01-2026
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dynamicFollowUp = tomorrow.toLocaleDateString('en-GB').replace(/\//g, '-');
+
     const payload: any = {
       firstName: formFirstName,
       lastName: formLastName,
@@ -252,7 +256,7 @@ export const AdminLeadsPage: React.FC = () => {
       enquiryDate: formEnquiryDate,
       course: formCourses[0] || 'UI/UX Design',
       status: 'Interested',
-      followUp: '01-01-2026',
+      followUp: dynamicFollowUp,
       remark: 'Newly Added',
       occupation: formOccupation,
       leadSource: formLeadSource || 'Walk-in',
@@ -429,7 +433,7 @@ export const AdminLeadsPage: React.FC = () => {
               </div>
             ) : filteredLeads.length === 0 ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
-                No leads recorded yet. Click "Add new lead" to add one.
+                No leads recorded yet. Click &quot;Add new lead&quot; to add one.
               </div>
             ) : (
               <table className="w-full text-left text-xs">
@@ -459,8 +463,8 @@ export const AdminLeadsPage: React.FC = () => {
                           {lead.status}
                         </span>
                       </td>
-                      <td className="py-3.5 text-[#050720]/70">{lead.followUp}</td>
-                      <td className="py-3.5 text-[#050720]/70">{lead.remark}</td>
+                      <td className="py-3.5 text-[#050720]/70">{lead.followUp || '—'}</td>
+                      <td className="py-3.5 text-[#050720]/70">{lead.remark || '—'}</td>
                       <td className="py-3.5 text-right">
                         <button
                           onClick={() => handleOpenLead(lead)}
@@ -852,7 +856,6 @@ export const AdminLeadsPage: React.FC = () => {
               </label>
             </div>
 
-            {/* Conditionally reveal fields when Referral is "Yes" */}
             {formReferral === 'Yes' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                 <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">

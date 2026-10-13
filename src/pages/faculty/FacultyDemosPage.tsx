@@ -37,10 +37,8 @@ export const FacultyDemoPage: React.FC = () => {
   const [modeFilter, setModeFilter] = useState('All');
   const [courseFilter, setCourseFilter] = useState('All');
 
-  // Form State for completion
-  const [feedbackText, setFeedbackText] = useState(
-    'Student showed strong interest in the course structure and tools. Asked relevant questions about projects and placement support. Recommended for follow-up within 24 hours.'
-  );
+  // Form State for completion (Clean empty state)
+  const [feedbackText, setFeedbackText] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('name.jpeg/png/jpg');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
@@ -99,10 +97,7 @@ export const FacultyDemoPage: React.FC = () => {
 
   const handleOpenDetails = (demo: DemoItem) => {
     setSelectedDemo(demo);
-    setFeedbackText(
-      demo.feedback ||
-        'Student showed strong interest in the course structure and tools. Asked relevant questions about projects and placement support. Recommended for follow-up within 24 hours.'
-    );
+    setFeedbackText(demo.feedback || '');
     setUploadedFileName('name.jpeg/png/jpg');
     setPreviewImage(demo.screenshotUrl || null);
     setCurrentView('details');
@@ -251,7 +246,7 @@ export const FacultyDemoPage: React.FC = () => {
                       {activeTab === 'Completed' && (
                         <>
                           <td className="py-3.5 text-[#050720]/70">{row.demoStatus || 'Attended'}</td>
-                          <td className="py-3.5 text-[#050720]/70">{row.remark || 'Joining soon'}</td>
+                          <td className="py-3.5 text-[#050720]/70">{row.remark || '—'}</td>
                         </>
                       )}
                       <td className="py-3.5 text-right">
@@ -301,7 +296,10 @@ export const FacultyDemoPage: React.FC = () => {
             {/* DEMO COMPLETED BUTTON: Shown only when viewing a Scheduled demo */}
             {selectedDemo.status === 'Scheduled' && (
               <button
-                onClick={() => setCurrentView('complete-form')}
+                onClick={() => {
+                  setFeedbackText(selectedDemo.feedback || '');
+                  setCurrentView('complete-form');
+                }}
                 className="px-5 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer font-['Sora']"
               >
                 Demo Completed
@@ -358,7 +356,7 @@ export const FacultyDemoPage: React.FC = () => {
                     Demo feedback
                   </span>
                   <p className="pt-4 text-xs text-[#050720] font-medium leading-relaxed">
-                    {selectedDemo.feedback || 'Completed demo session.'}
+                    {selectedDemo.feedback || 'No feedback logged yet.'}
                   </p>
                 </div>
 
@@ -450,7 +448,7 @@ export const FacultyDemoPage: React.FC = () => {
 
               {previewImage && (
                 <div className="rounded-xl overflow-hidden border border-[#050720]/10 max-w-md">
-                  <img src={previewImage} alt="Attendance preview" className="w-full h-auto object-cover" />
+                  <img src={previewImage} alt="Attendance proof preview" className="w-full h-auto object-cover" />
                 </div>
               )}
 

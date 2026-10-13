@@ -43,9 +43,7 @@ export const AdminDemosPage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-      {/* ========================================================= */}
-      {/* 1. DEMO MANAGEMENT TABLE VIEW                             */}
-      {/* ========================================================= */}
+      {/* 1. DEMO MANAGEMENT TABLE VIEW */}
       {!selectedDemo && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold font-['Sora']">Demo Management</h1>
@@ -62,7 +60,7 @@ export const AdminDemosPage: React.FC = () => {
                     setModeFilter('Mode');
                     setCourseFilter('Course');
                   }}
-                  className={`pb-3 relative transition-colors ${
+                  className={`pb-3 relative transition-colors cursor-pointer ${
                     activeTab === tab ? 'text-[#050720]' : 'text-[#050720]/50 hover:text-[#050720]'
                   }`}
                 >
@@ -85,7 +83,7 @@ export const AdminDemosPage: React.FC = () => {
                     setIsModeOpen(!isModeOpen);
                     setIsCourseOpen(false);
                   }}
-                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[100px]"
+                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[100px] cursor-pointer"
                 >
                   <span>{modeFilter}</span>
                   {isModeOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5 text-[#050720]/50" />}
@@ -99,7 +97,7 @@ export const AdminDemosPage: React.FC = () => {
                           setModeFilter(m);
                           setIsModeOpen(false);
                         }}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720]"
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720] cursor-pointer"
                       >
                         {m}
                       </button>
@@ -115,7 +113,7 @@ export const AdminDemosPage: React.FC = () => {
                     setIsCourseOpen(!isCourseOpen);
                     setIsModeOpen(false);
                   }}
-                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[110px]"
+                  className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[110px] cursor-pointer"
                 >
                   <span>{courseFilter}</span>
                   {isCourseOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5 text-[#050720]/50" />}
@@ -129,7 +127,7 @@ export const AdminDemosPage: React.FC = () => {
                           setCourseFilter(c);
                           setIsCourseOpen(false);
                         }}
-                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720]"
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720] cursor-pointer"
                       >
                         {c}
                       </button>
@@ -183,7 +181,7 @@ export const AdminDemosPage: React.FC = () => {
                       {activeTab === 'Completed' ? (
                         <>
                           <td className="py-3.5 text-[#050720]/70">{demo.demoStatusText || 'Attended'}</td>
-                          <td className="py-3.5 text-[#050720]/70">{demo.remark || 'Joining soon'}</td>
+                          <td className="py-3.5 text-[#050720]/70">{demo.remark || '—'}</td>
                         </>
                       ) : null}
                       <td className="py-3.5 text-right">
@@ -209,11 +207,11 @@ export const AdminDemosPage: React.FC = () => {
                 className="w-8 h-7 text-center border border-[#050720]/20 rounded font-semibold text-xs"
               />
               <div className="flex items-center gap-1.5 ml-2">
-                <button className="p-1 hover:text-[#050720]">
+                <button className="p-1 hover:text-[#050720] cursor-pointer">
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
                 <span className="text-[11px] font-semibold text-[#050720]">01 of 10</span>
-                <button className="p-1 hover:text-[#050720]">
+                <button className="p-1 hover:text-[#050720] cursor-pointer">
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -223,14 +221,12 @@ export const AdminDemosPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. SCHEDULED DEMO DETAILS VIEW                            */}
-      {/* ========================================================= */}
+      {/* 2. SCHEDULED DEMO DETAILS VIEW */}
       {selectedDemo && selectedDemo.status === 'Scheduled' && (
         <div className="space-y-6">
           <button
             onClick={() => setSelectedDemo(null)}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Scheduled demo details</span>
@@ -270,14 +266,12 @@ export const AdminDemosPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 3. COMPLETED DEMO DETAILS VIEW                            */}
-      {/* ========================================================= */}
+      {/* 3. COMPLETED DEMO DETAILS VIEW */}
       {selectedDemo && selectedDemo.status === 'Completed' && (
         <div className="space-y-6">
           <button
             onClick={() => setSelectedDemo(null)}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Completed demo details</span>
@@ -317,63 +311,34 @@ export const AdminDemosPage: React.FC = () => {
             {/* Feedback */}
             <div className="pt-2 text-xs">
               <span className="text-[10px] text-[#050720]/50 block mb-1">Demo feedback</span>
-              <p className="leading-relaxed text-[#050720]/90">
-                {selectedDemo.feedback ||
-                  'Student showed strong interest in the course structure and tools. Asked relevant questions about projects and placement support. Recommended for follow-up within 24 hours.'}
+              <p className="leading-relaxed text-[#050720]/80">
+                {selectedDemo.feedback || 'No feedback logged yet.'}
               </p>
             </div>
 
-            {/* Zoom / Video Call Frame Screenshot */}
-            <div className="pt-2">
-              <span className="text-[10px] text-[#050720]/50 block mb-2">Attendance screenshot</span>
-              <div className="rounded-xl overflow-hidden border border-[#050720]/20 bg-[#1E1E1E] max-w-xl">
-                {/* Browser/Zoom style top bar */}
-                <div className="bg-[#2A2A2A] px-3 py-1.5 flex items-center gap-1.5 border-b border-[#3A3A3A]">
-                  <div className="w-2.5 h-2.5 rounded-full bg-[#ED6A5E]" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-[#F5BF4F]" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-[#61C554]" />
-                  <span className="text-[10px] text-white/50 ml-auto mr-auto font-medium">Zoom Meeting</span>
-                </div>
-                <div className="p-3 bg-black flex gap-2">
-                  <div className="w-1/2 aspect-video bg-neutral-800 rounded-lg overflow-hidden flex items-center justify-center relative">
-                    {selectedDemo.screenshotUrl ? (
-                      <img
-                        src={selectedDemo.screenshotUrl}
-                        alt="Student"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="text-white text-xs font-semibold">{selectedDemo.name}</div>
-                    )}
-                    <span className="absolute bottom-1 left-2 text-[9px] bg-black/60 text-white px-1.5 py-0.5 rounded">
-                      {selectedDemo.name}
-                    </span>
-                  </div>
-                  <div className="w-1/2 aspect-video bg-neutral-800 rounded-lg overflow-hidden flex items-center justify-center relative">
-                    <img
-                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80"
-                      alt="Faculty"
-                      className="w-full h-full object-cover"
-                    />
-                    <span className="absolute bottom-1 left-2 text-[9px] bg-black/60 text-white px-1.5 py-0.5 rounded">
-                      {selectedDemo.faculty}
-                    </span>
-                  </div>
+            {/* Attendance Screenshot (Only renders if screenshot is uploaded) */}
+            {selectedDemo.screenshotUrl ? (
+              <div className="pt-2">
+                <span className="text-[10px] text-[#050720]/50 block mb-2">Attendance screenshot</span>
+                <div className="rounded-xl overflow-hidden border border-[#050720]/15 max-w-xl">
+                  <img
+                    src={selectedDemo.screenshotUrl}
+                    alt="Attendance Screenshot"
+                    className="w-full h-auto object-cover"
+                  />
                 </div>
               </div>
-            </div>
+            ) : null}
           </div>
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 4. CANCELLED DEMO DETAILS VIEW                            */}
-      {/* ========================================================= */}
+      {/* 4. CANCELLED DEMO DETAILS VIEW */}
       {selectedDemo && selectedDemo.status === 'Cancelled' && (
         <div className="space-y-6">
           <button
             onClick={() => setSelectedDemo(null)}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Cancelled demo details</span>
