@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { financeService, InvoiceItem as ServiceInvoiceItem } from '../../services/financeService';
 import { leadService } from '../../services/leadService';
+import { calculateInvoiceTaxes } from '../../utils/invoiceCalculator';
 
 interface InvoiceItem {
   id: string;
@@ -16,14 +17,17 @@ interface InvoiceItem {
   name: string;
   course: string;
   paidFees: string;
+  requestAmount: string;
+  rawRequestAmount: number;
   mobile: string;
   approvedOn: string;
   email: string;
   invoiceId: string;
   status: 'Approved' | 'Requests' | 'Cancelled';
-  rawPaidFees?: number;
-  rawTotalFees?: number;
+  rawPaidFees: number;
+  rawTotalFees: number;
   dueDate?: string;
+  installments?: any[];
 }
 
 interface FeeItem {
@@ -33,6 +37,8 @@ interface FeeItem {
   course: string;
   totalFees: string;
   paid: string;
+  rawPaid: number;
+  rawTotal: number;
   lastFollowUp: string;
   remarks: string;
   mobile: string;
@@ -40,6 +46,7 @@ interface FeeItem {
   paymentDate: string;
   approvedDate: string;
   invoiceId?: string;
+  timeline?: any[];
 }
 
 interface EnrolledStudentOption {
@@ -74,14 +81,13 @@ export const AdminInvoicesPage: React.FC = () => {
   // Calendar State for Fees Details
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<number | null>(null);
 
-  // Form State for "Create Invoice" & "Invoice Preview" (Matches Image 3)
   const [createFormData, setCreateFormData] = useState({
     companyName: 'Radiquolab Private Limited',
     companyMobile: '9145272921',
-    companyAddress: 'Horizon Chambers, Shop No. 6, GAT NO 281/2, Kasar Amboli Ghotawade, Pirangut, Mulshi, Pune 412115',
+    companyAddress: 'Horizon Chambers, Shop No. 6, GAT NO 281/2, Plot No 26, Kasar Amboli Ghotavade, Pirangut, Mulshi, Pune 412115',
     companyEmail: 'info@radiquolab.com',
     companyGst: '27AANCR8297C1ZT',
-    course: 'UI/UX Design',
+    course: '',
     companyPan: 'AANCR8297C',
     companyIec: 'AANCR8297C',
     bankName: 'State Bank of India',
@@ -89,22 +95,22 @@ export const AdminInvoicesPage: React.FC = () => {
     accountName: 'Radiquolab Private Limited',
     accountNumber: '20523204478',
     ifsc: 'SBIN0011430',
-    swiftCode: 'SBININBB23B',
+    swiftCode: 'SBININBB238',
     invoiceType: 'Tax Invoice',
     invoiceNumber: 'GST/001',
-    studentName: 'Rahul Sharma',
-    studentMobile: '9784569874',
-    studentEmail: 'rahul@gmail.com',
-    hsnSac: '998456',
-    qtyHrs: '01',
+    studentName: '',
+    studentMobile: '',
+    studentEmail: '',
+    hsnSac: '9992',
+    qtyHrs: '1',
     rate: '-',
-    currency: 'Rupee(₹)',
-    subtotal: 35000,
+    currency: 'INR',
+    subtotal: 0,
     cgst: 0,
     sgst: 0,
     igst: 0,
-    grandTotal: 35000,
-    amountInWords: 'Thirty-five thousand only',
+    grandTotal: 0,
+    amountInWords: '',
   });
 
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
@@ -123,42 +129,57 @@ export const AdminInvoicesPage: React.FC = () => {
           firstName: l.firstName || '',
           lastName: l.lastName || '',
           mobile: l.contactNo || '',
-          email: l.email || `${(l.firstName || 'student').toLowerCase()}@gmail.com`,
-          course: l.course || 'UI/UX Design',
-          totalFees: parseInt((l.finalFees || '35000').replace(/[^0-9]/g, ''), 10) || 35000,
+          email: l.email || '',
+          course: l.course || '',
+          totalFees: parseInt((l.finalFees || '0').replace(/[^0-9]/g, ''), 10) || 0,
         }));
       setEnrolledStudents(enrolled);
 
-      const mappedInvoices: InvoiceItem[] = dbInvoices.map((inv, idx) => ({
-        id: inv.id,
-        srNo: String(idx + 1).padStart(2, '0'),
-        name: inv.studentName || '—',
-        course: inv.course || '—',
-        paidFees: `₹${(inv.paidFees || 0).toLocaleString()}`,
-        mobile: inv.mobile || '—',
-        approvedOn: inv.approvedOn || (inv.approvalStatus === 'Approved' ? '01-12-2025' : '-'),
-        email: inv.email || `${inv.studentName.toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
-        invoiceId: inv.invoiceCode || `GST/${String(idx + 1).padStart(3, '0')}`,
-        status: (inv.approvalStatus as 'Approved' | 'Requests' | 'Cancelled') || 'Requests',
-        rawPaidFees: inv.paidFees || 0,
-        rawTotalFees: inv.totalFees || 35000,
-        dueDate: inv.dueDate || '01-12-2025',
-      }));
+      const mappedInvoices: InvoiceItem[] = dbInvoices.map((inv, idx) => {
+        const pendingInst = (inv.timeline || []).find((t: any) => t.status === 'Pending') ||
+          (inv.installments || []).find((t: any) => t.status === 'Pending');
+
+        const pendingAmtNum = pendingInst 
+          ? (typeof pendingInst.amount === 'string' ? parseInt(pendingInst.amount.replace(/[^0-9]/g, ''), 10) || 0 : Number(pendingInst.amount) || 0)
+          : (inv.paidFees || 0);
+
+        return {
+          id: inv.id,
+          srNo: String(idx + 1).padStart(2, '0'),
+          name: inv.studentName || '—',
+          course: inv.course || '—',
+          paidFees: `₹${(inv.paidFees || 0).toLocaleString()}`,
+          requestAmount: `₹${pendingAmtNum.toLocaleString()}`,
+          rawRequestAmount: pendingAmtNum,
+          mobile: inv.mobile || '—',
+          approvedOn: inv.approvedOn && inv.approvedOn !== '-' ? inv.approvedOn : (inv.approvalStatus === 'Approved' ? inv.dueDate : '-'),
+          email: inv.email || '—',
+          invoiceId: inv.invoiceCode || `GST/${String(idx + 1).padStart(3, '0')}`,
+          status: (inv.approvalStatus as 'Approved' | 'Requests' | 'Cancelled') || 'Requests',
+          rawPaidFees: inv.paidFees || 0,
+          rawTotalFees: inv.totalFees || 0,
+          dueDate: inv.dueDate || '—',
+          installments: inv.timeline || inv.installments || [],
+        };
+      });
 
       const mappedFees: FeeItem[] = dbInvoices.map((inv, idx) => ({
         id: inv.id,
         srNo: String(idx + 1).padStart(2, '0'),
         name: inv.studentName || '—',
         course: inv.course || '—',
-        totalFees: `₹${(inv.totalFees || 35000).toLocaleString()}`,
+        totalFees: `₹${(inv.totalFees || 0).toLocaleString()}`,
         paid: `₹${(inv.paidFees || 0).toLocaleString()}`,
-        lastFollowUp: inv.lastFollowUp || '01-12-2025',
-        remarks: inv.paymentStatus || (inv.paidFees >= inv.totalFees && inv.totalFees > 0 ? 'Paid' : 'Partially Paid'),
+        rawPaid: inv.paidFees || 0,
+        rawTotal: inv.totalFees || 0,
+        lastFollowUp: inv.lastFollowUp || '—',
+        remarks: inv.paymentStatus || ((inv.paidFees || 0) >= (inv.totalFees || 0) && (inv.totalFees || 0) > 0 ? 'Paid' : 'Partially Paid'),
         mobile: inv.mobile || '—',
         email: inv.email || '—',
-        paymentDate: inv.dueDate || '01-12-2025',
-        approvedDate: inv.approvedOn || '01-12-2025',
+        paymentDate: inv.dueDate || '—',
+        approvedDate: inv.approvedOn || '—',
         invoiceId: inv.invoiceCode || `GST/${String(idx + 1).padStart(3, '0')}`,
+        timeline: inv.timeline || inv.installments || [],
       }));
 
       setInvoices(mappedInvoices);
@@ -193,8 +214,7 @@ export const AdminInvoicesPage: React.FC = () => {
       await financeService.approveInvoice(selectedInvoice.id);
       setShowApproveModal(false);
       await loadData();
-      setInvoiceTab('Approved'); // Automatically switch to Approved tab
-      alert(`Invoice ${selectedInvoice.invoiceId} approved successfully.`);
+      setInvoiceTab('Approved');
     } catch (err) {
       console.error('Failed to approve invoice:', err);
     }
@@ -207,7 +227,6 @@ export const AdminInvoicesPage: React.FC = () => {
       setShowRejectModal(false);
       setRejectReason('');
       await loadData();
-      alert(`Invoice ${selectedInvoice.invoiceId} rejected.`);
     } catch (err) {
       console.error('Failed to reject invoice:', err);
     }
@@ -223,7 +242,6 @@ export const AdminInvoicesPage: React.FC = () => {
       subtotal: st.totalFees,
       grandTotal: st.totalFees,
       invoiceNumber: `GST/${String(invoices.length + 1).padStart(3, '0')}`,
-      amountInWords: st.totalFees ? `₹${st.totalFees.toLocaleString()} only` : '',
     }));
     setStudentSearchQuery(st.name);
     setIsSearchingStudent(false);
@@ -231,18 +249,19 @@ export const AdminInvoicesPage: React.FC = () => {
 
   const handleFinalGenerateInvoice = async () => {
     try {
+      const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
       const payload: Partial<ServiceInvoiceItem> = {
         studentName: createFormData.studentName,
         course: createFormData.course,
         totalFees: createFormData.grandTotal,
         paidFees: createFormData.grandTotal,
         remainingFees: 0,
-        dueDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
+        dueDate: todayStr,
         invoiceCode: createFormData.invoiceNumber,
         mobile: createFormData.studentMobile,
         email: createFormData.studentEmail,
         approvalStatus: 'Approved',
-        approvedOn: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
+        approvedOn: todayStr,
         paymentStatus: 'Paid',
       };
 
@@ -264,17 +283,15 @@ export const AdminInvoicesPage: React.FC = () => {
   };
 
   const filteredInvoices = invoices.filter((inv) => inv.status === invoiceTab);
+  const invoicesGeneratedCount = invoices.filter((i) => i.status === 'Approved' || i.rawPaidFees > 0).length;
+  const pendingRequestsCount = invoices.filter((i) => i.status === 'Requests').length;
+  const pendingPaymentsCount = fees.filter((f) => f.remarks !== 'Paid').length;
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-      
-      {/* ========================================================= */}
-      {/* 1. INVOICE & FEES DASHBOARD                               */}
-      {/* ========================================================= */}
+      {/* 1. INVOICE & FEES DASHBOARD */}
       {view === 'main' && (
         <div className="space-y-10">
-          
-          {/* TOP SECTION: INVOICE */}
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h1 className="text-2xl font-bold font-['Sora']">Invoice</h1>
@@ -291,19 +308,19 @@ export const AdminInvoicesPage: React.FC = () => {
               <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
                 <span className="text-xs font-semibold block">Pending Requests</span>
                 <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
-                  {invoices.filter((i) => i.status === 'Requests').length}+
+                  {pendingRequestsCount > 0 ? `${pendingRequestsCount}+` : '00'}
                 </span>
               </div>
               <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
                 <span className="text-xs font-semibold block">Invoices Generated</span>
                 <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
-                  {String(invoices.filter((i) => i.status === 'Approved').length).padStart(2, '0')}
+                  {String(invoicesGeneratedCount).padStart(2, '0')}
                 </span>
               </div>
               <div className="bg-white border border-[#050720]/10 rounded-xl p-5 text-center shadow-xs">
                 <span className="text-xs font-semibold block">Pending Payments</span>
                 <span className="text-2xl font-extrabold font-['Sora'] mt-1 block">
-                  {String(fees.filter((f) => f.remarks !== 'Paid').length).padStart(2, '0')}
+                  {String(pendingPaymentsCount).padStart(2, '0')}
                 </span>
               </div>
             </div>
@@ -338,7 +355,7 @@ export const AdminInvoicesPage: React.FC = () => {
                       <th className="pb-3.5">Sr. No.</th>
                       <th className="pb-3.5">Name</th>
                       <th className="pb-3.5">Course</th>
-                      <th className="pb-3.5">Paid fees</th>
+                      <th className="pb-3.5">{invoiceTab === 'Requests' ? 'Requested Amount' : 'Paid fees'}</th>
                       <th className="pb-3.5">Mobile</th>
                       <th className="pb-3.5">Approved on</th>
                       <th className="pb-3.5">Email</th>
@@ -352,7 +369,9 @@ export const AdminInvoicesPage: React.FC = () => {
                         <td className="py-3.5 text-[#050720]/70">{inv.srNo}</td>
                         <td className="py-3.5 font-medium">{inv.name}</td>
                         <td className="py-3.5 text-[#050720]/70">{inv.course}</td>
-                        <td className="py-3.5 font-semibold">{inv.paidFees}</td>
+                        <td className="py-3.5 font-semibold">
+                          {invoiceTab === 'Requests' ? inv.requestAmount : inv.paidFees}
+                        </td>
                         <td className="py-3.5 text-[#050720]/70">{inv.mobile}</td>
                         <td className="py-3.5 text-[#050720]/70">{inv.approvedOn}</td>
                         <td className="py-3.5 text-[#050720]/70">{inv.email}</td>
@@ -377,16 +396,20 @@ export const AdminInvoicesPage: React.FC = () => {
                             <button
                               onClick={() => {
                                 setSelectedInvoice(inv);
+                                const installmentToPreview = (inv.installments || []).find((i: any) => i.status === 'Paid') || (inv.installments || [])[0];
+                                const previewAmt = installmentToPreview 
+                                  ? (typeof installmentToPreview.amount === 'string' ? parseInt(installmentToPreview.amount.replace(/[^0-9]/g, ''), 10) || 0 : Number(installmentToPreview.amount) || 0)
+                                  : inv.rawPaidFees;
+
                                 setCreateFormData((prev) => ({
                                   ...prev,
                                   studentName: inv.name,
                                   course: inv.course,
-                                  subtotal: inv.rawTotalFees || 35000,
-                                  grandTotal: inv.rawPaidFees || 35000,
+                                  subtotal: previewAmt,
+                                  grandTotal: previewAmt,
                                   invoiceNumber: inv.invoiceId,
                                   studentMobile: inv.mobile,
                                   studentEmail: inv.email,
-                                  amountInWords: inv.rawPaidFees ? `₹${inv.rawPaidFees.toLocaleString()} only` : '',
                                 }));
                                 setView('preview');
                               }}
@@ -463,9 +486,7 @@ export const AdminInvoicesPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. FEES DETAILS VIEW (MATCHES IMAGE 4)                    */}
-      {/* ========================================================= */}
+      {/* 2. FEES DETAILS VIEW */}
       {view === 'fee-details' && selectedFee && (
         <div className="space-y-6">
           <button
@@ -478,8 +499,6 @@ export const AdminInvoicesPage: React.FC = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
-              
-              {/* Fees Breakdown Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Fees Breakdown</h3>
                 <div className="flex justify-between items-center text-xs">
@@ -494,7 +513,7 @@ export const AdminInvoicesPage: React.FC = () => {
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Pending</span>
                     <span className="font-extrabold text-base font-['Sora']">
-                      ₹{Math.max(0, (parseInt(selectedFee.totalFees.replace(/[^0-9]/g, ''), 10) || 0) - (parseInt(selectedFee.paid.replace(/[^0-9]/g, ''), 10) || 0)).toLocaleString()}
+                      ₹{Math.max(0, selectedFee.rawTotal - selectedFee.rawPaid).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -503,21 +522,20 @@ export const AdminInvoicesPage: React.FC = () => {
                   <div className="flex justify-between text-[10px] text-[#050720]/60 mb-1">
                     <span>Payment progress</span>
                     <span className="font-semibold text-emerald-600">
-                      {Math.round(((parseInt(selectedFee.paid.replace(/[^0-9]/g, ''), 10) || 0) / (parseInt(selectedFee.totalFees.replace(/[^0-9]/g, ''), 10) || 1)) * 100)}%
+                      {selectedFee.rawTotal > 0 ? Math.round((selectedFee.rawPaid / selectedFee.rawTotal) * 100) : 0}%
                     </span>
                   </div>
                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-emerald-500 rounded-full"
                       style={{ 
-                        width: `${Math.round(((parseInt(selectedFee.paid.replace(/[^0-9]/g, ''), 10) || 0) / (parseInt(selectedFee.totalFees.replace(/[^0-9]/g, ''), 10) || 1)) * 100)}%` 
+                        width: `${selectedFee.rawTotal > 0 ? Math.min(100, Math.round((selectedFee.rawPaid / selectedFee.rawTotal) * 100)) : 0}%` 
                       }} 
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Student Overview Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Student Overview</h3>
                 <div className="grid grid-cols-2 gap-y-4 text-xs">
@@ -547,67 +565,44 @@ export const AdminInvoicesPage: React.FC = () => {
                       {selectedFee.remarks}
                     </span>
                   </div>
-                  <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Invoice</span>
-                    <span className="font-semibold text-sm">{selectedFee.invoiceId || 'GST/001'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Amount</span>
-                    <span className="font-semibold text-sm">{selectedFee.paid}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Payment Date</span>
-                    <span className="font-semibold text-sm">{selectedFee.paymentDate}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-[#050720]/50 block">Approved Date</span>
-                    <span className="font-semibold text-sm">{selectedFee.approvedDate}</span>
-                  </div>
                 </div>
               </div>
 
-              {/* Timeline Card */}
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora']">Timeline</h3>
-                <div className="border border-[#050720]/10 rounded-xl p-5 space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="text-sm font-bold font-['Sora']">Installment #1</h4>
-                      <span className="text-[10px] text-[#050720]/50 block mt-0.5">Due: {selectedFee.paymentDate}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-base font-bold font-['Sora'] block">{selectedFee.paid}</span>
-                      <span className="text-[10px] font-semibold text-emerald-600">Paid</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-[#050720]/80">Paid on: {selectedFee.approvedDate}</p>
-                  <p className="text-xs text-[#050720]/80">Amount left: Nil</p>
-                  <div className="pt-2 flex justify-end">
-                    <button 
-                      onClick={() => {
-                        setCreateFormData((prev) => ({
-                          ...prev,
-                          studentName: selectedFee.name,
-                          course: selectedFee.course,
-                          subtotal: parseInt(selectedFee.totalFees.replace(/[^0-9]/g, ''), 10) || 35000,
-                          grandTotal: parseInt(selectedFee.paid.replace(/[^0-9]/g, ''), 10) || 35000,
-                          invoiceNumber: selectedFee.invoiceId || 'GST/001',
-                          studentMobile: selectedFee.mobile,
-                          studentEmail: selectedFee.email,
-                        }));
-                        setView('preview');
-                      }}
-                      className="px-4 py-2 border border-[#050720]/30 rounded-lg text-xs font-bold hover:bg-[#050720]/5 cursor-pointer"
-                    >
-                      View Invoice
-                    </button>
-                  </div>
-                </div>
-              </div>
+                {(!selectedFee.timeline || selectedFee.timeline.length === 0) ? (
+                  <p className="text-xs text-[#050720]/40 italic py-2">No installments recorded yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {selectedFee.timeline.map((inst: any, idx: number) => {
+                      const isInstPaid = inst.status === 'Paid';
+                      const formattedAmt = typeof inst.amount === 'string' ? inst.amount : `₹${(Number(inst.amount) || 0).toLocaleString()}`;
+                      const formattedLeft = typeof inst.amountLeft === 'string' ? inst.amountLeft : `₹${(Number(inst.amountLeft) || 0).toLocaleString()}`;
 
+                      return (
+                        <div key={inst.id || idx} className="border border-[#050720]/10 rounded-xl p-5 space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="text-sm font-bold font-['Sora']">{inst.installmentTitle || inst.title || `Installment #${idx + 1}`}</h4>
+                              <span className="text-[10px] text-[#050720]/50 block mt-0.5">Due: {inst.dueDate || '—'}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-base font-bold font-['Sora'] block">{formattedAmt}</span>
+                              <span className={`text-[10px] font-semibold ${isInstPaid ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                {isInstPaid ? 'Paid' : 'Pending Approval'}
+                              </span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-[#050720]/80">Paid on: {inst.paidDate || '—'}</p>
+                          <p className="text-xs text-[#050720]/80">Amount left: {formattedLeft}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Right Column: Calendar & Remarks (Image 4) */}
             <div className="space-y-6">
               <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold font-['Sora'] text-[#050720]">Add Remark</h3>
@@ -635,10 +630,6 @@ export const AdminInvoicesPage: React.FC = () => {
                       </button>
                     ))}
                   </div>
-                  <div className="flex justify-between items-center pt-4 border-t border-[#050720]/10 mt-3 text-[10px]">
-                    <button onClick={() => setSelectedCalendarDay(null)} className="text-[#050720]/60 hover:underline cursor-pointer">Clear</button>
-                    <button className="font-bold text-[#050720] cursor-pointer">Done</button>
-                  </div>
                 </div>
 
                 <div>
@@ -662,9 +653,7 @@ export const AdminInvoicesPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 3. CREATE INVOICE FORM                                    */}
-      {/* ========================================================= */}
+      {/* 3. CREATE INVOICE VIEW */}
       {view === 'create' && (
         <div className="space-y-6 max-w-4xl">
           <button
@@ -694,7 +683,7 @@ export const AdminInvoicesPage: React.FC = () => {
             </div>
 
             {isSearchingStudent && enrolledStudents.length > 0 && (
-              <div className="absolute left-6 right-6 top-20 bg-white border border-[#050720]/15 rounded-xl shadow-xl max-h-48 overflow-y-auto z-30">
+              <div className="bg-white border border-[#050720]/15 rounded-xl shadow-xl max-h-48 overflow-y-auto z-30">
                 {enrolledStudents
                   .filter((st) => 
                     st.name.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
@@ -734,11 +723,9 @@ export const AdminInvoicesPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 4. INVOICE PREVIEW VIEW (MATCHES IMAGE 3)                 */}
-      {/* ========================================================= */}
+      {/* 4. INVOICE PREVIEW VIEW (MATCHES REFERENCE WITH 9% CGST & 9% SGST) */}
       {view === 'preview' && (
-        <div className="space-y-6 max-w-4xl">
+        <div className="space-y-6 max-w-4xl font-['Onest']">
           <button
             onClick={() => setView('main')}
             className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 cursor-pointer"
@@ -747,104 +734,129 @@ export const AdminInvoicesPage: React.FC = () => {
             <span>Invoice Preview</span>
           </button>
 
-          {/* Matches Screenshot 3 */}
-          <div className="bg-white border-2 border-[#050720] text-xs font-['Onest'] shadow-lg">
-            <div className="p-4 text-center border-b border-[#050720]">
-              <h2 className="text-base font-bold font-['Sora']">{createFormData.companyName}</h2>
-              <p className="text-[11px] text-[#050720]/80 mt-1">{createFormData.companyAddress}</p>
-            </div>
+          {(() => {
+            const taxes = calculateInvoiceTaxes(createFormData.grandTotal || 0);
 
-            <div className="grid grid-cols-2 border-b border-[#050720] p-2 text-[11px]">
-              <div>Mobile: +91-{createFormData.companyMobile}</div>
-              <div>Email: {createFormData.companyEmail}</div>
-            </div>
+            return (
+              <div className="bg-white border-2 border-black text-xs text-black shadow-lg">
+                <div className="p-3.5 text-center border-b-2 border-black">
+                  <h2 className="text-base font-bold font-['Sora']">Radiquolab Private Limited</h2>
+                  <p className="text-[11px] mt-1">
+                    Horizon Chambers, Shop No. 6, GAT NO 281/2, Plot No 26, Kasar Amboli Ghotavade, Pirangut, Mulshi, Pune 412115
+                  </p>
+                </div>
 
-            <div className="grid grid-cols-3 border-b border-[#050720] p-2 text-[10px]">
-              <div>GSTIN: {createFormData.companyGst}</div>
-              <div>Company PAN: {createFormData.companyPan}</div>
-              <div>IEC Code: {createFormData.companyIec}</div>
-            </div>
+                <div className="grid grid-cols-2 border-b-2 border-black text-center text-[11px]">
+                  <div className="p-2 border-r-2 border-black">Mobile: +91-9145272921</div>
+                  <div className="p-2">Email: info@radiquolab.com</div>
+                </div>
 
-            <div className="flex justify-between items-center border-b border-[#050720] p-2 font-bold bg-[#F8FAFC]">
-              <span>Tax Invoice</span>
-              <span>Date: 05-01-2026</span>
-            </div>
+                <div className="grid grid-cols-3 border-b-2 border-black text-center text-[10.5px]">
+                  <div className="p-2 border-r-2 border-black">GSTIN: 27AANCR8297C1ZT</div>
+                  <div className="p-2 border-r-2 border-black">Company PAN: AANCR8297C</div>
+                  <div className="p-2">IEC Code: AANCR8297C</div>
+                </div>
 
-            <div className="grid grid-cols-3 border-b border-[#050720] p-3 text-[11px]">
-              <div>
-                <span className="text-[10px] text-[#050720]/60 block">Bill To:</span>
-                <span className="font-bold text-sm">{createFormData.studentName || 'Rahul Sharma'}</span>
-              </div>
-              <div>
-                <span className="text-[10px] text-[#050720]/60 block">Invoice No.:</span>
-                <span className="font-bold text-sm">{createFormData.invoiceNumber || 'GST/001'}</span>
-              </div>
-              <div>
-                <span className="text-[10px] text-[#050720]/60 block">Country of supply:</span>
-                <span>India</span>
-              </div>
-            </div>
+                <div className="flex justify-between items-center border-b-2 border-black p-2 font-bold text-xs bg-slate-50/50">
+                  <span>Tax Invoice</span>
+                  <span>Date: {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                </div>
 
-            <table className="w-full text-left border-b border-[#050720]">
-              <thead className="border-b border-[#050720] font-bold bg-[#F8FAFC]">
-                <tr>
-                  <th className="p-2 border-r border-[#050720]">Sr. No.</th>
-                  <th className="p-2 border-r border-[#050720]">Description</th>
-                  <th className="p-2 border-r border-[#050720]">Hsn/Sac</th>
-                  <th className="p-2 border-r border-[#050720]">Qty/Hrs</th>
-                  <th className="p-2 border-r border-[#050720]">Rate</th>
-                  <th className="p-2 border-r border-[#050720]">Currency</th>
-                  <th className="p-2 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="p-2 border-r border-[#050720]">01</td>
-                  <td className="p-2 border-r border-[#050720]">{createFormData.course || 'UI/UX Design'}</td>
-                  <td className="p-2 border-r border-[#050720]">{createFormData.hsnSac || '998456'}</td>
-                  <td className="p-2 border-r border-[#050720]">{createFormData.qtyHrs || '01'}</td>
-                  <td className="p-2 border-r border-[#050720]">-</td>
-                  <td className="p-2 border-r border-[#050720]">{createFormData.currency || 'Rupee(₹)'}</td>
-                  <td className="p-2 text-right font-bold">{createFormData.grandTotal ? createFormData.grandTotal.toLocaleString() : '35,000'}</td>
-                </tr>
-              </tbody>
-            </table>
+                <div className="grid grid-cols-2 border-b-2 border-black min-h-[75px]">
+                  <div className="p-2.5 border-r-2 border-black leading-relaxed">
+                    <span className="font-bold block">Bill To</span>
+                    <span>{createFormData.studentName || '—'}</span>
+                    <span className="block text-[#050720]/70">Pune</span>
+                  </div>
+                  <div className="p-2.5">
+                    <span className="font-bold">Invoice No:</span> {createFormData.invoiceNumber || 'GST/001'}
+                  </div>
+                </div>
 
-            <div className="text-right p-3 space-y-1 text-xs border-b border-[#050720]">
-              <div>Subtotal: {createFormData.grandTotal ? createFormData.grandTotal.toLocaleString() : '35,000'}</div>
-              <div>CGST @ 0%: 0</div>
-              <div>SGST @ 0%: 0</div>
-              <div>IGST @ 0%: 0</div>
-              <div className="font-bold text-sm pt-1">Grand total: ₹{createFormData.grandTotal ? createFormData.grandTotal.toLocaleString() : '35,000'}</div>
-              <div className="text-[10px] text-[#050720]/70">In words: Thirty- five thousand only</div>
-            </div>
+                <table className="w-full text-left border-b-2 border-black">
+                  <thead className="border-b-2 border-black font-bold">
+                    <tr>
+                      <th className="p-2 border-r-2 border-black text-center w-12">Sr. No</th>
+                      <th className="p-2 border-r-2 border-black">Description</th>
+                      <th className="p-2 border-r-2 border-black text-center w-20">Hsn/Sac</th>
+                      <th className="p-2 border-r-2 border-black text-center w-16">Qty/Hrs</th>
+                      <th className="p-2 border-r-2 border-black text-right w-24">Rate</th>
+                      <th className="p-2 border-r-2 border-black text-center w-16">Currency</th>
+                      <th className="p-2 text-right w-24">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b-2 border-black">
+                      <td className="p-2 border-r-2 border-black text-center">1</td>
+                      <td className="p-2 border-r-2 border-black">{createFormData.course || 'Training Program'}</td>
+                      <td className="p-2 border-r-2 border-black text-center">9992</td>
+                      <td className="p-2 border-r-2 border-black text-center">1</td>
+                      <td className="p-2 border-r-2 border-black text-right">{taxes.subtotal.toFixed(2)}</td>
+                      <td className="p-2 border-r-2 border-black text-center">INR</td>
+                      <td className="p-2 text-right">{taxes.subtotal.toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
 
-            <div className="p-3 border-b border-[#050720] text-[11px] space-y-1">
-              <span className="font-bold block">Terms & Conditions</span>
-              <p>Payment terms: 30 Days</p>
-              <p>Due date: 04-Feb-2026</p>
-              <p>Billing Period: 04-Oct-2026 to 04-Feb-2026</p>
-            </div>
+                {/* Sub Total & GST Summary */}
+                <div className="border-b-2 border-black">
+                  <div className="flex border-b border-black/30">
+                    <div className="flex-1" />
+                    <div className="w-40 p-1.5 font-bold border-l-2 border-black">Sub Total</div>
+                    <div className="w-24 p-1.5 text-right border-l-2 border-black font-semibold">{taxes.subtotal.toFixed(2)}</div>
+                  </div>
+                  <div className="flex border-b border-black/30">
+                    <div className="flex-1" />
+                    <div className="w-40 p-1.5 border-l-2 border-black">CGST @ 9%</div>
+                    <div className="w-24 p-1.5 text-right border-l-2 border-black">{taxes.cgst.toFixed(2)}</div>
+                  </div>
+                  <div className="flex border-b border-black/30">
+                    <div className="flex-1" />
+                    <div className="w-40 p-1.5 border-l-2 border-black">SGST @ 9%</div>
+                    <div className="w-24 p-1.5 text-right border-l-2 border-black">{taxes.sgst.toFixed(2)}</div>
+                  </div>
+                  <div className="flex border-b border-black/30">
+                    <div className="flex-1" />
+                    <div className="w-40 p-1.5 border-l-2 border-black">IGST @ 0%</div>
+                    <div className="w-24 p-1.5 text-right border-l-2 border-black">00.00</div>
+                  </div>
+                  <div className="flex bg-slate-50/50">
+                    <div className="flex-1" />
+                    <div className="w-40 p-1.5 font-bold border-l-2 border-black text-sm">Grand Total</div>
+                    <div className="w-24 p-1.5 text-right border-l-2 border-black font-bold text-sm">{taxes.grandTotal.toFixed(2)}</div>
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-2 p-3 text-[11px]">
-              <div>
-                <span className="font-bold block mb-1">Bank Details:</span>
-                <p>Bank Name: {createFormData.bankName}</p>
-                <p>Branch: {createFormData.bankBranch}</p>
-                <p>Account Name: {createFormData.accountName}</p>
-                <p>Account Number: {createFormData.accountNumber}</p>
-                <p>IFSC: {createFormData.ifsc}</p>
-                <p>Swift Code: {createFormData.swiftCode}</p>
-              </div>
-              <div className="flex flex-col justify-end items-end text-center">
-                <div className="border-t border-[#050720] w-44 pt-1 text-[10px] font-semibold">
-                  Authorised Signature
+                <div className="p-2.5 text-right border-b-2 border-black font-medium text-[11px]">
+                  <strong>In Words:</strong> {taxes.amountInWords}
+                </div>
+
+                <div className="p-2.5 border-b-2 border-black text-[11px]">
+                  <span className="font-bold block mb-1">Terms And Conditions</span>
+                  <p>Payment Term: 15 Days</p>
+                  <p>Due Date: {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                </div>
+
+                <div className="grid grid-cols-2 p-2.5 min-h-[100px] text-[11px]">
+                  <div>
+                    <span className="font-bold block mb-1">Bank Details:</span>
+                    <p>Bank Name: State Bank of India</p>
+                    <p>Branch: Pirangut</p>
+                    <p>Account Name: Radiquolab Private Limited</p>
+                    <p>Account No: 20523204478</p>
+                    <p>IFS Code: SBIN0011430</p>
+                    <p>Swift Code: SBININBB238</p>
+                  </div>
+                  <div className="flex flex-col justify-end items-end text-center">
+                    <div className="border-t border-black w-48 pt-1 text-[11px] font-bold">
+                      Authorised Signature
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
 
-          {/* Action Row matching Image 3 */}
           <div className="flex gap-4">
             <button 
               onClick={() => setView('main')} 
@@ -862,9 +874,7 @@ export const AdminInvoicesPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 5. MODALS & POPUPS                                        */}
-      {/* ========================================================= */}
+      {/* 5. APPROVE MODAL */}
       {showApproveModal && selectedInvoice && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl space-y-5">
@@ -880,7 +890,7 @@ export const AdminInvoicesPage: React.FC = () => {
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Amount</span>
-                <span className="font-semibold">{selectedInvoice.paidFees}</span>
+                <span className="font-semibold text-emerald-600">{selectedInvoice.requestAmount}</span>
               </div>
             </div>
             <div className="flex gap-3 pt-2">
@@ -901,6 +911,7 @@ export const AdminInvoicesPage: React.FC = () => {
         </div>
       )}
 
+      {/* REJECT MODAL */}
       {showRejectModal && selectedInvoice && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl space-y-5">
@@ -930,12 +941,13 @@ export const AdminInvoicesPage: React.FC = () => {
         </div>
       )}
 
+      {/* CONFIRM GENERATE MODAL */}
       {showConfirmGenModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl text-center space-y-4">
             <h2 className="text-base font-bold font-['Sora']">Confirm invoice Generation?</h2>
             <p className="text-xs text-[#050720]/70">
-              This invoice will be permanently recorded and shared with the client. Once generated, it cannot be deleted, only marked as paid or cancelled.
+              This invoice will be permanently recorded and shared with the client.
             </p>
             <div className="flex gap-3 pt-2">
               <button 
@@ -955,6 +967,7 @@ export const AdminInvoicesPage: React.FC = () => {
         </div>
       )}
 
+      {/* SUCCESS TOAST */}
       {showSuccessToast && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl text-center space-y-2">

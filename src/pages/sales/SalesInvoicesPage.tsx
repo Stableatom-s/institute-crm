@@ -124,31 +124,24 @@ export const SalesInvoicesPage: React.FC = () => {
           return myLeadNames.has(inv.studentName.trim().toLowerCase());
         })
         .map((inv, index) => {
-          const isApproved = inv.approvalStatus === 'Approved';
-          const effectivePaid = isApproved ? (inv.paidFees || 0) : 0;
-
-          let timelineItems: TimelineItem[] = (inv.timeline || []).map((t: any, tIdx: number) => ({
+          // Normalize timeline items and derive real paid amount
+          const timelineItems: TimelineItem[] = (inv.timeline || []).map((t: any, tIdx: number) => ({
             id: t.id || `t-${tIdx}`,
             installmentTitle: t.installmentTitle || `Installment #${tIdx + 1}`,
-            dueDate: t.dueDate || inv.dueDate || '01-12-2025',
-            paidDate: t.paidDate || inv.approvedOn || '01-12-2025',
-            amount: t.amount || `₹${(effectivePaid || inv.totalFees || 35000).toLocaleString()}`,
-            amountLeft: t.amountLeft || (inv.remainingFees === 0 ? 'Nil' : `₹${(inv.remainingFees || 0).toLocaleString()}`),
-            status: isApproved ? 'Paid' : 'Pending',
+            dueDate: t.dueDate || inv.dueDate || '—',
+            paidDate: t.paidDate || inv.approvedOn || '—',
+            amount: t.amount || '₹0',
+            amountLeft: t.amountLeft || '—',
+            status: t.status === 'Paid' ? 'Paid' : 'Pending',
           }));
 
-          if (timelineItems.length === 0 && effectivePaid > 0) {
-            timelineItems = [
-              {
-                id: `inst-1-${inv.id}`,
-                installmentTitle: 'Installment #1',
-                dueDate: inv.dueDate || '01-12-2025',
-                paidDate: inv.approvedOn || inv.dueDate || '01-12-2025',
-                amount: `₹${effectivePaid.toLocaleString()}`,
-                amountLeft: inv.remainingFees === 0 ? 'Nil' : `₹${(inv.remainingFees || 0).toLocaleString()}`,
-                status: 'Paid',
-              },
-            ];
+          let effectivePaid = 0;
+          if (timelineItems.length > 0) {
+            effectivePaid = timelineItems
+              .filter((i) => i.status === 'Paid')
+              .reduce((sum, i) => sum + (parseInt(i.amount.replace(/[^0-9]/g, ''), 10) || 0), 0);
+          } else {
+            effectivePaid = inv.approvalStatus === 'Approved' ? (inv.paidFees || 0) : 0;
           }
 
           return {
@@ -163,7 +156,7 @@ export const SalesInvoicesPage: React.FC = () => {
             followUp: inv.lastFollowUp || '—',
             dueDate: inv.dueDate || '—',
             invoiceId: inv.invoiceCode || `GST/${String(index + 1).padStart(3, '0')}`,
-            paymentStatus: inv.paymentStatus || 'Partially Paid',
+            paymentStatus: effectivePaid >= (inv.totalFees || 0) && (inv.totalFees || 0) > 0 ? 'Paid' : 'Partially Paid',
             approvalStatus: inv.approvalStatus || 'Requests',
             timeline: timelineItems,
           };
@@ -189,11 +182,6 @@ export const SalesInvoicesPage: React.FC = () => {
   }, [currentSalesName, userRole]);
 
   const handleDownloadPDF = (inv: InvoiceItem, installmentTitle?: string, amount?: string) => {
-    if (inv.approvalStatus !== 'Approved') {
-      alert(`Invoice ${inv.invoiceId} is currently "${inv.approvalStatus}". Only Admin-approved invoices can be downloaded.`);
-      return;
-    }
-
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(`
@@ -227,7 +215,7 @@ export const SalesInvoicesPage: React.FC = () => {
                 Course: ${inv.course}
               </div>
               <div style="text-align: right;">
-                <strong>Invoice Date:</strong> ${inv.dueDate || '01-12-2025'}<br/>
+                <strong>Invoice Date:</strong> ${inv.dueDate || '—'}<br/>
                 <strong>Payment Status:</strong> Paid (Approved)
               </div>
             </div>
@@ -307,48 +295,52 @@ export const SalesInvoicesPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                  {invoices.map((inv, index) => (
-                    <tr key={`${inv.id}-${inv.invoiceId}`} className="hover:bg-[#FFB908]/5 transition-colors">
-                      <td className="py-3.5 text-[#050720]/70">
-                        {String(index + 1).padStart(2, '0')}
-                      </td>
-                      <td className="py-3.5 font-medium">{inv.name}</td>
-                      <td className="py-3.5 text-[#050720]/70">{inv.course}</td>
-                      <td className="py-3.5 text-[#050720]/70 font-semibold">₹{inv.paidFees.toLocaleString()}</td>
-                      <td className="py-3.5 text-[#050720]/70">{inv.followUp}</td>
-                      <td className="py-3.5 text-[#050720]/70">{inv.dueDate}</td>
-                      <td className="py-3.5 font-medium text-[#050720]">{inv.invoiceId}</td>
-                      <td className="py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {inv.approvalStatus === 'Approved' ? (
+                  {invoices.map((inv, index) => {
+                    const hasApprovedPayments = inv.paidFees > 0;
+
+                    return (
+                      <tr key={`${inv.id}-${inv.invoiceId}`} className="hover:bg-[#FFB908]/5 transition-colors">
+                        <td className="py-3.5 text-[#050720]/70">
+                          {String(index + 1).padStart(2, '0')}
+                        </td>
+                        <td className="py-3.5 font-medium">{inv.name}</td>
+                        <td className="py-3.5 text-[#050720]/70">{inv.course}</td>
+                        <td className="py-3.5 text-[#050720]/70 font-semibold">₹{inv.paidFees.toLocaleString()}</td>
+                        <td className="py-3.5 text-[#050720]/70">{inv.followUp}</td>
+                        <td className="py-3.5 text-[#050720]/70">{inv.dueDate}</td>
+                        <td className="py-3.5 font-medium text-[#050720]">{inv.invoiceId}</td>
+                        <td className="py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {hasApprovedPayments ? (
+                              <button
+                                onClick={() => handleDownloadPDF(inv)}
+                                title="Download Approved Invoice"
+                                className="p-1 text-[#050720] hover:text-black transition-colors cursor-pointer"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+                            ) : inv.approvalStatus === 'Cancelled' ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                <Ban className="w-3 h-3" />
+                                <span>Rejected</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                <Clock className="w-3 h-3" />
+                                <span>Pending Approval</span>
+                              </span>
+                            )}
                             <button
-                              onClick={() => handleDownloadPDF(inv)}
-                              title="Download Approved Invoice"
-                              className="p-1 text-[#050720] hover:text-black transition-colors cursor-pointer"
+                              onClick={() => handleOpenDetails(inv)}
+                              className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
                             >
-                              <Download className="w-4 h-4" />
+                              View
                             </button>
-                          ) : inv.approvalStatus === 'Cancelled' ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                              <Ban className="w-3 h-3" />
-                              <span>Rejected</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                              <Clock className="w-3 h-3" />
-                              <span>Pending Approval</span>
-                            </span>
-                          )}
-                          <button
-                            onClick={() => handleOpenDetails(inv)}
-                            className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
-                          >
-                            View
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -391,13 +383,13 @@ export const SalesInvoicesPage: React.FC = () => {
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Paid fees</span>
-                <span className="text-base font-bold font-['Sora'] mt-0.5 block">
+                <span className="text-base font-bold font-['Sora'] mt-0.5 block text-emerald-600">
                   ₹{selectedInvoice.paidFees.toLocaleString()}
                 </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Pending</span>
-                <span className="text-base font-bold font-['Sora'] mt-0.5 block">
+                <span className="text-base font-bold font-['Sora'] mt-0.5 block text-amber-600">
                   ₹{pendingAmount.toLocaleString()}
                 </span>
               </div>
@@ -449,37 +441,49 @@ export const SalesInvoicesPage: React.FC = () => {
               </p>
             ) : (
               <div className="space-y-4">
-                {selectedInvoice.timeline.map((inst) => (
-                  <div key={inst.id} className="border border-[#050720]/10 rounded-xl p-5 space-y-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="text-sm font-bold font-['Sora'] text-[#050720]">{inst.installmentTitle}</h4>
-                        <span className="text-[10px] text-[#050720]/50 block mt-0.5">Due: {inst.dueDate}</span>
-                        <span className="text-xs font-medium text-[#050720] block mt-1.5">
-                          Paid on: {inst.paidDate}
-                        </span>
-                        <span className="text-xs font-semibold text-[#050720] block mt-1">
-                          Amount left: <span className="text-[#10B981]">{inst.amountLeft}</span>
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-base font-bold font-['Sora'] block text-[#050720]">{inst.amount}</span>
-                        <span className="text-[10px] text-[#10B981] font-semibold block mt-0.5">
-                          {inst.status}
-                        </span>
-                      </div>
-                    </div>
+                {selectedInvoice.timeline.map((inst) => {
+                  const isInstPaid = inst.status === 'Paid';
 
-                    <div className="flex justify-end pt-1">
-                      <button
-                        onClick={() => handleDownloadPDF(selectedInvoice, inst.installmentTitle, inst.amount)}
-                        className="px-6 py-2.5 bg-[#050720] hover:bg-[#050720]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
-                      >
-                        Download Invoice
-                      </button>
+                  return (
+                    <div key={inst.id} className="border border-[#050720]/10 rounded-xl p-5 space-y-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-sm font-bold font-['Sora'] text-[#050720]">{inst.installmentTitle}</h4>
+                          <span className="text-[10px] text-[#050720]/50 block mt-0.5">Due: {inst.dueDate}</span>
+                          <span className="text-xs font-medium text-[#050720] block mt-1.5">
+                            Paid on: {inst.paidDate}
+                          </span>
+                          <span className="text-xs font-semibold text-[#050720] block mt-1">
+                            Amount left: <span className="text-[#10B981]">{inst.amountLeft}</span>
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-base font-bold font-['Sora'] block text-[#050720]">{inst.amount}</span>
+                          <span className={`text-[10px] font-semibold block mt-0.5 ${
+                            isInstPaid ? 'text-[#10B981]' : 'text-amber-600'
+                          }`}>
+                            {isInstPaid ? 'Paid' : 'Pending Approval'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end pt-1">
+                        {isInstPaid ? (
+                          <button
+                            onClick={() => handleDownloadPDF(selectedInvoice, inst.installmentTitle, inst.amount)}
+                            className="px-6 py-2.5 bg-[#050720] hover:bg-[#050720]/90 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                          >
+                            Download Invoice
+                          </button>
+                        ) : (
+                          <span className="px-4 py-2 border border-amber-300 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold cursor-not-allowed">
+                            Pending Admin Approval
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

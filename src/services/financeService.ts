@@ -44,12 +44,12 @@ export const financeService = {
 
       const mappedTimeline: InstallmentItem[] = (item.installments || []).map((t: any, idx: number) => ({
         id: t.id || `inst-${idx}`,
-        installmentTitle: t.installmentTitle || `Installment #${idx + 1}`,
+        installmentTitle: t.installmentTitle || t.title || `Installment #${idx + 1}`,
         dueDate: t.dueDate || item.dueDate || '—',
         paidDate: t.paidDate || '—',
-        amount: `₹${(Number(t.amount) || 0).toLocaleString()}`,
-        amountLeft: `₹${(Number(t.amountLeft) || 0).toLocaleString()}`,
-        status: t.status || 'Paid',
+        amount: typeof t.amount === 'string' && t.amount.startsWith('₹') ? t.amount : `₹${(Number(t.amount) || 0).toLocaleString()}`,
+        amountLeft: typeof t.amountLeft === 'string' && t.amountLeft.startsWith('₹') ? t.amountLeft : `₹${(Number(t.amountLeft) || 0).toLocaleString()}`,
+        status: t.status || 'Pending',
       }));
 
       return {

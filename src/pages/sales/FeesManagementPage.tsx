@@ -11,6 +11,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { financeService } from '../../services/financeService';
 import { leadService } from '../../services/leadService';
+import { generateInvoiceHTML } from '../../utils/invoiceCalculator';
 
 export interface InstallmentRecord {
   id: string;
@@ -42,7 +43,6 @@ export interface FeeStudent {
 export const FeesManagementPage: React.FC = () => {
   const auth = useAuth() as any;
 
-  // Safe resolver for salesperson profile that survives browser reloads
   const getActiveUser = () => {
     if (auth?.user?.name) return auth.user;
     try {
@@ -131,9 +131,33 @@ export const FeesManagementPage: React.FC = () => {
           return myLeadNames.has(inv.studentName.trim().toLowerCase());
         })
         .map((inv, index) => {
-          const isApproved = inv.approvalStatus === 'Approved';
-          const rawPaid = inv.paidFees || 0;
-          const boundedPaid = isApproved ? Math.min(inv.totalFees || 0, rawPaid) : 0;
+          const timelineItems: InstallmentRecord[] = (inv.timeline || []).map((t: any) => {
+            const isInstPaid = t.status === 'Paid';
+            return {
+              id: t.id,
+              title: t.installmentTitle || t.title,
+              dueDate: t.dueDate,
+              paidDate: t.paidDate,
+              amount: t.amount,
+              amountLeft: t.amountLeft,
+              status: isInstPaid ? 'Paid' : 'Pending',
+              invoiceRequested: t.status === 'Pending' || inv.approvalStatus === 'Requests',
+            };
+          });
+
+          let totalApprovedPaid = 0;
+          if (timelineItems.length > 0) {
+            totalApprovedPaid = timelineItems
+              .filter((inst) => inst.status === 'Paid')
+              .reduce((sum, inst) => {
+                const amt = parseInt(inst.amount.replace(/[^0-9]/g, ''), 10) || 0;
+                return sum + amt;
+              }, 0);
+          } else {
+            totalApprovedPaid = inv.approvalStatus === 'Approved' ? (inv.paidFees || 0) : 0;
+          }
+
+          const boundedPaid = Math.min(inv.totalFees || 0, totalApprovedPaid);
 
           return {
             id: inv.id,
@@ -145,19 +169,10 @@ export const FeesManagementPage: React.FC = () => {
             totalFees: inv.totalFees || 0,
             paidFees: boundedPaid,
             lastFollowUp: inv.lastFollowUp || '—',
-            remarks: boundedPaid >= inv.totalFees && inv.totalFees > 0 ? 'Paid' : (inv.paymentStatus || 'Partially Paid'),
+            remarks: boundedPaid >= (inv.totalFees || 0) && (inv.totalFees || 0) > 0 ? 'Paid' : 'Partially Paid',
             approvalStatus: inv.approvalStatus || 'None',
             invoiceId: inv.invoiceCode,
-            timeline: (inv.timeline || []).map((t: any) => ({
-              id: t.id,
-              title: t.installmentTitle || t.title,
-              dueDate: t.dueDate,
-              paidDate: t.paidDate,
-              amount: t.amount,
-              amountLeft: t.amountLeft,
-              status: isApproved ? 'Paid' : 'Pending',
-              invoiceRequested: inv.approvalStatus === 'Requests',
-            })),
+            timeline: timelineItems,
           };
         });
 
@@ -180,7 +195,7 @@ export const FeesManagementPage: React.FC = () => {
   }, [loadFeeData]);
 
   const totalCollected = students.reduce((acc, curr) => acc + curr.paidFees, 0);
-  const totalOutstanding = students.reduce((acc, curr) => acc + (curr.totalFees - curr.paidFees), 0);
+  const totalOutstanding = students.reduce((acc, curr) => acc + Math.max(0, curr.totalFees - curr.paidFees), 0);
   const overdueCount = students.filter((s) => s.remarks === 'Partially Paid' || s.remarks === 'Overdue').length;
 
   const handleOpenDetails = (student: FeeStudent) => {
@@ -192,56 +207,24 @@ export const FeesManagementPage: React.FC = () => {
   };
 
   const handleDownloadInvoice = (student: FeeStudent, inst: InstallmentRecord) => {
+    if (inst.status !== 'Paid') {
+      alert(`Installment ${inst.title} is not approved yet. Only approved installments can be downloaded.`);
+      return;
+    }
+
+    const installmentNumber = parseInt(inst.amount.replace(/[^0-9]/g, ''), 10) || 0;
+
     const printWindow = window.open('', '_blank');
     if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Invoice - ${student.invoiceId || 'GST/001'}</title>
-            <style>
-              body { font-family: sans-serif; padding: 24px; color: #050720; }
-              .header { text-align: center; border-bottom: 2px solid #050720; padding-bottom: 12px; }
-              .details { margin-top: 20px; line-height: 1.6; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { border: 1px solid #050720; padding: 8px 12px; text-align: left; }
-              .total { text-align: right; font-weight: bold; margin-top: 15px; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h2>Radiquolab Private Limited</h2>
-              <p>Horizon Chambers, Shop No. 6, GAT NO 281/2, Kasar Amboli Ghotawade, Pirangut, Pune 412115</p>
-              <p>Tax Invoice - <strong>${student.invoiceId || 'GST/001'}</strong></p>
-            </div>
-            <div class="details">
-              <p><strong>Student Name:</strong> ${student.name}</p>
-              <p><strong>Course:</strong> ${student.course}</p>
-              <p><strong>Date:</strong> ${inst.paidDate || inst.dueDate}</p>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th>Installment</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>${student.course} Tuition Fee</td>
-                  <td>${inst.title}</td>
-                  <td>${inst.amount}</td>
-                </tr>
-              </tbody>
-            </table>
-            <div class="total">
-              <p>Total Paid: ${inst.amount}</p>
-              <p>Status: Approved (Paid)</p>
-            </div>
-            <script>window.print();</script>
-          </body>
-        </html>
-      `);
+      printWindow.document.write(
+        generateInvoiceHTML({
+          invoiceNumber: student.invoiceId || 'GST/001',
+          date: inst.paidDate || inst.dueDate || new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+          studentName: student.name,
+          course: student.course,
+          amount: installmentNumber,
+        })
+      );
       printWindow.document.close();
     }
   };
@@ -269,12 +252,12 @@ export const FeesManagementPage: React.FC = () => {
           paidDate: inst.paidDate,
           amount: inst.amount,
           amountLeft: inst.amountLeft,
-          status: 'Pending',
+          status: inst.status === 'Paid' ? 'Paid' : 'Pending',
         })),
       });
 
       const updatedTimeline = selectedStudent.timeline.map((inst) =>
-        inst.id === instId ? { ...inst, invoiceRequested: true } : inst
+        inst.id === instId ? { ...inst, invoiceRequested: true, status: 'Pending' as const } : inst
       );
       const updatedStudent: FeeStudent = { 
         ...selectedStudent, 
@@ -300,7 +283,7 @@ export const FeesManagementPage: React.FC = () => {
     }
 
     const instNumber = selectedStudent.timeline.length + 1;
-    const dateFormatted = paymentDate || new Date().toISOString().split('T')[0];
+    const dateFormatted = paymentDate || new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
     const newRemaining = Math.max(0, selectedStudent.totalFees - selectedStudent.paidFees - amtNum);
 
     const newRecord: InstallmentRecord = {
@@ -331,11 +314,6 @@ export const FeesManagementPage: React.FC = () => {
     setInstallmentAmount('');
     setScreenshotFile('');
     alert('Installment submitted! Click "Request Invoice" to send to Admin for approval.');
-  };
-
-  const handleSaveRemark = () => {
-    alert(`Remark saved! Title: ${remarkTitle}, Follow-up Day: ${selectedDay ?? 'None'}`);
-    setRemarkDescription('');
   };
 
   const percentPaid = selectedStudent && selectedStudent.totalFees > 0
@@ -477,13 +455,13 @@ export const FeesManagementPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Paid fees</span>
-                    <span className="text-base font-bold font-['Sora'] mt-0.5 block">
+                    <span className="text-base font-bold font-['Sora'] mt-0.5 block text-emerald-600">
                       ₹{selectedStudent.paidFees.toLocaleString()}
                     </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-[#050720]/50 block">Pending</span>
-                    <span className="text-base font-bold font-['Sora'] mt-0.5 block">
+                    <span className="text-base font-bold font-['Sora'] mt-0.5 block text-amber-600">
                       ₹{pendingAmount.toLocaleString()}
                     </span>
                   </div>
@@ -538,9 +516,7 @@ export const FeesManagementPage: React.FC = () => {
                 ) : (
                   <div className="space-y-3">
                     {selectedStudent.timeline.map((inst) => {
-                      const isApproved = selectedStudent.approvalStatus === 'Approved';
-                      const isRequested = selectedStudent.approvalStatus === 'Requests' || inst.invoiceRequested;
-                      const isRejected = selectedStudent.approvalStatus === 'Cancelled';
+                      const isInstApproved = inst.status === 'Paid';
 
                       return (
                         <div key={inst.id} className="border border-[#050720]/10 rounded-xl p-5 space-y-3">
@@ -560,15 +536,15 @@ export const FeesManagementPage: React.FC = () => {
                                 {inst.amount}
                               </span>
                               <span className={`text-[11px] font-semibold block mt-0.5 ${
-                                isApproved ? 'text-[#10B981]' : isRejected ? 'text-[#EF4444]' : 'text-[#FFB908]'
+                                isInstApproved ? 'text-[#10B981]' : 'text-[#FFB908]'
                               }`}>
-                                {isApproved ? 'Paid' : isRejected ? 'Rejected' : 'Pending Approval'}
+                                {isInstApproved ? 'Paid' : 'Pending Approval'}
                               </span>
                             </div>
                           </div>
 
                           <div className="flex justify-end pt-2">
-                            {isApproved ? (
+                            {isInstApproved ? (
                               <button 
                                 onClick={() => handleDownloadInvoice(selectedStudent, inst)}
                                 className="px-5 py-2.5 bg-[#050720] hover:bg-[#050720]/90 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs flex items-center gap-2"
@@ -576,14 +552,7 @@ export const FeesManagementPage: React.FC = () => {
                                 <Download className="w-3.5 h-3.5" />
                                 <span>Download Invoice</span>
                               </button>
-                            ) : isRejected ? (
-                              <button 
-                                onClick={() => handleRequestInvoice(inst.id)}
-                                className="px-4 py-2 border border-rose-400 text-rose-600 rounded-lg text-xs font-bold hover:bg-rose-50 cursor-pointer"
-                              >
-                                Rejected — Request Again
-                              </button>
-                            ) : isRequested ? (
+                            ) : inst.invoiceRequested ? (
                               <button 
                                 disabled
                                 className="px-4 py-2 border border-amber-300 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold cursor-not-allowed opacity-80"
@@ -775,7 +744,7 @@ export const FeesManagementPage: React.FC = () => {
                 </div>
 
                 <button
-                  onClick={handleSaveRemark}
+                  onClick={() => alert(`Remark saved!`)}
                   className="w-full py-3 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
                 >
                   Save Remark
