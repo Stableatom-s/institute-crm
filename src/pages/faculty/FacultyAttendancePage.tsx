@@ -39,7 +39,7 @@ function calculateWorkingHours(inTimeStr: string, outTimeStr: string): string {
 
 export const FacultyAttendancePage: React.FC = () => {
   const auth = useAuth() as any;
-  const currentUserName = auth?.user?.name || 'Poorva Pande';
+  const currentUserName = auth?.user?.name || 'Staff Member';
   const currentUserRole = auth?.user?.role || 'Faculty';
 
   // Navigation views
@@ -60,8 +60,10 @@ export const FacultyAttendancePage: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Attendance state
-  const [inTime, setInTime] = useState('09:30 AM');
+  // Attendance state initialized dynamically from stored punch or current time
+  const [inTime, setInTime] = useState<string>(() => {
+    return localStorage.getItem('radiquolab_punch_in') || '';
+  });
   const [isClockedOut, setIsClockedOut] = useState(false);
   const [outTimeText, setOutTimeText] = useState('Yet to clock out');
   const [activities, setActivities] = useState<ActivityItem[]>([]);
@@ -97,27 +99,26 @@ export const FacultyAttendancePage: React.FC = () => {
     return isNaN(diffDays) ? '01' : String(diffDays).padStart(2, '0');
   };
 
-  // Fetch live logs on mount
-useEffect(() => {
-  const fetchData = async () => {
-    try {
-      setIsLoading(true);
-      const [attLogs, leaveLogs] = await Promise.all([
-        attendanceService.getMyAttendance(currentUserName),
-        attendanceService.getMyLeaves(currentUserName),
-      ]);
-      setAttendanceHistory(attLogs);
-      setLeaveHistory(leaveLogs);
-    } catch (err) {
-      console.error('Failed to load faculty attendance:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Fetch live logs and sync real punch-in
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [attLogs, leaveLogs] = await Promise.all([
+          attendanceService.getMyAttendance(currentUserName),
+          attendanceService.getMyLeaves(currentUserName),
+        ]);
+        setAttendanceHistory(attLogs);
+        setLeaveHistory(leaveLogs);
+      } catch (err) {
+        console.error('Failed to load faculty attendance:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
     fetchData();
 
-    // Check today's punch status
     const todayStr = new Date()
       .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
       .replace(/\//g, '-');
@@ -125,12 +126,20 @@ useEffect(() => {
     const savedInTime = localStorage.getItem('radiquolab_punch_in');
     if (savedInTime) {
       setInTime(savedInTime);
+      // Sync punch-in to database with user identity
+      attendanceService.clockIn(savedInTime, todayStr, {
+        userName: currentUserName,
+        userRole: currentUserRole,
+      }).catch(() => {});
     } else {
       const now = new Date();
       const formatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
       localStorage.setItem('radiquolab_punch_in', formatted);
       setInTime(formatted);
-      attendanceService.clockIn(formatted, todayStr).catch(() => { });
+      attendanceService.clockIn(formatted, todayStr, {
+        userName: currentUserName,
+        userRole: currentUserRole,
+      }).catch(() => {});
     }
 
     const savedOutTime = localStorage.getItem(`radiquolab_clock_out_${todayStr}`);
@@ -147,7 +156,7 @@ useEffect(() => {
         setActivities([]);
       }
     }
-  }, [currentUserName]);
+  }, [currentUserName, currentUserRole]);
 
   const handleAddActivity = () => {
     if (!selectedActivity || (!hours && !minutes)) return;
@@ -179,8 +188,8 @@ useEffect(() => {
       .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
       .replace(/\//g, '-');
 
-    // Dynamically calculate exact elapsed working hours
-    const computedWorkingHours = calculateWorkingHours(inTime, formattedOut);
+    const effectiveIn = inTime || formattedOut;
+    const computedWorkingHours = calculateWorkingHours(effectiveIn, formattedOut);
 
     setIsClockedOut(true);
     setOutTimeText(formattedOut);
@@ -189,7 +198,7 @@ useEffect(() => {
     const newRecord: AttendanceRecord = {
       id: `att-${Date.now()}`,
       date: todayStr,
-      inTime,
+      inTime: effectiveIn,
       outTime: formattedOut,
       workingHours: computedWorkingHours,
       activities,
@@ -256,7 +265,6 @@ useEffect(() => {
           <div className="flex justify-between items-center relative">
             <h1 className="text-2xl font-bold text-[#050720] font-['Sora']">My attendance</h1>
 
-            {/* Three Dots Menu Container */}
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setShowMenu(!showMenu)}
@@ -266,7 +274,6 @@ useEffect(() => {
                 <MoreVertical className="w-5 h-5" />
               </button>
 
-              {/* Dropdown Menu */}
               {showMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white border border-[#050720]/10 rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
                   <button
@@ -317,8 +324,7 @@ useEffect(() => {
             </div>
           </div>
 
-
-          {/* Time Spent Form */}
+          {/* Time Spent Form (Matching Image Reference) */}
           <div className="bg-white border border-[#050720]/10 rounded-2xl p-6 shadow-xs space-y-4">
             <h2 className="text-sm font-bold text-[#050720] font-['Sora']">Time Spent</h2>
             <div className="flex flex-wrap sm:flex-nowrap gap-3">
@@ -326,7 +332,7 @@ useEffect(() => {
                 <select
                   value={selectedActivity}
                   onChange={(e) => setSelectedActivity(e.target.value)}
-                  className="w-full border border-[#050720]/15 rounded-lg px-3 py-2 text-xs text-[#050720] bg-white focus:outline-none"
+                  className="w-full border border-[#050720]/15 rounded-lg px-3 py-2 text-xs text-[#050720] bg-white focus:outline-none cursor-pointer"
                 >
                   <option value="">Select</option>
                   <option value="Demo">Demo</option>
@@ -339,7 +345,7 @@ useEffect(() => {
                 <select
                   value={hours}
                   onChange={(e) => setHours(e.target.value)}
-                  className="w-full border border-[#050720]/15 rounded-lg px-3 py-2 text-xs text-[#050720] bg-white focus:outline-none"
+                  className="w-full border border-[#050720]/15 rounded-lg px-3 py-2 text-xs text-[#050720] bg-white focus:outline-none cursor-pointer"
                 >
                   <option value="">Hours</option>
                   {Array.from({ length: 9 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
@@ -351,7 +357,7 @@ useEffect(() => {
                 <select
                   value={minutes}
                   onChange={(e) => setMinutes(e.target.value)}
-                  className="w-full border border-[#050720]/15 rounded-lg px-3 py-2 text-xs text-[#050720] bg-white focus:outline-none"
+                  className="w-full border border-[#050720]/15 rounded-lg px-3 py-2 text-xs text-[#050720] bg-white focus:outline-none cursor-pointer"
                 >
                   <option value="">Minutes</option>
                   <option value="00">00</option>
@@ -403,7 +409,7 @@ useEffect(() => {
           {/* Month Attendance Table */}
           <div className="bg-white border border-[#050720]/10 rounded-2xl p-6 shadow-xs space-y-4">
             <div className="w-36">
-              <select className="border border-[#050720]/15 rounded-md px-3 py-1 text-xs text-[#050720] bg-white focus:outline-none">
+              <select className="border border-[#050720]/15 rounded-md px-3 py-1 text-xs text-[#050720] bg-white focus:outline-none cursor-pointer">
                 <option>All Months</option>
                 <option>January</option>
                 <option>February</option>
