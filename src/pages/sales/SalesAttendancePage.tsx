@@ -22,40 +22,58 @@ const ACTIVITY_OPTIONS = [
   "Administrative Work",
 ];
 
+// Helper to calculate exact working hours dynamically
+function calculateWorkingHours(inTimeStr: string, outTimeStr: string): string {
+  try {
+    const parseTime = (str: string) => {
+      const parts = str.trim().split(" ");
+      if (parts.length < 2) return 0;
+      const [time, modifier] = parts;
+      let [h, m] = time.split(":").map(Number);
+      if (modifier.toUpperCase() === "PM" && h < 12) h += 12;
+      if (modifier.toUpperCase() === "AM" && h === 12) h = 0;
+      return h * 60 + m;
+    };
+
+    const diffMins = parseTime(outTimeStr) - parseTime(inTimeStr);
+    if (diffMins <= 0) return "00:00";
+
+    const hours = Math.floor(diffMins / 60);
+    const minutes = diffMins % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  } catch {
+    return "00:00";
+  }
+}
+
 export const SalesAttendancePage: React.FC = () => {
   const auth = useAuth() as any;
   const currentUserName = auth?.user?.name || "User";
   const currentUserRole = auth?.user?.role || "Sales";
 
-  // Navigation states: 'main' | 'checkout' | 'leave-records' | 'apply-leave' | 'view-work-details'
   const [view, setView] = useState<
     "main" | "checkout" | "leave-records" | "apply-leave" | "view-work-details"
   >("main");
 
-  // Attendance state
   const [isClockedIn, setIsClockedIn] = useState<boolean>(true);
   const [inTimeText, setInTimeText] = useState<string>("");
   const [outTimeText, setOutTimeText] = useState<string>("Yet to checkout");
   const [selectedMonth, setSelectedMonth] = useState<string>("Month");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Activities & Attendance Log
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [selectedRecordActivities, setSelectedRecordActivities] = useState<ActivityItem[]>([]);
   const [selectedRecordDate, setSelectedRecordDate] = useState<string>("");
 
-  // Time Spent Logger inputs
   const [selectedActivity, setSelectedActivity] = useState<string>("Select Activity");
   const [hoursSpent, setHoursSpent] = useState<string>("Hours");
   const [minutesSpent, setMinutesSpent] = useState<string>("Minutes");
   const [activityDetails, setActivityDetails] = useState<string>("");
 
-  // Leave Records Tab & Lists
   const [leaveTab, setLeaveTab] = useState<"Applied" | "Cancelled">("Applied");
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
 
-  // Apply Leave form state (Cleared of hardcoded defaults)
   const [leaveFromDate, setLeaveFromDate] = useState<string>("");
   const [leaveToDate, setLeaveToDate] = useState<string>("");
   const [leaveType, setLeaveType] = useState<"Casual" | "Sick" | "Vacation">("Casual");
@@ -63,8 +81,7 @@ export const SalesAttendancePage: React.FC = () => {
   const [leaveReason, setLeaveReason] = useState<string>("");
   const [leaveDateError, setLeaveDateError] = useState<boolean>(false);
 
-  // Fetch live attendance history & leave records
-useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
@@ -83,7 +100,6 @@ useEffect(() => {
 
     fetchData();
 
-    // Check today's clock in/out status from localStorage
     const todayStr = new Date()
       .toLocaleDateString("en-GB", {
         day: "2-digit",
@@ -92,9 +108,19 @@ useEffect(() => {
       })
       .replace(/\//g, "-");
 
-    const savedInTime = localStorage.getItem("radiquolab_punch_in");
-    if (savedInTime) {
-      setInTimeText(savedInTime);
+    // Persist punch-in by user so logout/login never resets the original morning in-time
+    const userInKey = `radiquolab_punch_in_${currentUserName.toLowerCase().replace(/\s+/g, "_")}_${todayStr}`;
+    const userOutKey = `radiquolab_clock_out_${currentUserName.toLowerCase().replace(/\s+/g, "_")}_${todayStr}`;
+
+    let punchInTime = localStorage.getItem(userInKey) || localStorage.getItem("radiquolab_punch_in");
+
+    if (punchInTime) {
+      setInTimeText(punchInTime);
+      localStorage.setItem(userInKey, punchInTime);
+      attendanceService.clockIn(punchInTime, todayStr, {
+        userName: currentUserName,
+        userRole: currentUserRole,
+      }).catch(() => {});
     } else {
       const now = new Date();
       const formatted = now.toLocaleTimeString([], {
@@ -102,18 +128,24 @@ useEffect(() => {
         minute: "2-digit",
         hour12: true,
       });
+      localStorage.setItem(userInKey, formatted);
       localStorage.setItem("radiquolab_punch_in", formatted);
       setInTimeText(formatted);
-      attendanceService.clockIn(formatted, todayStr).catch(() => { });
+      attendanceService.clockIn(formatted, todayStr, {
+        userName: currentUserName,
+        userRole: currentUserRole,
+      }).catch(() => {});
     }
 
-    const savedOutTime = localStorage.getItem(`radiquolab_clock_out_${todayStr}`);
+    const savedOutTime = localStorage.getItem(userOutKey);
     if (savedOutTime) {
       setIsClockedIn(false);
       setOutTimeText(savedOutTime);
+    } else {
+      setIsClockedIn(true);
+      setOutTimeText("Yet to checkout");
     }
 
-    // Load active activities for the day
     const savedActivities = localStorage.getItem(`radiquolab_activities_${todayStr}`);
     if (savedActivities) {
       try {
@@ -122,13 +154,13 @@ useEffect(() => {
         setActivities([]);
       }
     }
-  }, [currentUserName]);
+  }, [currentUserName, currentUserRole]);
 
-  // Add new activity
   const handleAddActivity = () => {
     if (selectedActivity === "Select Activity") return;
-    const duration = `${hoursSpent !== "Hours" ? hoursSpent : "00"}:${minutesSpent !== "Minutes" ? minutesSpent : "00"
-      } Hrs`;
+    const duration = `${hoursSpent !== "Hours" ? hoursSpent : "00"}:${
+      minutesSpent !== "Minutes" ? minutesSpent : "00"
+    } Hrs`;
 
     const newAct: ActivityItem = {
       id: `act-${Date.now()}`,
@@ -155,7 +187,6 @@ useEffect(() => {
     setActivityDetails("");
   };
 
-  // Confirm Clock Out
   const handleFinalClockOut = async () => {
     const now = new Date();
     const formattedOut = now.toLocaleTimeString([], {
@@ -171,23 +202,27 @@ useEffect(() => {
       })
       .replace(/\//g, "-");
 
+    const effectiveIn = inTimeText || formattedOut;
+    const computedWorkingHours = calculateWorkingHours(effectiveIn, formattedOut);
+
+    const userOutKey = `radiquolab_clock_out_${currentUserName.toLowerCase().replace(/\s+/g, "_")}_${todayStr}`;
     setIsClockedIn(false);
     setOutTimeText(formattedOut);
-    localStorage.setItem(`radiquolab_clock_out_${todayStr}`, formattedOut);
+    localStorage.setItem(userOutKey, formattedOut);
 
     const newRecord: AttendanceRecord = {
       id: `att-${Date.now()}`,
       date: todayStr,
-      inTime: inTimeText,
+      inTime: effectiveIn,
       outTime: formattedOut,
-      workingHours: "09:00",
+      workingHours: `${computedWorkingHours} Hrs`,
       activities: activities,
     };
 
     try {
-      await attendanceService.clockOut(formattedOut, activities, "09:00", {
+      await attendanceService.clockOut(formattedOut, activities, `${computedWorkingHours} Hrs`, {
         userName: currentUserName,
-        date: todayStr
+        date: todayStr,
       });
     } catch {
       // Offline fallback
@@ -197,7 +232,6 @@ useEffect(() => {
     setView("main");
   };
 
-  // Submit Leave Request
   const handleSubmitLeave = async () => {
     if (!leaveFromDate) {
       setLeaveDateError(true);
@@ -214,15 +248,15 @@ useEffect(() => {
       .replace(/\//g, "-");
 
     const payload = {
-      userId: auth?.user?.id || 'sales-1',
+      userId: auth?.user?.id || "sales-1",
       userName: currentUserName,
       role: currentUserRole,
       userRole: currentUserRole,
       leaveType,
       fromDate: leaveFromDate,
       toDate: leaveToDate || leaveFromDate,
-      noOfDays: leaveDays || '01',
-      reason: leaveReason || "Personal Leave",
+      noOfDays: leaveDays || "01",
+      reason: leaveReason || "",
       applicationDate: todayStr,
       status: "Pending",
     };
@@ -253,16 +287,14 @@ useEffect(() => {
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-      {/* ========================================================= */}
-      {/* 1. MY ATTENDANCE MAIN PAGE                                */}
-      {/* ========================================================= */}
+      {/* 1. MY ATTENDANCE MAIN PAGE */}
       {view === "main" && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold font-['Sora']">My attendance</h1>
             <button
               onClick={() => setView("leave-records")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#050720]/20 text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#050720]/20 text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
             >
               <CalendarCheck className="w-3.5 h-3.5" />
               <span>Leave Records</span>
@@ -291,7 +323,7 @@ useEffect(() => {
               {isClockedIn ? (
                 <button
                   onClick={() => setView("checkout")}
-                  className="px-6 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                  className="px-6 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
                 >
                   Clock Out
                 </button>
@@ -312,7 +344,7 @@ useEffect(() => {
                 <select
                   value={selectedActivity}
                   onChange={(e) => setSelectedActivity(e.target.value)}
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                 >
                   {ACTIVITY_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>
@@ -327,7 +359,7 @@ useEffect(() => {
                 <select
                   value={hoursSpent}
                   onChange={(e) => setHoursSpent(e.target.value)}
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                 >
                   <option value="Hours">Hours</option>
                   {Array.from({ length: 9 }, (_, i) => String(i + 1).padStart(2, "0")).map(
@@ -345,7 +377,7 @@ useEffect(() => {
                 <select
                   value={minutesSpent}
                   onChange={(e) => setMinutesSpent(e.target.value)}
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                 >
                   <option value="Minutes">Minutes</option>
                   {["00", "15", "30", "45"].map((m) => (
@@ -359,7 +391,7 @@ useEffect(() => {
 
               <button
                 onClick={handleAddActivity}
-                className="px-5 py-2.5 bg-white border border-[#050720]/30 hover:bg-[#050720]/5 rounded-lg text-xs font-bold text-[#050720] transition-colors flex items-center gap-1.5"
+                className="px-5 py-2.5 bg-white border border-[#050720]/30 hover:bg-[#050720]/5 rounded-lg text-xs font-bold text-[#050720] transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Activity</span>
@@ -404,7 +436,7 @@ useEffect(() => {
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full bg-[#F8FAFC] text-xs px-3 py-1.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                className="w-full bg-[#F8FAFC] text-xs px-3 py-1.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
               >
                 <option value="Month">Month</option>
                 <option value="January">January</option>
@@ -448,11 +480,11 @@ useEffect(() => {
                       <td className="py-3.5 text-[#050720]/80">{row.date}</td>
                       <td className="py-3.5 font-medium">{row.inTime}</td>
                       <td className="py-3.5 text-[#050720]/80">{row.outTime}</td>
-                      <td className="py-3.5 text-[#050720]/80">{row.workingHours}</td>
+                      <td className="py-3.5 font-semibold text-[#050720]">{row.workingHours}</td>
                       <td className="py-3.5 text-right">
                         <button
                           onClick={() => handleOpenWorkDetails(row)}
-                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors"
+                          className="px-3 py-1 border border-[#050720]/30 rounded text-[11px] font-semibold text-[#050720] hover:bg-[#050720]/5 transition-colors cursor-pointer"
                         >
                           View
                         </button>
@@ -466,20 +498,17 @@ useEffect(() => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. CLOCK OUT / CHECKOUT SUMMARY                           */}
-      {/* ========================================================= */}
+      {/* 2. CLOCK OUT CHECKOUT VIEW */}
       {view === "checkout" && (
         <div className="space-y-6 max-w-4xl">
           <button
             onClick={() => setView("main")}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Clock Out</span>
           </button>
 
-          {/* Personal Details */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Personal Details</h3>
             <div className="grid grid-cols-2 gap-y-4 text-xs">
@@ -493,7 +522,7 @@ useEffect(() => {
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">In time</span>
-                <span className="font-semibold text-sm">{inTimeText}</span>
+                <span className="font-semibold text-sm">{inTimeText || "—"}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Out time</span>
@@ -507,7 +536,12 @@ useEffect(() => {
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Working Hours</span>
-                <span className="font-semibold text-sm">09:00 Hrs</span>
+                <span className="font-semibold text-sm">
+                  {calculateWorkingHours(
+                    inTimeText || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }),
+                    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+                  )} Hrs
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Location</span>
@@ -518,7 +552,6 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Today's Activities */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Today's Activities</h3>
             {activities.length === 0 ? (
@@ -541,17 +574,16 @@ useEffect(() => {
             )}
           </div>
 
-          {/* Buttons */}
           <div className="flex gap-4">
             <button
               onClick={() => setView("main")}
-              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+              className="flex-1 py-2.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={handleFinalClockOut}
-              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               Clock Out
             </button>
@@ -559,15 +591,13 @@ useEffect(() => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 3. LEAVE RECORDS HUB                                      */}
-      {/* ========================================================= */}
+      {/* 3. LEAVE RECORDS HUB */}
       {view === "leave-records" && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <button
               onClick={() => setView("main")}
-              className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
             >
               <ArrowLeft className="w-6 h-6 text-[#050720]" />
               <span>Leave Records</span>
@@ -581,13 +611,12 @@ useEffect(() => {
                 setLeaveDateError(false);
                 setView("apply-leave");
               }}
-              className="px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+              className="px-4 py-2 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
             >
               Apply for leave
             </button>
           </div>
 
-          {/* Leave Quota Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-white p-6 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Sick Leaves</span>
@@ -603,17 +632,17 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Active Leave Records */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-6 border-b border-[#050720]/10 pb-3">
               {(["Applied", "Cancelled"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setLeaveTab(t)}
-                  className={`text-sm font-semibold transition-all relative pb-2 ${leaveTab === t
+                  className={`text-sm font-semibold transition-all relative pb-2 cursor-pointer ${
+                    leaveTab === t
                       ? "text-[#050720] font-bold"
                       : "text-[#050720]/50 hover:text-[#050720]"
-                    }`}
+                  }`}
                 >
                   <span>{t}</span>
                   {leaveTab === t && (
@@ -646,12 +675,13 @@ useEffect(() => {
                       <td className="py-3.5 text-[#050720]/80">{l.applicationDate}</td>
                       <td className="py-3.5 text-right">
                         <span
-                          className={`font-semibold ${l.status === "Approved"
+                          className={`font-semibold ${
+                            l.status === "Approved"
                               ? "text-[#10B981]"
                               : l.status === "Rejected"
-                                ? "text-[#EF4444]"
-                                : "text-[#FFB908]"
-                            }`}
+                              ? "text-[#EF4444]"
+                              : "text-[#FFB908]"
+                          }`}
                         >
                           {l.status}
                         </span>
@@ -661,55 +691,15 @@ useEffect(() => {
               </tbody>
             </table>
           </div>
-
-          {/* Historical Leave Log */}
-          <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold font-['Sora']">Leave Record History</h3>
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
-                  <th className="pb-3.5 font-semibold">Leave Type</th>
-                  <th className="pb-3.5 font-semibold">Leave Date</th>
-                  <th className="pb-3.5 font-semibold">Reason</th>
-                  <th className="pb-3.5 font-semibold">Application Date</th>
-                  <th className="pb-3.5 text-right font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                {leaves.map((l) => (
-                  <tr key={`hist-${l.id}`} className="hover:bg-[#FFB908]/5 transition-colors">
-                    <td className="py-3.5 font-medium">{l.leaveType}</td>
-                    <td className="py-3.5 text-[#050720]/80">{l.leaveDate}</td>
-                    <td className="py-3.5 text-[#050720]/80">{l.reason}</td>
-                    <td className="py-3.5 text-[#050720]/80">{l.applicationDate}</td>
-                    <td className="py-3.5 text-right">
-                      <span
-                        className={`font-semibold ${l.status === "Approved"
-                            ? "text-[#10B981]"
-                            : l.status === "Rejected"
-                              ? "text-[#EF4444]"
-                              : "text-[#FFB908]"
-                          }`}
-                      >
-                        {l.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 4. APPLY FOR LEAVE                                        */}
-      {/* ========================================================= */}
+      {/* 4. APPLY FOR LEAVE */}
       {view === "apply-leave" && (
         <div className="space-y-6 max-w-4xl">
           <button
             onClick={() => setView("leave-records")}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>Apply for leave</span>
@@ -722,16 +712,14 @@ useEffect(() => {
               <div>
                 <input
                   type="date"
-                  placeholder="From date*"
                   value={leaveFromDate}
                   onChange={(e) => {
                     setLeaveFromDate(e.target.value);
                     if (e.target.value) setLeaveDateError(false);
                   }}
-                  className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border ${leaveDateError
-                      ? "border-rose-500 ring-1 ring-rose-500"
-                      : "border-[#050720]/15"
-                    } focus:outline-none`}
+                  className={`w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border ${
+                    leaveDateError ? "border-rose-500 ring-1 ring-rose-500" : "border-[#050720]/15"
+                  } focus:outline-none`}
                 />
                 {leaveDateError && (
                   <span className="text-[10px] font-semibold text-rose-500 mt-1 block">
@@ -743,7 +731,6 @@ useEffect(() => {
               <div>
                 <input
                   type="date"
-                  placeholder="To date*"
                   value={leaveToDate}
                   onChange={(e) => setLeaveToDate(e.target.value)}
                   className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 focus:outline-none"
@@ -756,7 +743,7 @@ useEffect(() => {
                   onChange={(e) =>
                     setLeaveType(e.target.value as "Casual" | "Sick" | "Vacation")
                   }
-                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none"
+                  className="w-full bg-[#F8FAFC] text-xs px-3.5 py-2.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer"
                 >
                   <option value="Casual">Casual</option>
                   <option value="Sick">Sick</option>
@@ -792,13 +779,13 @@ useEffect(() => {
             <div className="flex gap-4 pt-2">
               <button
                 onClick={() => setView("leave-records")}
-                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors"
+                className="flex-1 py-2.5 border border-[#050720]/20 rounded-lg text-xs font-bold hover:bg-[#050720]/5 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmitLeave}
-                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs"
+                className="flex-1 py-2.5 bg-[#FFB908] hover:bg-[#E5A607] rounded-lg text-xs font-bold text-[#050720] transition-colors shadow-xs cursor-pointer"
               >
                 Submit leave request
               </button>
@@ -807,14 +794,12 @@ useEffect(() => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 5. VIEW WORK DETAILS / MY ACTIVITIES                      */}
-      {/* ========================================================= */}
+      {/* 5. VIEW WORK DETAILS */}
       {view === "view-work-details" && (
         <div className="space-y-6 max-w-4xl">
           <button
             onClick={() => setView("main")}
-            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 text-2xl font-bold font-['Sora'] hover:opacity-80 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-6 h-6 text-[#050720]" />
             <span>My activities</span>

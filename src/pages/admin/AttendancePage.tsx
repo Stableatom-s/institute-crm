@@ -51,7 +51,7 @@ const ALL_MONTHS = [
   'December'
 ];
 
-// Robust calculation helper for elapsed duration
+// Robust elapsed duration calculation from clock-in to clock-out (or current time if still active)
 const calculateWorkingHours = (inTimeStr?: string, outTimeStr?: string): string => {
   if (!inTimeStr || inTimeStr === '-' || inTimeStr.trim() === '') return '-';
 
@@ -84,9 +84,10 @@ const calculateWorkingHours = (inTimeStr?: string, outTimeStr?: string): string 
   if (startMins === null) return '-';
 
   let endMins: number | null = null;
-  if (outTimeStr && outTimeStr !== '-' && outTimeStr !== 'Yet to checkout') {
+  if (outTimeStr && outTimeStr !== '-' && outTimeStr !== 'Yet to checkout' && outTimeStr !== 'Yet to clock out') {
     endMins = parseTimeToMinutes(outTimeStr);
   } else {
+    // If user is clocked in and hasn't clicked checkout, calculate elapsed time until now
     const now = new Date();
     endMins = now.getHours() * 60 + now.getMinutes();
   }
@@ -94,7 +95,7 @@ const calculateWorkingHours = (inTimeStr?: string, outTimeStr?: string): string 
   if (endMins === null) return '-';
 
   let diff = endMins - startMins;
-  if (diff < 0) diff += 24 * 60;
+  if (diff < 0) diff += 24 * 60; // Crosses midnight
 
   const diffHrs = Math.floor(diff / 60);
   const diffRemainderMins = diff % 60;
@@ -108,12 +109,10 @@ export const AdminAttendancePage: React.FC = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeAttendance | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
-  // Sort / Filter state
   const [selectedCourse, setSelectedCourse] = useState('Course');
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
   const [historyMonth, setHistoryMonth] = useState('Month');
 
-  // Load employee attendance live from backend
   const loadAttendance = async () => {
     try {
       setIsLoading(true);
@@ -121,11 +120,12 @@ export const AdminAttendancePage: React.FC = () => {
 
       if (Array.isArray(data) && data.length > 0) {
         const mapped: EmployeeAttendance[] = data.map((item: any, idx: number) => {
-          const roleDisplay = item.userRole === 'sales' ? 'Salesperson' : 'Faculty';
-          const clockInTime = item.inTime || item.clockIn || '-';
-          const clockOutTime = item.outTime || item.clockOut || '-';
+          const roleDisplay = (item.userRole || '').toLowerCase().includes('sales') ? 'Salesperson' : 'Faculty';
+          const clockInTime = item.inTime && item.inTime !== '-' ? item.inTime : '-';
+          const clockOutTime = item.outTime && item.outTime !== 'Yet to checkout' && item.outTime !== 'Yet to clock out' 
+            ? item.outTime 
+            : '-';
 
-          // Determine status dynamically
           let computedStatus: 'Present' | 'On Leave' | 'Absent' = 'Absent';
           if (item.status === 'On Leave') {
             computedStatus = 'On Leave';
@@ -133,9 +133,8 @@ export const AdminAttendancePage: React.FC = () => {
             computedStatus = 'Present';
           }
 
-          // Prioritize actual time calculation over stale DB mock string
-          const calculated = calculateWorkingHours(clockInTime, clockOutTime);
-          const hoursWorked = calculated !== '-' ? calculated : (item.workingHours || '-');
+          // Prioritize dynamic calculation using real timestamps
+          const hoursWorked = calculateWorkingHours(clockInTime, clockOutTime);
 
           return {
             id: item._id || item.id || `emp-${idx}`,
@@ -146,7 +145,7 @@ export const AdminAttendancePage: React.FC = () => {
             clockOut: clockOutTime,
             status: computedStatus,
             remarkStatus: item.remark || '-',
-            remarkCourse: item.course || 'UI/UX Design',
+            remarkCourse: item.course || '',
             location: item.location || (clockInTime !== '-' ? 'Radiquolab Design Institute' : '-'),
             clockOutLocation: item.clockOutLocation || (clockOutTime !== '-' ? 'Office (Pune)' : '-'),
             workingHours: hoursWorked,
@@ -183,7 +182,6 @@ export const AdminAttendancePage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-
       {/* 1. ATTENDANCE MANAGEMENT ROSTER */}
       {view === 'roster' && (
         <div className="space-y-6">
@@ -283,7 +281,7 @@ export const AdminAttendancePage: React.FC = () => {
                         {emp.remarkStatus !== '-' ? (
                           <span>{emp.remarkStatus}</span>
                         ) : (
-                          <span>{emp.remarkCourse}</span>
+                          <span>{emp.remarkCourse || '—'}</span>
                         )}
                       </td>
                       <td className="py-3.5 text-right">
@@ -459,10 +457,8 @@ export const AdminAttendancePage: React.FC = () => {
               <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronRight className="w-3.5 h-3.5" /></button>
             </div>
           </div>
-
         </div>
       )}
-
     </div>
   );
 };

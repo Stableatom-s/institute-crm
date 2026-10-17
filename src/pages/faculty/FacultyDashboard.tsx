@@ -23,7 +23,6 @@ export const FacultyDashboardPage: React.FC = () => {
           batchService.getAllBatches(),
         ]);
 
-        // Strict filter: match only demos assigned to this faculty member
         const facultyDemos = allDemos.filter((d) => {
           const facultyName = (d.faculty || '').trim().toLowerCase();
           return (
@@ -34,7 +33,6 @@ export const FacultyDashboardPage: React.FC = () => {
         });
         setDemos(facultyDemos.filter((d) => d.status === 'Scheduled'));
 
-        // Strict filter: match only batches assigned to this faculty member
         const facultyBatches = allBatches.filter((b) => {
           const facultyName = (b.faculty || '').trim().toLowerCase();
           return (
@@ -202,7 +200,7 @@ export const FacultyDashboardPage: React.FC = () => {
                     {String(index + 1).padStart(2, '0')}
                   </td>
                   <td className="py-3.5 font-medium">{batch.batchCode}</td>
-                  <td className="py-3.5 text-[#050720]/70">{batch.startDate}</td>
+                  <td className="py-3.5 text-[#050720]/70">{batch.startDate || '—'}</td>
                   <td className="py-3.5 text-[#050720]/70">{batch.course}</td>
                   <td className="py-3.5 text-[#050720]/70">
                     {String(batch.students?.length || 0).padStart(2, '0')}

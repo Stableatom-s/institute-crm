@@ -55,7 +55,6 @@ export const AdminLeavePage: React.FC = () => {
   const [showApprovedNotice, setShowApprovedNotice] = useState(false);
   const [showRejectedNotice, setShowRejectedNotice] = useState(false);
 
-  // Load from backend
   const loadLeaves = async () => {
     try {
       setIsLoading(true);
@@ -65,6 +64,7 @@ export const AdminLeavePage: React.FC = () => {
         if (!selectedLeave) setSelectedLeave(data[0] as LeaveRequest);
       } else {
         setRequests([]);
+        setSelectedLeave(null);
       }
     } catch (err) {
       console.error('Failed to load leaves:', err);
@@ -77,16 +77,13 @@ export const AdminLeavePage: React.FC = () => {
     loadLeaves();
   }, []);
 
-  // Current tab items
   const tabItems = requests.filter((r) => r.status === activeTab);
 
-  // Filtered by leave type
   const filteredItems = tabItems.filter((r) => {
     if (filterType === 'Leave Type') return true;
     return r.leaveType.toLowerCase() === filterType.toLowerCase();
   });
 
-  // Approve handler (Persists to MongoDB)
   const handleConfirmApprove = async () => {
     if (!targetRequest) return;
     try {
@@ -101,7 +98,6 @@ export const AdminLeavePage: React.FC = () => {
     }
   };
 
-  // Reject handler (Persists to MongoDB)
   const handleConfirmReject = async () => {
     if (!targetRequest) return;
     try {
@@ -120,9 +116,7 @@ export const AdminLeavePage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-      {/* ========================================================= */}
-      {/* 1. MAIN LEAVE MANAGEMENT TABLE VIEW                       */}
-      {/* ========================================================= */}
+      {/* 1. MAIN LEAVE MANAGEMENT TABLE VIEW */}
       {view === 'table' && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold font-['Sora']">Leave Management</h1>
@@ -195,7 +189,7 @@ export const AdminLeavePage: React.FC = () => {
               </div>
             ) : (
               <>
-                {/* A. Active Tab Table */}
+                {/* Active Tab */}
                 {activeTab === 'Active' && (
                   <table className="w-full text-left text-xs">
                     <thead>
@@ -217,11 +211,11 @@ export const AdminLeavePage: React.FC = () => {
                           <td className="py-3.5 text-[#050720]/70">{item.srNo}</td>
                           <td className="py-3.5 font-medium">{item.name}</td>
                           <td className="py-3.5 text-[#050720]/70">{item.role}</td>
-                          <td className="py-3.5 text-[#050720]/70">{item.mobile}</td>
-                          <td className="py-3.5 text-[#050720]/70">{item.email}</td>
-                          <td className="py-3.5 text-[#050720]/70">{item.leaveDate}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.mobile || '—'}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.email || '—'}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.leaveDate || item.fromDate || '—'}</td>
                           <td className="py-3.5 text-[#050720]/70">{item.leaveType}</td>
-                          <td className="py-3.5 text-[#050720]/70">{item.reason}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.reason || '—'}</td>
                           <td className="py-3.5 text-right">
                             <button
                               onClick={() => {
@@ -239,7 +233,7 @@ export const AdminLeavePage: React.FC = () => {
                   </table>
                 )}
 
-                {/* B. Pending Tab Table */}
+                {/* Pending Tab */}
                 {activeTab === 'Pending' && (
                   <table className="w-full text-left text-xs">
                     <thead>
@@ -262,12 +256,12 @@ export const AdminLeavePage: React.FC = () => {
                           <td className="py-3.5 text-[#050720]/70">{item.srNo}</td>
                           <td className="py-3.5 font-medium">{item.name}</td>
                           <td className="py-3.5 text-[#050720]/70">{item.role}</td>
-                          <td className="py-3.5 text-[#050720]/70">{item.mobile}</td>
-                          <td className="py-3.5 text-[#050720]/70">{item.email}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.mobile || '—'}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.email || '—'}</td>
                           <td className="py-3.5 text-[#050720]/70">{item.leaveType}</td>
-                          <td className="py-3.5 text-[#050720]/70">{item.reason}</td>
-                          <td className="py-3.5 text-[#050720]/70">{item.fromDate}</td>
-                          <td className="py-3.5 text-[#050720]/70">{item.toDate}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.reason || '—'}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.fromDate || '—'}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.toDate || '—'}</td>
                           <td className="py-3.5 text-right">
                             <div className="flex items-center justify-end gap-2.5">
                               <button
@@ -298,7 +292,7 @@ export const AdminLeavePage: React.FC = () => {
                   </table>
                 )}
 
-                {/* C. Rejected Tab Table */}
+                {/* Rejected Tab */}
                 {activeTab === 'Rejected' && (
                   <table className="w-full text-left text-xs">
                     <thead>
@@ -318,7 +312,7 @@ export const AdminLeavePage: React.FC = () => {
                           <td className="py-3.5 font-medium">{item.name}</td>
                           <td className="py-3.5 text-[#050720]/70">{item.role}</td>
                           <td className="py-3.5 text-[#050720]/70">{item.leaveType}</td>
-                          <td className="py-3.5 text-[#050720]/70">{item.reason}</td>
+                          <td className="py-3.5 text-[#050720]/70">{item.reason || '—'}</td>
                           <td className="py-3.5 text-right">
                             <button
                               onClick={() => {
@@ -356,9 +350,7 @@ export const AdminLeavePage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. LEAVE DETAILS VIEW                                     */}
-      {/* ========================================================= */}
+      {/* 2. LEAVE DETAILS VIEW */}
       {view === 'details' && selectedLeave && (
         <div className="space-y-6 max-w-5xl">
           <button
@@ -385,31 +377,31 @@ export const AdminLeavePage: React.FC = () => {
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Leave Reason</span>
-                <span className="font-semibold text-sm">{selectedLeave.reason}</span>
+                <span className="font-semibold text-sm">{selectedLeave.reason || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Leave from</span>
-                <span className="font-semibold text-sm">{selectedLeave.fromDate}</span>
+                <span className="font-semibold text-sm">{selectedLeave.fromDate || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Leave to</span>
-                <span className="font-semibold text-sm">{selectedLeave.toDate}</span>
+                <span className="font-semibold text-sm">{selectedLeave.toDate || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Application Date</span>
-                <span className="font-semibold text-sm">{selectedLeave.applicationDate}</span>
+                <span className="font-semibold text-sm">{selectedLeave.applicationDate || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">No. of days</span>
-                <span className="font-semibold text-sm">{selectedLeave.noOfDays}</span>
+                <span className="font-semibold text-sm">{selectedLeave.noOfDays || '—'}</span>
               </div>
             </div>
 
             {selectedLeave.status === 'Rejected' && (
               <div className="pt-2 border-t border-[#050720]/10">
                 <span className="text-[10px] text-[#050720]/50 block">Reason for rejection</span>
-                <span className="font-semibold text-xs text-[#050720] mt-1 block">
-                  {selectedLeave.rejectionReason || 'Critical work scheduled on the requested date'}
+                <span className="font-semibold text-xs text-[#EF4444] mt-1 block">
+                  {selectedLeave.rejectionReason || 'Rejected by administrator'}
                 </span>
               </div>
             )}
@@ -417,9 +409,7 @@ export const AdminLeavePage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 3. APPROVE LEAVE MODAL                                    */}
-      {/* ========================================================= */}
+      {/* 3. APPROVE LEAVE MODAL */}
       {showApproveModal && targetRequest && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-7 max-w-lg w-full space-y-5 shadow-2xl">
@@ -432,15 +422,15 @@ export const AdminLeavePage: React.FC = () => {
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Last Name</span>
-                <span className="font-semibold">{targetRequest.lastName}</span>
+                <span className="font-semibold">{targetRequest.lastName || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">From date</span>
-                <span className="font-semibold">{targetRequest.fromDate}</span>
+                <span className="font-semibold">{targetRequest.fromDate || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">To date</span>
-                <span className="font-semibold">{targetRequest.toDate}</span>
+                <span className="font-semibold">{targetRequest.toDate || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Reason for leave</span>
@@ -470,9 +460,7 @@ export const AdminLeavePage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 4. REJECT LEAVE MODAL                                     */}
-      {/* ========================================================= */}
+      {/* 4. REJECT LEAVE MODAL */}
       {showRejectModal && targetRequest && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-7 max-w-lg w-full space-y-4 shadow-2xl">
@@ -485,15 +473,15 @@ export const AdminLeavePage: React.FC = () => {
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Last Name</span>
-                <span className="font-semibold">{targetRequest.lastName}</span>
+                <span className="font-semibold">{targetRequest.lastName || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">From date</span>
-                <span className="font-semibold">{targetRequest.fromDate}</span>
+                <span className="font-semibold">{targetRequest.fromDate || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">To date</span>
-                <span className="font-semibold">{targetRequest.toDate}</span>
+                <span className="font-semibold">{targetRequest.toDate || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Reason for leave</span>
@@ -533,9 +521,7 @@ export const AdminLeavePage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 5. CONFIRMATION ALERT DIALOGS                             */}
-      {/* ========================================================= */}
+      {/* 5. CONFIRMATION ALERT DIALOGS */}
       {showApprovedNotice && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-1.5 shadow-2xl">
