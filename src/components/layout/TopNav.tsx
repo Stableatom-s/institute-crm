@@ -19,7 +19,24 @@ interface SearchResult {
 export const TopNav: React.FC = () => {
   const navigate = useNavigate();
   const auth = useAuth() as any;
-  const userRole = auth?.user?.role?.toLowerCase() || 'faculty';
+
+  // Safe resolver for user profile and role across reloads
+  const getActiveUser = () => {
+    if (auth?.user?.name) return auth.user;
+    try {
+      const stored = localStorage.getItem('crm_user') || localStorage.getItem('user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const activeUser = getActiveUser();
+  const currentUserName = (activeUser?.name || '').trim().toLowerCase();
+  const userRole = (activeUser?.role || '').trim().toLowerCase();
+  const isAdmin = userRole === 'admin' || userRole === 'super admin';
+  const isFaculty = userRole === 'faculty';
+  const isSales = userRole === 'sales' || userRole.includes('sales');
 
   const [inTime, setInTime] = useState<string>('09:30 AM');
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
@@ -57,6 +74,7 @@ export const TopNav: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Scoped Search Execution
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
@@ -76,7 +94,21 @@ export const TopNav: React.FC = () => {
           leadService.getAllLeads().catch(() => [] as any[]),
         ]);
 
-        batches.forEach((batch) => {
+        // 1. FILTER BATCHES & STUDENTS BASED ON USER ROLE
+        const visibleBatches = batches.filter((batch) => {
+          if (isAdmin) return true;
+          if (isFaculty) {
+            const batchFac = (batch.faculty || '').trim().toLowerCase();
+            return (
+              batchFac === currentUserName ||
+              batchFac.includes(currentUserName) ||
+              currentUserName.includes(batchFac)
+            );
+          }
+          return true; // Sales can view batches for enrollment context
+        });
+
+        visibleBatches.forEach((batch) => {
           if (
             batch.batchCode?.toLowerCase().includes(q) ||
             batch.course?.toLowerCase().includes(q)
@@ -86,13 +118,55 @@ export const TopNav: React.FC = () => {
               category: 'Batch',
               title: batch.batchCode,
               subtitle: `${batch.course} • ${batch.students?.length || 0} Students`,
-              route: userRole === 'sales' ? '/sales/batches' : '/admin/batches',
+              route: isSales ? '/sales/batches' : isFaculty ? '/faculty/batches' : '/admin/batches',
               state: { batchCode: batch.batchCode },
             });
           }
+
+          // Search students strictly within the batches visible to this user
+          (batch.students || []).forEach((st: any) => {
+            const stName = (st.name || `${st.firstName || ''} ${st.lastName || ''}`).trim();
+            if (
+              stName.toLowerCase().includes(q) ||
+              st.contact?.toLowerCase().includes(q)
+            ) {
+              collected.push({
+                id: `st-${st.id || st._id || Math.random()}`,
+                category: 'Student',
+                title: stName,
+                subtitle: `${batch.batchCode} • ${batch.course}`,
+                route: isFaculty ? '/faculty/students' : isSales ? '/sales/students' : '/admin/students',
+              });
+            }
+          });
         });
 
-        demos.forEach((d) => {
+        // 2. FILTER DEMOS BASED ON USER ROLE
+        const visibleDemos = demos.filter((demo) => {
+          if (isAdmin) return true;
+          if (isFaculty) {
+            const demoFac = (demo.faculty || '').trim().toLowerCase();
+            return (
+              demoFac === currentUserName ||
+              demoFac.includes(currentUserName) ||
+              currentUserName.includes(demoFac)
+            );
+          }
+          if (isSales) {
+            // Only show demos that match this salesperson's assigned leads
+            const matchingLead = leads.find((l) => {
+              const leadFullName = `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase();
+              const demoFullName = `${demo.name || ''} ${demo.lastName || ''}`.trim().toLowerCase();
+              return leadFullName === demoFullName || l.contactNo === demo.contactNo;
+            });
+            if (!matchingLead) return false;
+            const assigned = (matchingLead.assignedTo || '').trim().toLowerCase();
+            return assigned === currentUserName || assigned.includes(currentUserName);
+          }
+          return false;
+        });
+
+        visibleDemos.forEach((d) => {
           const dName = `${d.name} ${d.lastName || ''}`.trim();
           if (
             dName.toLowerCase().includes(q) ||
@@ -104,39 +178,55 @@ export const TopNav: React.FC = () => {
               category: 'Demo',
               title: `${dName} (${d.status})`,
               subtitle: `${d.course} • ${d.demoDate} (${d.timeSlot})`,
-              route: userRole === 'sales' ? '/sales/demos' : '/admin/demos',
+              route: isFaculty ? '/faculty/demos' : isSales ? '/sales/demos' : '/admin/demos',
             });
           }
         });
 
-        leads.forEach((l) => {
-          const lName = `${l.firstName || ''} ${l.lastName || ''}`.trim();
-          if (
-            lName.toLowerCase().includes(q) ||
-            l.contactNo?.toLowerCase().includes(q) ||
-            l.course?.toLowerCase().includes(q)
-          ) {
-            collected.push({
-              id: `lead-${l.id}`,
-              category: 'Lead',
-              title: lName,
-              subtitle: `Lead: ${l.course || 'General'} • ${l.status || 'Active'}`,
-              route: userRole === 'sales' ? '/sales/leads' : '/admin/leads',
-            });
-          }
-        });
+        // 3. FILTER LEADS (ONLY ACCESSIBLE TO ADMIN AND SALES; FACULTY CANNOT SEARCH LEADS)
+        if (!isFaculty) {
+          const visibleLeads = leads.filter((l) => {
+            if (isAdmin) return true;
+            if (isSales) {
+              const assigned = (l.assignedTo || '').trim().toLowerCase();
+              return (
+                assigned === currentUserName ||
+                (currentUserName.length > 0 && assigned.includes(currentUserName)) ||
+                (assigned.length > 0 && currentUserName.includes(assigned))
+              );
+            }
+            return false;
+          });
+
+          visibleLeads.forEach((l) => {
+            const lName = `${l.firstName || ''} ${l.lastName || ''}`.trim();
+            if (
+              lName.toLowerCase().includes(q) ||
+              l.contactNo?.toLowerCase().includes(q) ||
+              l.course?.toLowerCase().includes(q)
+            ) {
+              collected.push({
+                id: `lead-${l.id}`,
+                category: 'Lead',
+                title: lName,
+                subtitle: `Lead: ${l.course || 'General'} • ${l.status || 'Active'}`,
+                route: isSales ? '/sales/leads' : '/admin/leads',
+              });
+            }
+          });
+        }
 
         setResults(collected.slice(0, 8));
         setIsOpen(true);
       } catch (err) {
-        console.error('Global search error:', err);
+        console.error('Scoped search error:', err);
       } finally {
         setIsSearching(false);
       }
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [query, userRole]);
+  }, [query, currentUserName, userRole, isAdmin, isFaculty, isSales]);
 
   const handleSelectResult = (item: SearchResult) => {
     setIsOpen(false);
@@ -147,7 +237,7 @@ export const TopNav: React.FC = () => {
   return (
     <>
       <header className="h-16 bg-white border-b border-[#050720]/10 px-8 flex items-center justify-between sticky top-0 z-30 font-['Onest']">
-        {/* Left: Punch-in Timestamp matching Figma */}
+        {/* Left: Punch-in Timestamp */}
         <div className="flex flex-col">
           <span className="text-[11px] font-medium text-[#050720]/45 leading-none">
             In time
@@ -159,7 +249,7 @@ export const TopNav: React.FC = () => {
 
         {/* Right: Search, Notifications & Logout */}
         <div className="flex items-center gap-6">
-          {/* Global Search Bar */}
+          {/* Scoped Global Search Bar */}
           <div className="relative w-80 lg:w-96" ref={dropdownRef}>
             <input
               type="text"
@@ -204,7 +294,6 @@ export const TopNav: React.FC = () => {
             )}
           </div>
 
-          {/* Notification Icon */}
           <button
             type="button"
             onClick={() => navigate('/notifications')}
@@ -214,7 +303,6 @@ export const TopNav: React.FC = () => {
             <Bell className="w-4 h-4" />
           </button>
 
-          {/* Logout Button matching Figma */}
           <button
             type="button"
             onClick={() => setShowLogoutModal(true)}
