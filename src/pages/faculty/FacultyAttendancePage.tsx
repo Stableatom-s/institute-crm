@@ -317,6 +317,7 @@ useEffect(() => {
             </div>
           </div>
 
+
           {/* Time Spent Form */}
           <div className="bg-white border border-[#050720]/10 rounded-2xl p-6 shadow-xs space-y-4">
             <h2 className="text-sm font-bold text-[#050720] font-['Sora']">Time Spent</h2>
@@ -327,12 +328,11 @@ useEffect(() => {
                   onChange={(e) => setSelectedActivity(e.target.value)}
                   className="w-full border border-[#050720]/15 rounded-lg px-3 py-2 text-xs text-[#050720] bg-white focus:outline-none"
                 >
-                  <option value="">Select Activity</option>
-                  <option value="Lecture MWF-JAN-2026">Lecture MWF-JAN-2026</option>
-                  <option value="Lecture TTS-JAN-2026">Lecture TTS-JAN-2026</option>
+                  <option value="">Select</option>
+                  <option value="Demo">Demo</option>
+                  <option value="Lecture">Lecture</option>
                   <option value="Assignment Review">Assignment Review</option>
-                  <option value="Project Work">Project Work</option>
-                  <option value="Curriculum Planning">Curriculum Planning</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
               <div className="w-28">

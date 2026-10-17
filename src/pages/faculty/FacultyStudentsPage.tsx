@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft} from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { batchService, BatchItem } from '../../services/batchService';
 
@@ -37,7 +37,7 @@ interface StudentRecord {
 
 export const FacultyStudentsPage: React.FC = () => {
   const auth = useAuth() as any;
-  const currentUserName = auth?.user?.name || 'Poorva Pande';
+  const currentUserName = (auth?.user?.name || '').trim().toLowerCase();
 
   const [view, setView] = useState<'list' | 'details'>('list');
   const [courseFilter, setCourseFilter] = useState('All');
@@ -45,23 +45,26 @@ export const FacultyStudentsPage: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Fetch all batches and extract unique students with live lecture attendance calculations
+  // Strict student isolation: Only display students in batches taught by the logged-in faculty
   const fetchStudents = async () => {
     try {
       setIsLoading(true);
       const allBatches: BatchItem[] = await batchService.getAllBatches();
 
-      // Filter batches belonging to the logged-in faculty member
-      const facultyBatches = allBatches.filter(
-        (b) =>
-          b.faculty.toLowerCase().includes(currentUserName.toLowerCase()) ||
-          currentUserName.toLowerCase().includes(b.faculty.toLowerCase())
-      );
+      // Only match batches belonging directly to this faculty member
+      const facultyBatches = allBatches.filter((b) => {
+        const batchFaculty = (b.faculty || '').trim().toLowerCase();
+        if (!currentUserName || !batchFaculty) return false;
+        return (
+          batchFaculty === currentUserName ||
+          batchFaculty.includes(currentUserName) ||
+          currentUserName.includes(batchFaculty)
+        );
+      });
 
-      const targetBatches = facultyBatches.length > 0 ? facultyBatches : allBatches;
       const studentList: StudentRecord[] = [];
 
-      targetBatches.forEach((batch) => {
+      facultyBatches.forEach((batch) => {
         (batch.students || []).forEach((st: any, idx: number) => {
           const rawName =
             st.name ||
@@ -69,9 +72,8 @@ export const FacultyStudentsPage: React.FC = () => {
             'Unnamed Student';
           const nameParts = rawName.split(' ');
           const fName = st.firstName || nameParts[0] || 'Student';
-          const lName = st.lastName || nameParts.slice(1).join(' ') || '—';
+          const lName = st.lastName || nameParts.slice(1).join(' ') || '';
 
-          // Extract roll-call presence dynamically from each lecture in this batch
           const studentLectures: AttendanceLecture[] = (batch.lectures || []).map((lec: any, lIdx: number) => {
             const hasRecord = (lec.studentsList || []).find(
               (s: any) => (s.name || '').trim().toLowerCase() === rawName.toLowerCase()
@@ -89,7 +91,6 @@ export const FacultyStudentsPage: React.FC = () => {
             };
           });
 
-          // Calculate real percentage from actual lecture entries
           const totalLecs = studentLectures.length;
           const presentLecs = studentLectures.filter((l) => l.status === 'Present').length;
 
@@ -114,17 +115,17 @@ export const FacultyStudentsPage: React.FC = () => {
             name: rawName,
             firstName: fName,
             lastName: lName,
-            startDate: st.startDate || batch.startDate || '05-10-2026',
+            startDate: st.startDate || batch.startDate || '—',
             contact: st.contact || '—',
             attendance: attendanceStr,
             attendedCount: presentLecs,
             totalCount: totalLecs,
             remark: st.remark || (dynamicPercent >= 75 ? 'Regular Attendance' : 'Irregular Attendance'),
-            course: batch.course || 'UI/UX Design',
+            course: batch.course || '',
             batchCode: batch.batchCode || '—',
             batchId: batch.id,
-            email: st.email || `${fName.toLowerCase()}.${lName.toLowerCase()}@radiquolab.com`,
-            address: st.address || 'Pune',
+            email: st.email || '',
+            address: st.address || '—',
             metrics: {
               thisMonth: dynamicPercent,
               lastMonth: dynamicPercent,
@@ -138,9 +139,12 @@ export const FacultyStudentsPage: React.FC = () => {
       setStudents(studentList);
       if (studentList.length > 0 && !selectedStudent) {
         setSelectedStudent(studentList[0]);
+      } else if (studentList.length === 0) {
+        setSelectedStudent(null);
       }
     } catch (err) {
       console.error('Failed to load students for faculty:', err);
+      setStudents([]);
     } finally {
       setIsLoading(false);
     }
@@ -186,7 +190,7 @@ export const FacultyStudentsPage: React.FC = () => {
               </div>
             ) : filteredStudents.length === 0 ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
-                No students found. Add enrolled students to batches first.
+                No students found in your assigned batches.
               </div>
             ) : (
               <table className="w-full text-left text-xs">
@@ -248,7 +252,7 @@ export const FacultyStudentsPage: React.FC = () => {
         </>
       )}
 
-      {/* 2. DETAILS VIEW (SCREENSHOT 1) */}
+      {/* 2. DETAILS VIEW */}
       {view === 'details' && selectedStudent && (
         <div className="space-y-6">
           <button
@@ -270,7 +274,7 @@ export const FacultyStudentsPage: React.FC = () => {
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Last Name</span>
-                <span className="font-semibold text-sm">{selectedStudent.lastName}</span>
+                <span className="font-semibold text-sm">{selectedStudent.lastName || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Batch</span>
@@ -303,7 +307,6 @@ export const FacultyStudentsPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-6">
             <h3 className="text-sm font-bold font-['Sora']">Attendance</h3>
 
-            {/* Attendance Progress Cards - Dynamically calculated */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
                 { label: 'This Month', percent: selectedStudent.metrics.thisMonth },
@@ -327,7 +330,6 @@ export const FacultyStudentsPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Dynamic Lecture History or Today's Attendance Badge */}
             <div className="space-y-3 pt-2">
               {selectedStudent.lectures.length === 0 ? (
                 <div className="border border-[#050720]/10 rounded-xl px-5 py-4 flex items-center justify-between">

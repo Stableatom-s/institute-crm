@@ -37,7 +37,7 @@ export const FacultyDemoPage: React.FC = () => {
   const [modeFilter, setModeFilter] = useState('All');
   const [courseFilter, setCourseFilter] = useState('All');
 
-  // Form State for completion (Clean empty state)
+  // Form State for completion
   const [feedbackText, setFeedbackText] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('name.jpeg/png/jpg');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -71,7 +71,7 @@ export const FacultyDemoPage: React.FC = () => {
         remark: d.remark || (d.status === 'Completed' ? 'Joining soon' : undefined),
         feedback: d.feedback,
         cancellationReason: d.cancellationReason,
-        screenshotUrl: (d as any).screenshotUrl,
+        screenshotUrl: d.screenshotUrl,
       }));
 
       setDemos(mapped);
@@ -103,12 +103,49 @@ export const FacultyDemoPage: React.FC = () => {
     setCurrentView('details');
   };
 
+  // Convert and compress file to base64 Data URL so it permanently displays on Admin side
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setUploadedFileName(file.name);
-      setPreviewImage(URL.createObjectURL(file));
-    }
+    if (!file) return;
+
+    setUploadedFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 900;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          setPreviewImage(compressedDataUrl);
+        } else {
+          setPreviewImage(event.target?.result as string);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSaveCompleted = async () => {
@@ -118,10 +155,9 @@ export const FacultyDemoPage: React.FC = () => {
       setIsSaving(true);
       await demoService.updateDemoStatus(selectedDemo.id, 'Completed', {
         feedback: feedbackText,
-        screenshotUrl: previewImage || undefined,
-      } as any);
+        screenshotUrl: previewImage || '',
+      });
 
-      // Update state locally and switch to Completed tab
       setDemos((prev) =>
         prev.map((d) =>
           d.id === selectedDemo.id
@@ -129,7 +165,7 @@ export const FacultyDemoPage: React.FC = () => {
                 ...d,
                 status: 'Completed',
                 feedback: feedbackText,
-                screenshotUrl: previewImage || undefined,
+                screenshotUrl: previewImage || '',
                 demoStatus: 'Attended',
                 remark: 'Joining soon',
               }
@@ -150,15 +186,12 @@ export const FacultyDemoPage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] space-y-6 pb-12">
-      {/* ─────────────────────────────────────────────────────────────
-          1. LIST VIEW (SCHEDULED / COMPLETED / CANCELLED TABS)
-      ───────────────────────────────────────────────────────────── */}
+      {/* 1. LIST VIEW */}
       {currentView === 'list' && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold text-[#050720] font-['Sora']">Demo Management</h1>
 
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs">
-            {/* Tab Navigation */}
             <div className="flex gap-8 border-b border-[#050720]/10 pb-0">
               {(['Scheduled', 'Completed', 'Cancelled'] as DemoTab[]).map((tab) => {
                 const isActive = activeTab === tab;
@@ -179,7 +212,6 @@ export const FacultyDemoPage: React.FC = () => {
               })}
             </div>
 
-            {/* Filter Controls */}
             <div className="flex items-center gap-3 my-5">
               <span className="text-xs text-[#050720]/60 font-medium">Sort by:</span>
               <select
@@ -204,7 +236,6 @@ export const FacultyDemoPage: React.FC = () => {
               </select>
             </div>
 
-            {/* Live Demo Table */}
             {isLoading ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
                 Loading demo sessions from database...
@@ -263,7 +294,6 @@ export const FacultyDemoPage: React.FC = () => {
               </table>
             )}
 
-            {/* Pagination Controls */}
             <div className="flex justify-end items-center gap-3 mt-6 text-xs text-[#050720]/60">
               <span>Jump to</span>
               <span className="border border-[#050720]/20 rounded px-2 py-0.5 text-[#050720] font-medium">01</span>
@@ -273,9 +303,7 @@ export const FacultyDemoPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─────────────────────────────────────────────────────────────
-          2. DETAILS VIEW (SCHEDULED / COMPLETED / CANCELLED)
-      ───────────────────────────────────────────────────────────── */}
+      {/* 2. DETAILS VIEW */}
       {currentView === 'details' && selectedDemo && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
@@ -293,7 +321,6 @@ export const FacultyDemoPage: React.FC = () => {
               </h1>
             </div>
 
-            {/* DEMO COMPLETED BUTTON: Shown only when viewing a Scheduled demo */}
             {selectedDemo.status === 'Scheduled' && (
               <button
                 onClick={() => {
@@ -310,7 +337,6 @@ export const FacultyDemoPage: React.FC = () => {
           <div className="bg-white border border-[#050720]/10 rounded-xl p-8 shadow-xs space-y-6">
             <h3 className="text-base font-bold text-[#050720] font-['Sora']">Demo Overview</h3>
 
-            {/* Read-Only Overview Grid */}
             <div className="grid grid-cols-2 gap-y-6 text-xs max-w-2xl">
               <div>
                 <span className="text-[#050720]/50 block text-[11px]">Lead Name</span>
@@ -337,7 +363,6 @@ export const FacultyDemoPage: React.FC = () => {
                 <span className="font-semibold text-sm text-[#050720] mt-0.5 block">{selectedDemo.mode}</span>
               </div>
 
-              {/* Cancelled-only specific field */}
               {selectedDemo.status === 'Cancelled' && (
                 <div className="col-span-2 pt-2">
                   <span className="text-[#050720]/50 block text-[11px]">Reason for cancellation</span>
@@ -348,7 +373,6 @@ export const FacultyDemoPage: React.FC = () => {
               )}
             </div>
 
-            {/* Completed Read-Only Section */}
             {selectedDemo.status === 'Completed' && (
               <div className="space-y-4 pt-4 border-t border-[#050720]/10">
                 <div className="relative border border-[#050720]/15 rounded-lg p-3.5 bg-white">
@@ -361,8 +385,11 @@ export const FacultyDemoPage: React.FC = () => {
                 </div>
 
                 {selectedDemo.screenshotUrl && (
-                  <div className="rounded-xl overflow-hidden border border-[#050720]/10 max-w-md">
-                    <img src={selectedDemo.screenshotUrl} alt="Attendance proof" className="w-full h-auto object-cover" />
+                  <div className="space-y-2 pt-2">
+                    <span className="text-[10px] text-[#050720]/50 block font-medium">Attendance Screenshot</span>
+                    <div className="rounded-xl overflow-hidden border border-[#050720]/15 max-w-xl bg-slate-50">
+                      <img src={selectedDemo.screenshotUrl} alt="Attendance proof" className="w-full h-auto max-h-96 object-contain" />
+                    </div>
                   </div>
                 )}
               </div>
@@ -371,9 +398,7 @@ export const FacultyDemoPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─────────────────────────────────────────────────────────────
-          3. COMPLETE FORM VIEW (FEEDBACK + SCREENSHOT + SAVE)
-      ───────────────────────────────────────────────────────────── */}
+      {/* 3. COMPLETE FORM VIEW */}
       {currentView === 'complete-form' && selectedDemo && (
         <div className="space-y-6">
           <div className="flex items-center gap-2">
@@ -438,7 +463,7 @@ export const FacultyDemoPage: React.FC = () => {
                   <span>Add Attendance Screenshot</span>
                   <input
                     type="file"
-                    accept="image/png, image/jpeg, image/jpg"
+                    accept="image/png, image/jpeg, image/jpg, image/webp"
                     onChange={handleFileUpload}
                     className="hidden"
                   />
@@ -447,8 +472,8 @@ export const FacultyDemoPage: React.FC = () => {
               </div>
 
               {previewImage && (
-                <div className="rounded-xl overflow-hidden border border-[#050720]/10 max-w-md">
-                  <img src={previewImage} alt="Attendance proof preview" className="w-full h-auto object-cover" />
+                <div className="rounded-xl overflow-hidden border border-[#050720]/10 max-w-md bg-slate-50">
+                  <img src={previewImage} alt="Attendance proof preview" className="w-full h-auto max-h-80 object-contain" />
                 </div>
               )}
 

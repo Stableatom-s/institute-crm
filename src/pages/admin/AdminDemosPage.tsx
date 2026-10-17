@@ -316,15 +316,18 @@ export const AdminDemosPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Attendance Screenshot (Only renders if screenshot is uploaded) */}
+            {/* Attendance Screenshot */}
             {selectedDemo.screenshotUrl ? (
               <div className="pt-2">
                 <span className="text-[10px] text-[#050720]/50 block mb-2">Attendance screenshot</span>
-                <div className="rounded-xl overflow-hidden border border-[#050720]/15 max-w-xl">
+                <div className="rounded-xl overflow-hidden border border-[#050720]/15 max-w-xl bg-slate-50 p-1">
                   <img
                     src={selectedDemo.screenshotUrl}
                     alt="Attendance Screenshot"
-                    className="w-full h-auto object-cover"
+                    className="w-full h-auto max-h-96 object-contain rounded-lg"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).alt = 'Screenshot failed to load or has invalid image data.';
+                    }}
                   />
                 </div>
               </div>

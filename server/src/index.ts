@@ -1,82 +1,50 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { connectDB } from './config/db';
+import mongoose from 'mongoose';
+
+// Route imports
 import { leadRoutes } from './routes/leads';
 import { demoRoutes } from './routes/demo';
-import batchRoutes from './routes/batches';   
 import { invoiceRoutes } from './routes/invoices';
 import { attendanceRoutes } from './routes/attendance';
-import leaveRoutes from './routes/leaves';
-import teamRoutes from './routes/team';
-import authRoutes from './routes/auth';
-import notificationRoutes from './routes/notifications';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/institute_crm';
 
-// Dynamic CORS configuration allowing localhost and Vercel domains safely
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  process.env.FRONTEND_URL,
-].filter(Boolean) as string[];
+// Middleware
+app.use(cors());
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (same-origin, curl, mobile, serverless proxy)
-      if (!origin) return callback(null, true);
-
-      const isExplicitlyAllowed = allowedOrigins.includes(origin);
-      const isVercelDomain = origin.endsWith('.vercel.app');
-
-      if (isExplicitlyAllowed || isVercelDomain) {
-        callback(null, true);
-      } else {
-        // Return false instead of throwing new Error to avoid uncaught 500 crashes
-        callback(null, false);
-      }
-    },
-    credentials: true,
-  })
-);
-
-app.use(express.json());
+// High payload limits for base64 screenshot uploads
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
 // Health check endpoint
-app.get('/api/health', (_req: Request, res: Response) => {
+app.get('/api/health', (_req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Serverless DB connection middleware
-app.use(async (_req, _res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    console.error('Database connection middleware error:', err);
-    next(err);
-  }
-});
-
-// Application API routes
-app.use('/api/auth', authRoutes);
+// Mount API routes
 app.use('/api/leads', leadRoutes);
 app.use('/api/demos', demoRoutes);
-app.use('/api/batches', batchRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/attendance', attendanceRoutes);
-app.use('/api/leaves', leaveRoutes);
-app.use('/api/team', teamRoutes);
-app.use('/api/notifications', notificationRoutes);
 
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  app.listen(PORT, () => {
-    console.log(`Backend server running on port ${PORT}`);
+// MongoDB connection & server launch
+mongoose
+  .connect(MONGODB_URI)
+  .then(() => {
+    console.log('MongoDB connected successfully');
+    app.listen(PORT, () => {
+      console.log(`Backend server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
   });
-}
 
 export default app;
