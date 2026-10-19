@@ -206,9 +206,11 @@ export const AdminLeavePage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                      {filteredItems.map((item) => (
+                      {filteredItems.map((item, index) => (
                         <tr key={item.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                          <td className="py-3.5 text-[#050720]/70">{item.srNo}</td>
+                          <td className="py-3.5 text-[#050720]/70">
+                            {String(index + 1).padStart(2, '0')}
+                          </td>
                           <td className="py-3.5 font-medium">{item.name}</td>
                           <td className="py-3.5 text-[#050720]/70">{item.role}</td>
                           <td className="py-3.5 text-[#050720]/70">{item.mobile || '—'}</td>
@@ -251,9 +253,11 @@ export const AdminLeavePage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                      {filteredItems.map((item) => (
+                      {filteredItems.map((item, index) => (
                         <tr key={item.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                          <td className="py-3.5 text-[#050720]/70">{item.srNo}</td>
+                          <td className="py-3.5 text-[#050720]/70">
+                            {String(index + 1).padStart(2, '0')}
+                          </td>
                           <td className="py-3.5 font-medium">{item.name}</td>
                           <td className="py-3.5 text-[#050720]/70">{item.role}</td>
                           <td className="py-3.5 text-[#050720]/70">{item.mobile || '—'}</td>
@@ -306,9 +310,11 @@ export const AdminLeavePage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                      {filteredItems.map((item) => (
+                      {filteredItems.map((item, index) => (
                         <tr key={item.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                          <td className="py-3.5 text-[#050720]/70">{item.srNo}</td>
+                          <td className="py-3.5 text-[#050720]/70">
+                            {String(index + 1).padStart(2, '0')}
+                          </td>
                           <td className="py-3.5 font-medium">{item.name}</td>
                           <td className="py-3.5 text-[#050720]/70">{item.role}</td>
                           <td className="py-3.5 text-[#050720]/70">{item.leaveType}</td>

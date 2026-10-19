@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { batchService, BatchItem } from '../../services/batchService';
+import { leadService } from '../../services/leadService';
 
 interface AttendanceLecture {
   id: string;
@@ -29,37 +30,44 @@ interface StudentRecord {
   lectures: AttendanceLecture[];
 }
 
-const COURSES = ['UI/UX Design', 'No Code', 'Full Stack', 'Portfolio'];
+const COURSES = ['All', 'UI/UX Design', 'No Code', 'Full Stack', 'Full-stack Development', 'Portfolio'];
 
 export const AdminStudentPage: React.FC = () => {
   const [view, setView] = useState<'list' | 'details'>('list');
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null);
-  const [courseFilter, setCourseFilter] = useState('UI/UX Design');
+  const [courseFilter, setCourseFilter] = useState('All');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const fetchStudents = async () => {
     try {
       setIsLoading(true);
-      const batches: BatchItem[] = await batchService.getAllBatches();
-      const studentMap: StudentRecord[] = [];
+      const [batches, leads] = await Promise.all([
+        batchService.getAllBatches().catch(() => [] as BatchItem[]),
+        leadService.getAllLeads().catch(() => [] as any[]),
+      ]);
 
+      const studentList: StudentRecord[] = [];
+      const seenNames = new Set<string>();
+
+      // 1. Process batch students with live lecture attendance
       batches.forEach((batch) => {
         (batch.students || []).forEach((st: any, idx: number) => {
           const rawName = st.name || `${st.firstName || ''} ${st.lastName || ''}`.trim() || 'Student';
+          seenNames.add(rawName.toLowerCase());
+
           const nameParts = rawName.split(' ');
           const fName = st.firstName || nameParts[0] || 'Student';
-          const lName = st.lastName || nameParts.slice(1).join(' ') || '—';
+          const lName = st.lastName || nameParts.slice(1).join(' ') || '';
 
-          // Extract roll-call presence dynamically from each lecture
           const studentLectures: AttendanceLecture[] = (batch.lectures || []).map((lec: any, lIdx: number) => {
             const hasRecord = (lec.studentsList || []).find(
               (s: any) => (s.name || '').trim().toLowerCase() === rawName.toLowerCase()
             );
 
             const isPresent = hasRecord
-              ? (hasRecord.isPresent ?? hasRecord.present ?? false)
+              ? Boolean(hasRecord.isPresent ?? hasRecord.present)
               : false;
 
             return {
@@ -70,7 +78,6 @@ export const AdminStudentPage: React.FC = () => {
             };
           });
 
-          // Accurate calculation: Attended / Total lectures
           const totalLecs = studentLectures.length;
           const attendedLecs = studentLectures.filter((l) => l.status === 'Present').length;
 
@@ -84,23 +91,20 @@ export const AdminStudentPage: React.FC = () => {
             const [att, tot] = st.attendanceRatio.split('/').map((n: string) => parseInt(n, 10));
             dynamicPercent = tot > 0 ? Math.round((att / tot) * 100) : 0;
             ratioStr = st.attendanceRatio;
-          } else if (st.attendance && st.attendance.includes('%')) {
-            dynamicPercent = parseInt(st.attendance.replace('%', ''), 10) || 0;
-            ratioStr = st.attendance;
           }
 
-          studentMap.push({
+          studentList.push({
             id: st.id || st._id || `${batch.id}-st-${idx}`,
             srNo: '',
             firstName: fName,
             lastName: lName,
-            startDate: st.startDate || batch.startDate,
+            startDate: st.startDate || batch.startDate || '—',
             contact: st.contact || '—',
             course: batch.course || 'UI/UX Design',
             batch: batch.batchCode || '—',
-            address: st.address || 'Pune',
+            address: st.address || '—',
             attendanceRatio: ratioStr,
-            remark: st.remark || (dynamicPercent >= 75 ? 'Regular Attendance' : 'Irregular Attendance'),
+            remark: st.remark || (dynamicPercent >= 75 ? 'Regular Attendance' : 'Active'),
             metrics: {
               thisMonth: dynamicPercent,
               lastMonth: dynamicPercent,
@@ -111,9 +115,40 @@ export const AdminStudentPage: React.FC = () => {
         });
       });
 
-      setStudents(studentMap);
-      if (studentMap.length > 0 && !selectedStudent) {
-        setSelectedStudent(studentMap[0]);
+      // 2. Include all enrolled leads even if not yet placed into a batch
+      leads
+        .filter((l) => l.status === 'Enrolled')
+        .forEach((l) => {
+          const fullName = `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Student';
+          if (!seenNames.has(fullName.toLowerCase())) {
+            seenNames.add(fullName.toLowerCase());
+            studentList.push({
+              id: l.id,
+              srNo: '',
+              firstName: l.firstName || '',
+              lastName: l.lastName || '',
+              startDate: l.enquiryDate || '—',
+              contact: l.contactNo || '—',
+              course: l.course || 'UI/UX Design',
+              batch: 'Pending Batch',
+              address: l.address || '—',
+              attendanceRatio: '00/00',
+              remark: 'Newly Enrolled',
+              metrics: {
+                thisMonth: 0,
+                lastMonth: 0,
+                average: 0,
+              },
+              lectures: [],
+            });
+          }
+        });
+
+      setStudents(studentList);
+      if (studentList.length > 0 && !selectedStudent) {
+        setSelectedStudent(studentList[0]);
+      } else if (studentList.length === 0) {
+        setSelectedStudent(null);
       }
     } catch (err) {
       console.error('Failed to load students from server:', err);
@@ -126,9 +161,11 @@ export const AdminStudentPage: React.FC = () => {
     fetchStudents();
   }, []);
 
-  const filteredStudents = students.filter(
-    (student) => student.course.toLowerCase() === courseFilter.toLowerCase()
-  );
+  const filteredStudents = students.filter((student) => {
+    if (courseFilter === 'All') return true;
+    return student.course.toLowerCase().includes(courseFilter.toLowerCase()) ||
+      courseFilter.toLowerCase().includes(student.course.toLowerCase());
+  });
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
@@ -146,12 +183,12 @@ export const AdminStudentPage: React.FC = () => {
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className="flex items-center justify-between gap-3 px-3 py-1.5 bg-white border border-[#050720]/20 rounded-lg text-xs font-medium min-w-[130px] cursor-pointer"
                 >
-                  <span>{courseFilter}</span>
+                  <span>{courseFilter === 'All' ? 'All Courses' : courseFilter}</span>
                   {isDropdownOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
 
                 {isDropdownOpen && (
-                  <div className="absolute left-0 top-9 w-40 bg-white border border-[#050720]/15 rounded-lg shadow-lg py-1 z-20">
+                  <div className="absolute left-0 top-9 w-44 bg-white border border-[#050720]/15 rounded-lg shadow-lg py-1 z-20">
                     {COURSES.map((course) => (
                       <button
                         key={course}
@@ -161,7 +198,7 @@ export const AdminStudentPage: React.FC = () => {
                         }}
                         className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#FFB908]/15 text-[#050720] cursor-pointer"
                       >
-                        {course}
+                        {course === 'All' ? 'All Courses' : course}
                       </button>
                     ))}
                   </div>
@@ -175,7 +212,7 @@ export const AdminStudentPage: React.FC = () => {
               </div>
             ) : filteredStudents.length === 0 ? (
               <div className="py-12 text-center text-xs text-[#050720]/50">
-                No students enrolled in {courseFilter}.
+                No students enrolled in {courseFilter === 'All' ? 'the institute' : courseFilter}.
               </div>
             ) : (
               <table className="w-full text-left text-xs">
@@ -273,7 +310,7 @@ export const AdminStudentPage: React.FC = () => {
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Last Name</span>
-                <span className="font-semibold text-sm">{selectedStudent.lastName}</span>
+                <span className="font-semibold text-sm">{selectedStudent.lastName || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#050720]/50 block">Batch</span>

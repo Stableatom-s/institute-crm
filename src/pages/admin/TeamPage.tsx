@@ -8,18 +8,9 @@ import {
   Check 
 } from 'lucide-react';
 import { teamService } from '../../services/teamService';
+import { attendanceService, LeaveRecord } from '../../services/attendanceService';
 
-// --- TYPES ---
 export type MemberTab = 'Active' | 'Inactive';
-
-export interface LeaveHistoryItem {
-  id: string;
-  leaveType: string;
-  leaveDate: string;
-  reason: string;
-  applicationDate: string;
-  status: 'Approved' | 'Rejected' | 'Pending';
-}
 
 export interface TeamMember {
   id: string;
@@ -43,7 +34,7 @@ export interface TeamMember {
     jobTitle: string;
     experienceYears: string;
   };
-  leaveHistory: LeaveHistoryItem[];
+  leaveHistory: LeaveRecord[];
 }
 
 const AVAILABLE_COURSES = [
@@ -56,7 +47,6 @@ const AVAILABLE_COURSES = [
 ];
 
 export const AdminTeamPage: React.FC = () => {
-  // Navigation states: 'roster' | 'view-member' | 'edit-member' | 'add-details' | 'add-credentials' | 'add-preview'
   const [view, setView] = useState<
     'roster' | 'view-member' | 'edit-member' | 'add-details' | 'add-credentials' | 'add-preview'
   >('roster');
@@ -64,6 +54,7 @@ export const AdminTeamPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<MemberTab>('Active');
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const [memberLeaves, setMemberLeaves] = useState<LeaveRecord[]>([]);
 
   // Edit / Add state tracking
   const [isDirty, setIsDirty] = useState(false);
@@ -128,18 +119,37 @@ export const AdminTeamPage: React.FC = () => {
     loadMembers();
   }, []);
 
-  // Active / Inactive filter count
+  // Fetch live leave records specifically matching the selected team member
+  useEffect(() => {
+    if (!selectedMember) return;
+    const fetchMemberLeaves = async () => {
+      try {
+        const allLeaves = await attendanceService.getAllLeaves();
+        const memberFullName = (selectedMember.name || `${selectedMember.firstName} ${selectedMember.lastName}`).trim().toLowerCase();
+        const memberFirst = (selectedMember.firstName || '').trim().toLowerCase();
+
+        const matched = allLeaves.filter((l: any) => {
+          const lName = (l.name || `${l.firstName || ''} ${l.lastName || ''}`).trim().toLowerCase();
+          const lUser = (l.userName || '').trim().toLowerCase();
+          return lName === memberFullName || lUser === memberFullName || (memberFirst && (lName.includes(memberFirst) || lUser.includes(memberFirst)));
+        });
+        setMemberLeaves(matched);
+      } catch (err) {
+        console.error('Failed to load leaves for member:', err);
+      }
+    };
+    fetchMemberLeaves();
+  }, [selectedMember]);
+
   const activeCount = members.filter((m) => m.status === 'Active').length;
   const inactiveCount = members.filter((m) => m.status === 'Inactive').length;
   const currentList = members.filter((m) => m.status === activeTab);
 
-  // Open member details
   const handleOpenMember = (m: TeamMember) => {
     setSelectedMember(m);
     setView('view-member');
   };
 
-  // Launch Edit view
   const handleStartEdit = (m: TeamMember) => {
     setSelectedMember(m);
     setEditFirstName(m.firstName);
@@ -158,7 +168,6 @@ export const AdminTeamPage: React.FC = () => {
     setView('edit-member');
   };
 
-  // Save changes from Edit Member
   const handleSaveEditChanges = async () => {
     if (!selectedMember) return;
     const updated: TeamMember = {
@@ -194,7 +203,6 @@ export const AdminTeamPage: React.FC = () => {
     setView('view-member');
   };
 
-  // Confirm Restore Access for Inactive member
   const handleConfirmRestore = async () => {
     if (!selectedMember) return;
     try {
@@ -221,7 +229,6 @@ export const AdminTeamPage: React.FC = () => {
     }, 1500);
   };
 
-  // Confirm Remove User
   const handleConfirmRemoveUser = async () => {
     if (!selectedMember) return;
     const todayStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
@@ -249,7 +256,6 @@ export const AdminTeamPage: React.FC = () => {
     }, 1500);
   };
 
-  // Save & Dispatch Credentials in Add Member Multi-Step
   const handleConfirmSendCredentials = async () => {
     const payload: any = {
       firstName: addFirstName,
@@ -262,9 +268,9 @@ export const AdminTeamPage: React.FC = () => {
       address: addAddress,
       education: addEducation,
       course: addCourses[0] || 'UI/UX Design',
-      assignedBatches: [], // Start clean with no random mock batches
+      assignedBatches: [],
       status: 'Active',
-      photoUrl: '', // No fake photo fallback
+      photoUrl: '',
       workHistory: {
         companyName: addCompany,
         jobTitle: addJobTitle,
@@ -295,7 +301,6 @@ export const AdminTeamPage: React.FC = () => {
     }, 1500);
   };
 
-  // Helper for generating initial badges
   const renderAvatar = (firstName: string, lastName: string, photoUrl?: string) => {
     if (photoUrl) {
       return (
@@ -316,13 +321,9 @@ export const AdminTeamPage: React.FC = () => {
 
   return (
     <div className="font-['Onest'] text-[#050720] pb-16">
-
-      {/* ========================================================= */}
-      {/* 1. ROSTER VIEW (ACTIVE / INACTIVE TABS)                   */}
-      {/* ========================================================= */}
+      {/* 1. ROSTER VIEW */}
       {view === 'roster' && (
         <div className="space-y-6">
-          {/* Header & Primary CTA */}
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold font-['Sora']">Team Members</h1>
             <button
@@ -349,7 +350,6 @@ export const AdminTeamPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Metric Overview Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-white p-6 rounded-xl border border-[#050720]/10 text-center shadow-xs">
               <span className="text-xs font-bold block">Active Members</span>
@@ -365,7 +365,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Tabbed Table Container */}
           <div className="bg-white border border-[#050720]/10 rounded-xl p-6 shadow-xs space-y-4">
             <div className="flex items-center gap-8 border-b border-[#050720]/10 pb-3">
               {(['Active', 'Inactive'] as MemberTab[]).map((tab) => (
@@ -386,7 +385,6 @@ export const AdminTeamPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Roster Table */}
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
@@ -407,9 +405,9 @@ export const AdminTeamPage: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  currentList.map((m) => (
+                  currentList.map((m, index) => (
                     <tr key={m.id} className="hover:bg-[#FFB908]/5 transition-colors">
-                      <td className="py-3.5 text-[#050720]/70">{m.srNo}</td>
+                      <td className="py-3.5 text-[#050720]/70">{String(index + 1).padStart(2, '0')}</td>
                       <td className="py-3.5 font-medium">{m.name}</td>
                       <td className="py-3.5 text-[#050720]/70">{m.role}</td>
                       <td className="py-3.5 text-[#050720]/70">{m.mobile}</td>
@@ -429,7 +427,6 @@ export const AdminTeamPage: React.FC = () => {
               </tbody>
             </table>
 
-            {/* Pagination Footer */}
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#050720]/5 text-xs text-[#050720]/70">
               <span className="text-[11px]">Jump to</span>
               <input
@@ -447,9 +444,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. VIEW MEMBER DETAILS (ACTIVE & INACTIVE)                */}
-      {/* ========================================================= */}
+      {/* 2. VIEW MEMBER DETAILS */}
       {view === 'view-member' && selectedMember && (
         <div className="space-y-6 max-w-5xl">
           <div className="flex justify-between items-center">
@@ -487,12 +482,10 @@ export const AdminTeamPage: React.FC = () => {
               )}
             </div>
 
-            {/* Profile Avatar / Initials */}
             <div className="w-20 h-24 rounded-lg overflow-hidden border border-[#050720]/15 bg-slate-100 flex items-center justify-center">
               {renderAvatar(selectedMember.firstName, selectedMember.lastName, selectedMember.photoUrl)}
             </div>
 
-            {/* Field Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="p-3 bg-white border border-[#050720]/15 rounded-lg">
                 <span className="text-[10px] text-[#050720]/50 block">First Name*</span>
@@ -535,7 +528,6 @@ export const AdminTeamPage: React.FC = () => {
               )}
             </div>
 
-            {/* Courses and Assigned Batches Tags */}
             <div className="space-y-3 pt-2">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block mb-1">Course</span>
@@ -581,22 +573,12 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Leave History Card */}
+          {/* Live Leave History Card */}
           {selectedMember.status === 'Active' && (
             <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-bold font-['Sora']">Leave Record History</h3>
-                <div className="w-28 relative">
-                  <select className="w-full bg-[#F8FAFC] text-xs px-2.5 py-1.5 rounded-lg border border-[#050720]/15 appearance-none focus:outline-none cursor-pointer">
-                    <option>Leave Type</option>
-                    <option>Sick</option>
-                    <option>Casual</option>
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-[#050720]/40 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              </div>
+              <h3 className="text-sm font-bold font-['Sora']">Leave Record History</h3>
 
-              {selectedMember.leaveHistory && selectedMember.leaveHistory.length > 0 ? (
+              {memberLeaves.length > 0 ? (
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-[#050720]/10 text-[#050720] font-bold">
@@ -608,12 +590,12 @@ export const AdminTeamPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#050720]/5 text-[#050720]">
-                    {selectedMember.leaveHistory.map((l) => (
+                    {memberLeaves.map((l) => (
                       <tr key={l.id} className="hover:bg-[#FFB908]/5 transition-colors">
                         <td className="py-3.5 font-medium">{l.leaveType}</td>
-                        <td className="py-3.5 text-[#050720]/80">{l.leaveDate}</td>
-                        <td className="py-3.5 text-[#050720]/80">{l.reason}</td>
-                        <td className="py-3.5 text-[#050720]/80">{l.applicationDate}</td>
+                        <td className="py-3.5 text-[#050720]/80">{l.leaveDate || l.fromDate || '—'}</td>
+                        <td className="py-3.5 text-[#050720]/80">{l.reason || '—'}</td>
+                        <td className="py-3.5 text-[#050720]/80">{l.applicationDate || '—'}</td>
                         <td className="py-3.5 text-right">
                           <span
                             className={`font-semibold ${
@@ -632,24 +614,16 @@ export const AdminTeamPage: React.FC = () => {
                   </tbody>
                 </table>
               ) : (
-                <div className="py-4 text-center text-xs text-[#050720]/40 italic">
+                <div className="py-6 text-center text-xs text-[#050720]/40 italic">
                   No leave records found for this team member.
                 </div>
               )}
-
-              <div className="flex items-center justify-center gap-3 pt-4 text-xs text-[#050720]/70">
-                <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" /></button>
-                <span className="text-[11px] font-semibold text-[#050720]">01 of 10</span>
-                <button className="p-1 hover:text-[#050720] cursor-pointer"><ChevronRight className="w-3.5 h-3.5" /></button>
-              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 3. EDIT MEMBER VIEW                                       */}
-      {/* ========================================================= */}
+      {/* 3. EDIT MEMBER VIEW */}
       {view === 'edit-member' && (
         <div className="space-y-6 max-w-5xl">
           <button
@@ -667,7 +641,6 @@ export const AdminTeamPage: React.FC = () => {
             <span>Edit Member</span>
           </button>
 
-          {/* Personal Details */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-6">
             <h3 className="text-sm font-bold font-['Sora']">Personal Details</h3>
 
@@ -763,7 +736,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Work History */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Work History</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -800,7 +772,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Course Checkboxes */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Course</h3>
             <div className="flex flex-wrap items-center gap-6 text-xs">
@@ -827,7 +798,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-4">
             <button
               onClick={() => setShowRemoveUserModal(true)}
@@ -845,9 +815,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 4. ADD MEMBER - STEP 1: PERSONAL DETAILS                  */}
-      {/* ========================================================= */}
+      {/* 4. ADD DETAILS VIEW */}
       {view === 'add-details' && (
         <div className="space-y-6 max-w-5xl">
           <button
@@ -868,7 +836,6 @@ export const AdminTeamPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-6">
             <h3 className="text-sm font-bold font-['Sora']">Personal Details</h3>
 
-            {/* Photo Upload */}
             <div className="space-y-2">
               <div className="w-20 h-24 rounded-lg border border-[#050720]/15 bg-[#E2E8F0] flex items-center justify-center font-bold text-xs text-[#050720]/40">
                 Photo
@@ -971,7 +938,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Work History */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Work History</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1008,7 +974,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Course Checkboxes */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Course</h3>
             <div className="flex flex-wrap items-center gap-6 text-xs">
@@ -1052,9 +1017,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 5. ADD MEMBER - STEP 2: SET CREDENTIALS                   */}
-      {/* ========================================================= */}
+      {/* 5. ADD CREDENTIALS VIEW */}
       {view === 'add-credentials' && (
         <div className="space-y-6 max-w-4xl">
           <button
@@ -1108,9 +1071,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 6. ADD MEMBER - STEP 3: PREVIEW                          */}
-      {/* ========================================================= */}
+      {/* 6. ADD PREVIEW VIEW */}
       {view === 'add-preview' && (
         <div className="space-y-6 max-w-5xl">
           <button
@@ -1163,7 +1124,6 @@ export const AdminTeamPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Tags */}
             <div className="space-y-3 pt-2">
               <div>
                 <span className="text-[10px] text-[#050720]/50 block mb-1">Course</span>
@@ -1174,7 +1134,6 @@ export const AdminTeamPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Work History */}
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold font-['Sora']">Work History</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
@@ -1202,11 +1161,7 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 7. MODALS & POPUPS                                        */}
-      {/* ========================================================= */}
-
-      {/* A. UNSAVED CHANGES WARNING MODAL */}
+      {/* MODALS */}
       {showUnsavedModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -1244,7 +1199,6 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* B. RESTORE ACCESS CONFIRMATION MODAL */}
       {showRestoreModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -1270,7 +1224,6 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* C. ACCESS RESTORED NOTIFICATION */}
       {showAccessRestoredAlert && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-1.5 shadow-2xl">
@@ -1280,7 +1233,6 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* D. REMOVE USER MODAL */}
       {showRemoveUserModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-7 max-w-md w-full space-y-4 shadow-2xl">
@@ -1312,7 +1264,6 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* E. USER HAS BEEN REMOVED CONFIRMATION POPUP */}
       {showUserRemovedAlert && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
@@ -1321,7 +1272,6 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* F. SEND CREDENTIALS CONFIRMATION MODAL */}
       {showSendCredentialsModal && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
@@ -1347,7 +1297,6 @@ export const AdminTeamPage: React.FC = () => {
         </div>
       )}
 
-      {/* G. CREDENTIALS SENT CONFIRMATION POPUP */}
       {showCredentialsSentAlert && (
         <div className="fixed inset-0 z-50 bg-[#050720]/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-1.5 shadow-2xl">
@@ -1356,7 +1305,6 @@ export const AdminTeamPage: React.FC = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };
