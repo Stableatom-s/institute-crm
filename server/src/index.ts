@@ -3,12 +3,13 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
-// Route imports - including the missing auth routes!
+// Route imports
 import authRoutes from './routes/auth';
 import { leadRoutes } from './routes/leads';
 import { demoRoutes } from './routes/demo';
 import { invoiceRoutes } from './routes/invoices';
 import { attendanceRoutes } from './routes/attendance';
+import { leaveRoutes } from './routes/leaves'; // <-- Added leaveRoutes import
 import { batchRoutes } from './routes/batches';
 import { teamRoutes } from './routes/team';
 
@@ -64,6 +65,7 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/demos', demoRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/leaves', leaveRoutes); // <-- Mounted /api/leaves
 if (batchRoutes) app.use('/api/batches', batchRoutes);
 if (teamRoutes) app.use('/api/team', teamRoutes);
 
