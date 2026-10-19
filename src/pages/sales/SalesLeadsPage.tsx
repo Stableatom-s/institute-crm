@@ -851,6 +851,7 @@ export const SalesLeadsPage: React.FC = () => {
                 "Full-stack Development",
                 "Portfolio Building",
                 "React Native",
+                "React",
               ].map((c) => (
                 <label key={c} className="flex items-center gap-2 cursor-pointer">
                   <div

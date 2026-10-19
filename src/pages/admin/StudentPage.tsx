@@ -30,7 +30,7 @@ interface StudentRecord {
   lectures: AttendanceLecture[];
 }
 
-const COURSES = ['All', 'UI/UX Design', 'No Code', 'Full Stack', 'Full-stack Development', 'Portfolio'];
+const COURSES = ['All', 'UI/UX Design', 'No Code', 'Full Stack', 'React Native', 'React', 'Portfolio'];
 
 export const AdminStudentPage: React.FC = () => {
   const [view, setView] = useState<'list' | 'details'>('list');

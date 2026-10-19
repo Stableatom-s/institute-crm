@@ -291,6 +291,8 @@ export const FacultyBatchesPage: React.FC = () => {
                 <option value="No Code">No Code</option>
                 <option value="Full Stack">Full Stack</option>
                 <option value="Portfolio">Portfolio</option>
+                <option value="React Native">React Native</option>
+                <option value="React">React</option>
               </select>
             </div>
 

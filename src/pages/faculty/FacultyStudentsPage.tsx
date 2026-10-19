@@ -181,6 +181,7 @@ export const FacultyStudentsPage: React.FC = () => {
                 <option value="Portfolio">Portfolio</option>
                 <option value="Full Stack">Full Stack</option>
                 <option value="React Native">React Native</option>
+                <option value="React">React</option>
               </select>
             </div>
 

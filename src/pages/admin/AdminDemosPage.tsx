@@ -3,7 +3,7 @@ import { ArrowLeft, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lu
 import { demoService, DemoItem, DemoTab } from '../../services/demoService';
 
 const MODES = ['Mode', 'Online', 'Offline'];
-const COURSES = ['Course', 'UI/UX Design', 'No Code', 'Portfolio', 'Full-Stack'];
+const COURSES = ['Course', 'UI/UX Design', 'No Code', 'Portfolio', 'Full-Stack','React Native', 'React'];
 
 export const AdminDemosPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DemoTab>('Scheduled');

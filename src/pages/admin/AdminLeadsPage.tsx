@@ -46,7 +46,7 @@ export interface DetailedLead {
   timeline: TimelineEntry[];
 }
 
-const COURSES = ['Course', 'UI/UX Design', 'No Code', 'Portfolio', 'Full-Stack', 'React Native'];
+const COURSES = ['Course', 'UI/UX Design', 'No Code', 'Portfolio', 'Full-Stack', 'React Native', 'React'];
 const STATUSES = ['Status', 'Interested', 'Not Interested', 'Demo Scheduled', 'Enrolled'];
 
 export const AdminLeadsPage: React.FC = () => {
@@ -804,7 +804,7 @@ export const AdminLeadsPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-[#050720]/10 p-6 shadow-xs space-y-3">
             <h3 className="text-sm font-bold font-['Sora']">Course</h3>
             <div className="flex flex-wrap items-center gap-6 text-xs">
-              {['UI/UX Design', 'No code Development', 'Full-stack Development', 'Portfolio Building', 'React Native'].map((c) => (
+              {['UI/UX Design', 'No code Development', 'Full-stack Development', 'Portfolio Building', 'React Native','React'].map((c) => (
                 <label key={c} className="flex items-center gap-2 cursor-pointer">
                   <div
                     onClick={() => toggleCourseCheckbox(c)}

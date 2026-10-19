@@ -22,6 +22,7 @@ const COURSES = [
   "Portfolio",
   "Full-Stack",
   "React Native",
+  "React",
 ];
 const TIME_SLOTS = [
   "11:00 - 12:00",

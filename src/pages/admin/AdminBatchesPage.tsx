@@ -20,6 +20,8 @@ const COURSES = [
   "No Code",
   "Full-Stack",
   "Portfolio",
+  "React Native",
+  "React",
 ];
 
 export const AdminBatchPage: React.FC = () => {

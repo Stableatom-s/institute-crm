@@ -32,7 +32,8 @@ const COURSES = [
   'No Code',
   'Full Stack',
   'Portfolio',
-  'React Native'
+  'React Native',
+  'React'
 ];
 
 const ALL_MONTHS = [
