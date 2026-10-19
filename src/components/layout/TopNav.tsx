@@ -5,6 +5,7 @@ import { LogoutModal } from '../modals/LogoutModal';
 import { batchService, BatchItem } from '../../services/batchService';
 import { demoService, DemoItem } from '../../services/demoService';
 import { leadService } from '../../services/leadService';
+import { attendanceService } from '../../services/attendanceService';
 import { useAuth } from '../../context/AuthContext';
 
 interface SearchResult {
@@ -38,7 +39,8 @@ export const TopNav: React.FC = () => {
   const isFaculty = userRole === 'faculty';
   const isSales = userRole === 'sales' || userRole.includes('sales');
 
-  const [inTime, setInTime] = useState<string>('09:30 AM');
+  // No hardcoded default time; clean fallback until resolved
+  const [inTime, setInTime] = useState<string>('-');
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
 
   // Search State
@@ -48,21 +50,65 @@ export const TopNav: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Synchronize In-Time scoped strictly to current user & today's date
   useEffect(() => {
-    const savedTime = localStorage.getItem('radiquolab_punch_in');
-    if (savedTime) {
-      setInTime(savedTime);
-    } else {
+    if (!currentUserName) return;
+
+    const todayStr = new Date()
+      .toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+      .replace(/\//g, '-');
+
+    const userKey = currentUserName.replace(/\s+/g, '_');
+    const userInKey = `radiquolab_punch_in_${userKey}_${todayStr}`;
+
+    const resolveInTime = async () => {
+      // 1. Check user-specific localStorage for today
+      const localPunch = localStorage.getItem(userInKey);
+      if (localPunch) {
+        setInTime(localPunch);
+        return;
+      }
+
+      // 2. Check live backend records for today
+      try {
+        const records = await attendanceService.getMyAttendance(activeUser?.name);
+        const todayRecord = records.find((r) => r.date === todayStr);
+
+        if (todayRecord && todayRecord.inTime && todayRecord.inTime !== '-') {
+          setInTime(todayRecord.inTime);
+          localStorage.setItem(userInKey, todayRecord.inTime);
+          return;
+        }
+      } catch (err) {
+        console.warn('Could not fetch remote attendance punch:', err);
+      }
+
+      // 3. First login of the day for this user: register current time
       const now = new Date();
       const formatted = now.toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
         hour12: true,
       });
-      localStorage.setItem('radiquolab_punch_in', formatted);
+
+      localStorage.setItem(userInKey, formatted);
       setInTime(formatted);
-    }
-  }, []);
+
+      // Persist to backend without overwriting checkout
+      attendanceService
+        .clockIn(formatted, todayStr, {
+          userName: activeUser?.name || 'Staff Member',
+          userRole: activeUser?.role || 'Faculty',
+        })
+        .catch(() => {});
+    };
+
+    resolveInTime();
+  }, [currentUserName]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -94,7 +140,7 @@ export const TopNav: React.FC = () => {
           leadService.getAllLeads().catch(() => [] as any[]),
         ]);
 
-        // 1. FILTER BATCHES & STUDENTS BASED ON USER ROLE
+        // 1. Filter Batches & Students
         const visibleBatches = batches.filter((batch) => {
           if (isAdmin) return true;
           if (isFaculty) {
@@ -105,7 +151,7 @@ export const TopNav: React.FC = () => {
               currentUserName.includes(batchFac)
             );
           }
-          return true; // Sales can view batches for enrollment context
+          return true;
         });
 
         visibleBatches.forEach((batch) => {
@@ -123,7 +169,6 @@ export const TopNav: React.FC = () => {
             });
           }
 
-          // Search students strictly within the batches visible to this user
           (batch.students || []).forEach((st: any) => {
             const stName = (st.name || `${st.firstName || ''} ${st.lastName || ''}`).trim();
             if (
@@ -141,7 +186,7 @@ export const TopNav: React.FC = () => {
           });
         });
 
-        // 2. FILTER DEMOS BASED ON USER ROLE
+        // 2. Filter Demos
         const visibleDemos = demos.filter((demo) => {
           if (isAdmin) return true;
           if (isFaculty) {
@@ -153,7 +198,6 @@ export const TopNav: React.FC = () => {
             );
           }
           if (isSales) {
-            // Only show demos that match this salesperson's assigned leads
             const matchingLead = leads.find((l) => {
               const leadFullName = `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase();
               const demoFullName = `${demo.name || ''} ${demo.lastName || ''}`.trim().toLowerCase();
@@ -183,7 +227,7 @@ export const TopNav: React.FC = () => {
           }
         });
 
-        // 3. FILTER LEADS (ONLY ACCESSIBLE TO ADMIN AND SALES; FACULTY CANNOT SEARCH LEADS)
+        // 3. Filter Leads
         if (!isFaculty) {
           const visibleLeads = leads.filter((l) => {
             if (isAdmin) return true;

@@ -119,7 +119,33 @@ export const AdminAttendancePage: React.FC = () => {
       const data = await attendanceService.getAllEmployeeAttendance();
 
       if (Array.isArray(data) && data.length > 0) {
-        const mapped: EmployeeAttendance[] = data.map((item: any, idx: number) => {
+        // 1. Exclude Admin & Super Admin records completely
+        const staffOnly = data.filter((item: any) => {
+          const role = (item.userRole || '').toLowerCase();
+          const name = (item.userName || '').toLowerCase();
+          return !role.includes('admin') && !name.includes('admin');
+        });
+
+        // 2. Deduplicate: Retain one row per employee per day, prioritizing checked-out records
+        const uniqueByEmployee = new Map<string, any>();
+
+        staffOnly.forEach((item: any) => {
+          const empKey = `${(item.userName || '').trim().toLowerCase()}_${item.date || ''}`;
+          const existing = uniqueByEmployee.get(empKey);
+
+          if (!existing) {
+            uniqueByEmployee.set(empKey, item);
+          } else {
+            const hasOutTime = item.outTime && item.outTime !== '-' && item.outTime !== 'Yet to checkout' && item.outTime !== 'Yet to clock out';
+            if (hasOutTime) {
+              uniqueByEmployee.set(empKey, item);
+            }
+          }
+        });
+
+        const deduplicatedList = Array.from(uniqueByEmployee.values());
+
+        const mapped: EmployeeAttendance[] = deduplicatedList.map((item: any, idx: number) => {
           const roleDisplay = (item.userRole || '').toLowerCase().includes('sales') ? 'Salesperson' : 'Faculty';
           const clockInTime = item.inTime && item.inTime !== '-' ? item.inTime : '-';
           const clockOutTime = item.outTime && item.outTime !== 'Yet to checkout' && item.outTime !== 'Yet to clock out' 
@@ -156,8 +182,9 @@ export const AdminAttendancePage: React.FC = () => {
             leaveHistory: item.leaveHistory || [],
           };
         });
+
         setEmployees(mapped);
-        if (!selectedEmployee) setSelectedEmployee(mapped[0]);
+        if (!selectedEmployee && mapped.length > 0) setSelectedEmployee(mapped[0]);
       } else {
         setEmployees([]);
         setSelectedEmployee(null);
